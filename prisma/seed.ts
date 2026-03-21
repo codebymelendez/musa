@@ -4,7 +4,7 @@ const prisma = new PrismaClient()
 
 async function main() {
   console.log('Seeding plans...')
-  
+
   const freePlan = await prisma.plan.upsert({
     where: { name: 'FREE' },
     update: {},
@@ -34,8 +34,6 @@ async function main() {
       }
     }
   })
-
-  console.log({ freePlan, proPlan })
 }
 
 main()
