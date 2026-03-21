@@ -1,5 +1,6 @@
 // POST /api/public/[slug]/book
 // Crear reserva pública (sin autenticación del profesional).
+export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";

@@ -1,5 +1,6 @@
 // GET  /api/services
 // POST /api/services
+export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";

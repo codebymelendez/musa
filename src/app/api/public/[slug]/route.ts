@@ -1,5 +1,6 @@
 // GET /api/public/[slug]?date=YYYY-MM-DD&serviceId=...
 // Devuelve perfil público + servicios + slots disponibles en una fecha dada.
+export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";

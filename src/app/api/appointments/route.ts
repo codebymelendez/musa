@@ -1,5 +1,6 @@
 // GET  /api/appointments?date=YYYY-MM-DD&from=ISO&to=ISO
 // POST /api/appointments
+export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";

@@ -1,5 +1,6 @@
 // GET  /api/notifications        – lista notificaciones del usuario autenticado
 // PATCH /api/notifications        – marca notificación(es) como leídas
+export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";

@@ -3,10 +3,11 @@ import { prisma } from "@/lib/prisma";
 
 const publicVapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
 const privateVapidKey = process.env.VAPID_PRIVATE_KEY || "";
+const vapidEmail = process.env.VAPID_EMAIL || "mailto:soporte@musa.app";
 
 if (publicVapidKey && privateVapidKey) {
   webpush.setVapidDetails(
-    "mailto:soporte@musa.com",
+    vapidEmail,
     publicVapidKey,
     privateVapidKey
   );

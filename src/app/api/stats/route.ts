@@ -1,4 +1,5 @@
 // GET /api/stats?period=month&year=2025&month=3
+export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";

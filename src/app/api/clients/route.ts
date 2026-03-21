@@ -1,5 +1,6 @@
 // GET  /api/clients?search=texto
 // POST /api/clients
+export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";

@@ -1,6 +1,7 @@
 // GET    /api/appointments/[id]
 // PATCH  /api/appointments/[id]  – actualizar estado, notas, pago
 // DELETE /api/appointments/[id]
+export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
