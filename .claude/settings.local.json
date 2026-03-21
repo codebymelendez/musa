@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npx prisma:*)",
+      "Bash(npx next:*)",
+      "Bash(node -e \"console.log\\(require\\(''zod/package.json''\\).version\\)\")",
+      "Bash(xargs sed:*)",
+      "Bash(npm run:*)",
+      "Bash(node -e \"require\\(''web-push''\\)\")",
+      "Bash(node -e \"require\\(''nanoid''\\)\")",
+      "Bash(node -e \"const webpush = require\\(''web-push''\\); const keys = webpush.generateVAPIDKeys\\(\\); console.log\\(''NEXT_PUBLIC_VAPID_PUBLIC_KEY='' + keys.publicKey\\); console.log\\(''VAPID_PRIVATE_KEY='' + keys.privateKey\\);\")"
+    ]
+  }
+}

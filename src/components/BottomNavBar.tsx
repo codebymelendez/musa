@@ -11,7 +11,10 @@ export default function BottomNavBar() {
   if (
     pathname === "/" ||
     pathname === "/login" ||
-    pathname.startsWith("/booking")
+    pathname.startsWith("/booking") ||
+    pathname.startsWith("/p/") ||
+    pathname.startsWith("/staff/join") ||
+    pathname === "/onboarding"
   ) {
     return null;
   }

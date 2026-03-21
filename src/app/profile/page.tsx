@@ -1,131 +1,385 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
+import { useAppStore } from "@/store/useAppStore";
+import { User, ProfessionalSettings } from "@/types";
+import { formatCurrency } from "@/lib/utils";
+
+const DAY_NAMES = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
 export default function Profile() {
+  const { user: storeUser, logout, loadUser } = useAuth();
+  const { setUser } = useAppStore();
+  const router = useRouter();
+  const [user, setLocalUser] = useState<User | null>(storeUser);
+  const [editMode, setEditMode] = useState<"none" | "profile" | "hours" | "contact" | "business">("none");
+  const [saving, setSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Form state
+  const [formName, setFormName] = useState("");
+  const [formBio, setFormBio] = useState("");
+  const [formWhatsapp, setFormWhatsapp] = useState("");
+  const [formInstagram, setFormInstagram] = useState("");
+  const [formStartHour, setFormStartHour] = useState(9);
+  const [formEndHour, setFormEndHour] = useState(18);
+  const [formWorkDays, setFormWorkDays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [formBusinessName, setFormBusinessName] = useState("");
+  const [formCity, setFormCity] = useState("");
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const u = await loadUser();
+      if (u) {
+        setLocalUser(u);
+        setUser(u);
+        fillForm(u);
+      }
+    };
+    fetchUser();
+  }, []);
+
+  const fillForm = (u: User) => {
+    setFormName(u.name ?? "");
+    setFormBio(u.bio ?? "");
+    setFormWhatsapp(u.whatsapp ?? "");
+    setFormInstagram(u.instagram ?? "");
+    setFormBusinessName(u.business?.name ?? "");
+    setFormCity(u.business?.city ?? "");
+    if (u.settings) {
+      setFormStartHour(u.settings.startHour);
+      setFormEndHour(u.settings.endHour);
+      setFormWorkDays(u.settings.workDays);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const payload: Record<string, unknown> = {};
+
+      if (editMode === "profile") {
+        payload.name = formName;
+        payload.bio = formBio;
+      } else if (editMode === "hours") {
+        payload.settings = {
+          workDays: formWorkDays,
+          startHour: formStartHour,
+          endHour: formEndHour,
+        };
+      } else if (editMode === "contact") {
+        payload.whatsapp = formWhatsapp;
+        payload.instagram = formInstagram;
+      } else if (editMode === "business") {
+        payload.businessName = formBusinessName;
+        payload.city = formCity;
+      }
+
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const updated = await res.json();
+      if (res.ok) {
+        const newUser = {
+          ...updated,
+          settings: updated.settings
+            ? { ...updated.settings, workDays: updated.settings.workDays }
+            : null,
+        } as User;
+        setLocalUser(newUser);
+        setUser(newUser);
+      }
+      setEditMode("none");
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleWorkDay = (day: number) => {
+    setFormWorkDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()
+    );
+  };
+
+  const bookingLink = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/p/${user?.slug ?? ""}`;
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(bookingLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const settings = user?.settings as ProfessionalSettings | null;
+
   return (
     <main className="max-w-screen-md mx-auto px-6 pt-24 space-y-8 pb-32">
-      {/* Profile Header Section */}
+      {/* Profile Header */}
       <section className="flex flex-col items-center text-center space-y-4">
         <div className="relative">
-          <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-surface-container-lowest shadow-sm relative">
-            <Image
-              className="object-cover"
-              alt="Ana Lopez stylist professional profile"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuCJS_mVOOFGTy9oELG6bXOVKXdM8RLvm8OqY0YtdyUKEoh1ty0UIUn4cXVWy9A4XiKaDUdaAh8fmcxn_rCrPzg6fhESHcT9OUXs3Wy1xUYKSxgBGjMjWxOrxQk0_IvZhCyDy1zzh7MWb-sucm6L0MGJg6AnslhRfCXaIObsgbFABvcJPLlOY3l2IpTx_Ocbr1W99GfeAwXb1lz45GCcIws6V0UcX-_ZXu5Mi64wbKr0jlKh3asqAMcTnU3ra44q5I64bz0Fr0J9Jnk8"
-              fill
-            />
+          <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-surface-container-lowest shadow-sm relative bg-surface-container-high">
+            {user?.avatarUrl ? (
+              <Image className="object-cover" alt="Foto de perfil" src={user.avatarUrl} fill />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <span className="material-symbols-outlined text-5xl text-on-surface-variant">person</span>
+              </div>
+            )}
           </div>
-          <button className="absolute bottom-1 right-1 bg-primary text-on-primary p-2 rounded-full shadow-lg border-2 border-surface-container-lowest active:scale-95 transition-transform">
+          <button
+            onClick={() => { setEditMode("profile"); fillForm(user!); }}
+            className="absolute bottom-1 right-1 bg-primary text-on-primary p-2 rounded-full shadow-lg border-2 border-surface-container-lowest active:scale-95 transition-transform"
+          >
             <span className="material-symbols-outlined text-sm">edit</span>
           </button>
         </div>
         <div>
           <h2 className="text-2xl font-extrabold text-on-surface tracking-tight">
-            Ana Lopez
+            {user?.name ?? "Tu nombre"}
           </h2>
-          <p className="text-on-surface-variant font-medium">Estilista Senior</p>
+          <p className="text-on-surface-variant font-medium capitalize">
+            {user?.serviceType ?? "Profesional de belleza"}
+          </p>
+          {user?.bio && (
+            <p className="text-on-surface-variant text-sm mt-2 max-w-xs">{user.bio}</p>
+          )}
         </div>
       </section>
 
-      {/* Bento Grid: Mi Negocio */}
+      {/* Edit Profile Modal */}
+      {editMode === "profile" && (
+        <div className="fixed inset-0 z-[100] bg-surface/95 backdrop-blur-md flex items-end sm:items-center justify-center">
+          <div className="bg-surface-container-lowest w-full max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] p-8 space-y-5">
+            <div className="flex items-center justify-between">
+              <h3 className="font-headline text-xl font-bold">Editar Perfil</h3>
+              <button onClick={() => setEditMode("none")} className="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="Tu nombre" className="w-full h-12 px-4 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface" />
+            <textarea value={formBio} onChange={(e) => setFormBio(e.target.value)} placeholder="Descripción de tu negocio..." rows={3} className="w-full px-4 py-3 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface text-sm resize-none" />
+            <button onClick={handleSave} disabled={saving} className="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white font-bold rounded-full">
+              {saving ? "Guardando..." : "Guardar"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Business Modal */}
+      {editMode === "business" && (
+        <div className="fixed inset-0 z-[100] bg-surface/95 backdrop-blur-md flex items-end sm:items-center justify-center">
+          <div className="bg-surface-container-lowest w-full max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] p-8 space-y-5">
+            <div className="flex items-center justify-between">
+              <h3 className="font-headline text-xl font-bold">Editar Negocio</h3>
+              <button onClick={() => setEditMode("none")} className="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Nombre del Negocio</label>
+              <input type="text" value={formBusinessName} onChange={(e) => setFormBusinessName(e.target.value)} placeholder="Ej. Aurora Atelier" className="w-full h-12 px-4 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Ciudad</label>
+              <input type="text" value={formCity} onChange={(e) => setFormCity(e.target.value)} placeholder="Ej. Caracas" className="w-full h-12 px-4 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface" />
+            </div>
+            <button onClick={handleSave} disabled={saving || !formBusinessName} className="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white font-bold rounded-full disabled:opacity-50">
+              {saving ? "Guardando..." : "Guardar"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bento Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Horario Card */}
-        <section className="bg-surface-container-lowest rounded-xl p-6 space-y-4 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border-l-4 border-primary">
+        {/* Negocio */}
+        {user?.role === "OWNER" && (
+          <section className="bg-surface-container-lowest rounded-xl p-6 space-y-4 shadow-sm border-l-4 border-secondary md:col-span-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-secondary">storefront</span>
+                <h3 className="font-bold text-on-surface">Mi Negocio</h3>
+              </div>
+              <button
+                onClick={() => { setEditMode("business"); fillForm(user!); }}
+                className="p-2 rounded-full bg-secondary/10 text-secondary hover:bg-secondary/20 transition-colors"
+              >
+                <span className="material-symbols-outlined text-sm">edit</span>
+              </button>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <div className="flex-1">
+                <p className="text-xl font-extrabold text-on-surface">{user.business?.name ?? "Sin nombre"}</p>
+                <p className="text-sm text-on-surface-variant">{user.business?.city ?? "Ciudad no configurada"}</p>
+              </div>
+              <span className="self-start sm:self-auto px-3 py-1 bg-secondary-container text-on-secondary-container rounded-full text-xs font-bold uppercase">
+                Plan {user.business?.plan?.name ?? "FREE"}
+              </span>
+            </div>
+          </section>
+        )}
+
+        {/* Horarios */}
+        <section className="bg-surface-container-lowest rounded-xl p-6 space-y-4 shadow-sm border-l-4 border-primary">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">
-              schedule
-            </span>
-            <h3 className="font-bold text-on-surface">Mi Negocio</h3>
+            <span className="material-symbols-outlined text-primary">schedule</span>
+            <h3 className="font-bold text-on-surface">Mi Horario</h3>
           </div>
           <div className="space-y-3">
             <div className="flex justify-between items-center py-2 border-b border-outline-variant/10">
               <span className="text-sm font-medium text-on-surface-variant">
-                Lunes a Viernes
+                Días laborables
               </span>
               <span className="text-sm font-bold text-on-surface">
-                9:00 - 18:00h
+                {settings?.workDays.map((d) => DAY_NAMES[d]).join(", ") ?? "Lun–Vie"}
               </span>
             </div>
             <div className="flex justify-between items-center py-2">
-              <span className="text-sm font-medium text-on-surface-variant">
-                Sábado y Domingo
+              <span className="text-sm font-medium text-on-surface-variant">Horario</span>
+              <span className="text-sm font-bold text-on-surface">
+                {settings ? `${settings.startHour}:00 – ${settings.endHour}:00` : "9:00 – 18:00"}
               </span>
-              <span className="text-sm font-bold text-error">Cerrado</span>
             </div>
           </div>
-          <button className="w-full py-2.5 text-sm font-semibold text-primary bg-primary/5 rounded-full hover:bg-primary/10 transition-colors">
+          <button
+            onClick={() => { setEditMode("hours"); }}
+            className="w-full py-2.5 text-sm font-semibold text-primary bg-primary/5 rounded-full hover:bg-primary/10 transition-colors"
+          >
             Editar Horarios
           </button>
         </section>
 
-        {/* Contacto Card */}
-        <section className="bg-surface-container-lowest rounded-xl p-6 space-y-4 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border-l-4 border-tertiary">
+        {/* Contacto */}
+        <section className="bg-surface-container-lowest rounded-xl p-6 space-y-4 shadow-sm border-l-4 border-tertiary">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-tertiary">
-              contact_support
-            </span>
+            <span className="material-symbols-outlined text-tertiary">contact_support</span>
             <h3 className="font-bold text-on-surface">Canales de Contacto</h3>
           </div>
           <div className="space-y-3">
             <div className="flex items-center gap-4 p-3 bg-surface-container-low rounded-lg">
-              <span className="material-symbols-outlined text-[#25D366]">
-                chat
-              </span>
+              <span className="material-symbols-outlined text-[#25D366]">chat</span>
               <div className="flex-1">
-                <p className="text-xs text-on-surface-variant font-medium">
-                  WhatsApp
-                </p>
-                <p className="text-sm font-bold text-on-surface">
-                  +34 600 000 000
+                <p className="text-xs text-on-surface-variant font-medium">WhatsApp</p>
+                <p className="text-sm font-bold text-on-surface truncate">
+                  {user?.whatsapp ?? "No configurado"}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-4 p-3 bg-surface-container-low rounded-lg">
-              <span className="material-symbols-outlined text-[#E1306C]">
-                photo_camera
-              </span>
+              <span className="material-symbols-outlined text-[#E1306C]">photo_camera</span>
               <div className="flex-1">
-                <p className="text-xs text-on-surface-variant font-medium">
-                  Instagram
-                </p>
-                <p className="text-sm font-bold text-on-surface">
-                  @ana_beauty_studio
+                <p className="text-xs text-on-surface-variant font-medium">Instagram</p>
+                <p className="text-sm font-bold text-on-surface truncate">
+                  {user?.instagram ? `@${user.instagram.replace("@", "")}` : "No configurado"}
                 </p>
               </div>
             </div>
           </div>
+          <button
+            onClick={() => setEditMode("contact")}
+            className="w-full py-2.5 text-sm font-semibold text-tertiary bg-tertiary/5 rounded-full hover:bg-tertiary/10 transition-colors"
+          >
+            Editar Contacto
+          </button>
         </section>
       </div>
 
-      {/* Enlace de Reserva: Glassmorphism effect card */}
+      {/* Edit Hours Modal */}
+      {editMode === "hours" && (
+        <div className="fixed inset-0 z-[100] bg-surface/95 backdrop-blur-md flex items-end sm:items-center justify-center">
+          <div className="bg-surface-container-lowest w-full max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] p-8 space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h3 className="font-headline text-xl font-bold">Editar Horarios</h3>
+              <button onClick={() => setEditMode("none")} className="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-on-surface-variant uppercase tracking-wider">Días disponibles</label>
+              <div className="flex gap-2 flex-wrap">
+                {DAY_NAMES.map((name, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => toggleWorkDay(idx)}
+                    className={`w-10 h-10 rounded-full text-sm font-bold transition-colors ${formWorkDays.includes(idx) ? "bg-primary text-on-primary" : "bg-surface-container-low text-on-surface-variant"}`}
+                  >
+                    {name[0]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-on-surface-variant uppercase tracking-wider">Hora inicio</label>
+                <input type="number" value={formStartHour} onChange={(e) => setFormStartHour(parseInt(e.target.value))} min={0} max={23} className="w-full h-12 px-4 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-on-surface-variant uppercase tracking-wider">Hora cierre</label>
+                <input type="number" value={formEndHour} onChange={(e) => setFormEndHour(parseInt(e.target.value))} min={1} max={24} className="w-full h-12 px-4 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface" />
+              </div>
+            </div>
+            <button onClick={handleSave} disabled={saving} className="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white font-bold rounded-full">
+              {saving ? "Guardando..." : "Guardar"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Contact Modal */}
+      {editMode === "contact" && (
+        <div className="fixed inset-0 z-[100] bg-surface/95 backdrop-blur-md flex items-end sm:items-center justify-center">
+          <div className="bg-surface-container-lowest w-full max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] p-8 space-y-5">
+            <div className="flex items-center justify-between">
+              <h3 className="font-headline text-xl font-bold">Editar Contacto</h3>
+              <button onClick={() => setEditMode("none")} className="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-on-surface-variant uppercase tracking-wider">WhatsApp</label>
+              <input type="tel" value={formWhatsapp} onChange={(e) => setFormWhatsapp(e.target.value)} placeholder="+58 412 000 0000" className="w-full h-12 px-4 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-on-surface-variant uppercase tracking-wider">Instagram</label>
+              <input type="text" value={formInstagram} onChange={(e) => setFormInstagram(e.target.value)} placeholder="@tu_usuario" className="w-full h-12 px-4 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface" />
+            </div>
+            <button onClick={handleSave} disabled={saving} className="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white font-bold rounded-full">
+              {saving ? "Guardando..." : "Guardar"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Enlace de Reserva */}
       <section className="relative overflow-hidden bg-primary/5 rounded-2xl p-6 border border-primary/10">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-1">
-            <h3 className="text-lg font-bold text-primary">
-              Enlace de Reserva
-            </h3>
+            <h3 className="text-lg font-bold text-primary">Enlace de Reserva</h3>
             <p className="text-sm text-on-surface-variant">
-              Comparte este link con tus clientes para recibir citas directas.
+              Comparte este link con tus clientes para recibir citas.
             </p>
           </div>
           <div className="flex items-center gap-3">
             <div className="px-4 py-2 bg-white rounded-lg border border-outline-variant/30 text-sm font-mono text-on-surface-variant truncate max-w-[180px]">
-              aura.pro/ana-lopez
+              /p/{user?.slug ?? "tu-nombre"}
             </div>
-            <button className="bg-primary hover:bg-primary-container text-on-primary px-6 py-2 rounded-full font-bold text-sm shadow-md transition-all active:scale-95 flex items-center gap-2">
+            <button
+              onClick={handleCopy}
+              className="bg-primary hover:bg-primary-container text-on-primary px-6 py-2 rounded-full font-bold text-sm shadow-md transition-all active:scale-95 flex items-center gap-2"
+            >
               <span className="material-symbols-outlined text-sm">
-                content_copy
+                {copied ? "check" : "content_copy"}
               </span>
-              Copiar
+              {copied ? "¡Copiado!" : "Copiar"}
             </button>
           </div>
-        </div>
-        <div className="mt-4 flex items-center justify-center p-4 bg-white/40 backdrop-blur-sm rounded-xl border border-white/50 cursor-pointer">
-          <button className="text-primary font-bold text-sm flex items-center gap-2">
-            <span className="material-symbols-outlined">visibility</span>
-            Previsualizar mi perfil público
-          </button>
         </div>
       </section>
 
@@ -135,43 +389,27 @@ export default function Profile() {
           <h3 className="font-bold text-on-surface">Gestión de Cuenta</h3>
         </div>
         <div className="divide-y divide-outline-variant/10">
-          <div className="flex items-center justify-between px-6 py-4 hover:bg-black/5 transition-colors cursor-pointer">
+          <div
+            onClick={() => router.push("/settings/plans")}
+            className="flex items-center justify-between px-6 py-4 hover:bg-black/5 transition-colors cursor-pointer"
+          >
             <div className="flex items-center gap-4">
-              <span className="material-symbols-outlined text-on-surface-variant">
-                language
-              </span>
-              <div>
-                <p className="text-sm font-bold text-on-surface">Idioma</p>
-                <p className="text-xs text-on-surface-variant">
-                  Español (España)
-                </p>
-              </div>
-            </div>
-            <span className="material-symbols-outlined text-on-surface-variant">
-              chevron_right
-            </span>
-          </div>
-          <div className="flex items-center justify-between px-6 py-4 hover:bg-black/5 transition-colors cursor-pointer">
-            <div className="flex items-center gap-4">
-              <span className="material-symbols-outlined text-on-surface-variant">
-                stars
-              </span>
+              <span className="material-symbols-outlined text-on-surface-variant">stars</span>
               <div>
                 <p className="text-sm font-bold text-on-surface">Mi Plan</p>
-                <p className="text-xs text-primary font-bold">
-                  Plan Pro (Renueva en 15 días)
+                <p className="text-xs text-primary font-bold capitalize">
+                  Plan {user?.business?.plan?.name ?? "FREE"}
                 </p>
               </div>
             </div>
-            <span className="material-symbols-outlined text-on-surface-variant">
-              chevron_right
-            </span>
+            <span className="material-symbols-outlined text-on-surface-variant">chevron_right</span>
           </div>
-          <div className="flex items-center justify-between px-6 py-4 hover:bg-error/5 transition-colors cursor-pointer group">
+          <div
+            onClick={logout}
+            className="flex items-center justify-between px-6 py-4 hover:bg-error/5 transition-colors cursor-pointer group"
+          >
             <div className="flex items-center gap-4">
-              <span className="material-symbols-outlined text-error">
-                logout
-              </span>
+              <span className="material-symbols-outlined text-error">logout</span>
               <p className="text-sm font-bold text-error">Cerrar Sesión</p>
             </div>
           </div>

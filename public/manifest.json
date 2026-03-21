@@ -1,0 +1,41 @@
+{
+  "name": "Musa – Gestión de Belleza",
+  "short_name": "Musa",
+  "description": "Gestiona tu agenda de citas como profesional independiente de belleza",
+  "start_url": "/home",
+  "display": "standalone",
+  "background_color": "#FFFBFE",
+  "theme_color": "#764797",
+  "orientation": "portrait",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nueva Cita",
+      "short_name": "Nueva Cita",
+      "description": "Agregar una cita rápidamente",
+      "url": "/home",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Mi Agenda",
+      "short_name": "Agenda",
+      "description": "Ver las citas de hoy",
+      "url": "/calendar",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
