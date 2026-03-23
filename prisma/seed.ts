@@ -7,14 +7,22 @@ async function main() {
 
   const freePlan = await prisma.plan.upsert({
     where: { name: 'FREE' },
-    update: {},
+    update: {
+      price: 0,
+      currency: 'Bs',
+      limits: {
+        maxStaff: 1,
+        maxMonthlyAppointments: 20,
+        features: []
+      }
+    },
     create: {
       name: 'FREE',
       price: 0,
-      currency: 'USD',
+      currency: 'Bs',
       limits: {
         maxStaff: 1,
-        maxMonthlyAppointments: 30,
+        maxMonthlyAppointments: 20,
         features: []
       }
     }
@@ -22,18 +30,50 @@ async function main() {
 
   const proPlan = await prisma.plan.upsert({
     where: { name: 'PRO' },
-    update: {},
-    create: {
-      name: 'PRO',
-      price: 15,
+    update: {
+      price: 8,
       currency: 'USD',
       limits: {
-        maxStaff: 5,
-        maxMonthlyAppointments: 500,
-        features: ['stats', 'push_notifications']
+        maxStaff: 1,
+        maxMonthlyAppointments: 999999,
+        features: ['stats', 'push_notifications', 'promotions']
+      }
+    },
+    create: {
+      name: 'PRO',
+      price: 8,
+      currency: 'USD',
+      limits: {
+        maxStaff: 1, // Es independiente
+        maxMonthlyAppointments: 999999,
+        features: ['stats', 'push_notifications', 'promotions']
       }
     }
   })
+
+  const teamPlan = await prisma.plan.upsert({
+    where: { name: 'TEAM' },
+    update: {
+      price: 5,
+      currency: 'USD',
+      limits: {
+        maxStaff: 10,
+        maxMonthlyAppointments: 999999,
+        features: ['stats', 'push_notifications', 'promotions', 'unified_agenda', 'staff_control']
+      }
+    },
+    create: {
+      name: 'TEAM',
+      price: 5,
+      currency: 'USD',
+      limits: {
+        maxStaff: 10,
+        maxMonthlyAppointments: 999999,
+        features: ['stats', 'push_notifications', 'promotions', 'unified_agenda', 'staff_control']
+      }
+    }
+  })
+
 }
 
 main()

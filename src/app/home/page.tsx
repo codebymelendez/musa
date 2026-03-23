@@ -50,7 +50,8 @@ const statusConfig: Record<
 };
 
 export default function Home() {
-  const { user, loadUser } = useAuth();
+  const { user, isHydrated, loadUser } = useAuth();
+
   const { selectedDate } = useAppStore();
   const { appointments, loading, fetchByDate, updateStatus, registerPayment } =
     useAppointments();
@@ -64,11 +65,14 @@ export default function Home() {
     if (!user) loadUser();
   }, [user, loadUser]);
 
-  // Cargar citas del día
+  // Cargar citas del día cuando el usuario esté disponible y el store hidratado
   useEffect(() => {
-    const date = selectedDate || new Date().toISOString().split("T")[0];
-    fetchByDate(date);
-  }, [selectedDate, fetchByDate]);
+    if (isHydrated && user) {
+      const date = selectedDate || new Date().toISOString().split("T")[0];
+      fetchByDate(date);
+    }
+  }, [isHydrated, user, selectedDate, fetchByDate]);
+
 
   const today = new Date();
   const todayRevenue = appointments

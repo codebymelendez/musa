@@ -82,7 +82,7 @@ export function useAuth() {
   const logout = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     clearUser();
-    router.push("/login");
+    router.push("/");
   }, [clearUser, router]);
 
   return { user, isHydrated, login, register, logout, loadUser };
