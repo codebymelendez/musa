@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 
 // Rutas que requieren autenticación
-const PRIVATE_ROUTES = ["/home", "/calendar", "/services", "/stats", "/profile", "/onboarding"];
+const PRIVATE_ROUTES = ["/home", "/calendar", "/services", "/stats", "/profile", "/onboarding", "/promotions"];
 
 // Rutas solo para usuarios NO autenticados
 const AUTH_ROUTES = ["/login", "/register"];

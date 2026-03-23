@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useAppStore } from "@/store/useAppStore";
+
+
 import { useAuth } from "@/hooks/useAuth";
 import { useAppointments } from "@/hooks/useAppointments";
 import { Appointment } from "@/types";
@@ -51,8 +54,10 @@ export default function Home() {
   const { selectedDate } = useAppStore();
   const { appointments, loading, fetchByDate, updateStatus, registerPayment } =
     useAppointments();
+
   const [newModalOpen, setNewModalOpen] = useState(false);
   const [paymentTarget, setPaymentTarget] = useState<Appointment | null>(null);
+
 
   // Cargar usuario si no está en store
   useEffect(() => {
@@ -85,32 +90,55 @@ export default function Home() {
         </p>
       </section>
 
+      {/* Marketing / Promotions Access */}
+      <section className="mb-10">
+        <div className="bg-gradient-to-br from-purple-600 to-purple-800 rounded-3xl p-6 shadow-lg shadow-purple-500/20 relative overflow-hidden group">
+          <div className="absolute -right-6 -top-6 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:scale-110 transition-transform"></div>
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="space-y-1">
+              <h3 className="text-white font-bold text-lg">Impulsa tu negocio</h3>
+              <p className="text-purple-100 text-xs">Crea promociones y atrae más clientas</p>
+            </div>
+            <Link 
+              href="/promotions"
+              className="bg-white text-purple-700 px-5 py-2.5 rounded-full text-sm font-bold shadow-sm active:scale-95 transition-all"
+            >
+              Ver Promos
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* Stats Overview */}
       <div className="grid grid-cols-2 gap-4 mb-10">
-        <div className="bg-surface-container-low p-5 rounded-3xl">
-          <span className="text-on-surface-variant text-sm font-semibold uppercase tracking-wider block mb-2">
+        <div className="bg-surface-container-low p-5 rounded-3xl border border-outline-variant/10 shadow-sm">
+          <span className="text-on-surface-variant text-[10px] font-bold uppercase tracking-wider block mb-2 opacity-70">
             Ingresos Hoy
           </span>
-          <span className="text-3xl font-extrabold text-primary">
+          <span className="text-2xl font-extrabold text-primary">
             {formatCurrency(todayRevenue)}
           </span>
         </div>
-        <div className="bg-surface-container-low p-5 rounded-3xl">
-          <span className="text-on-surface-variant text-sm font-semibold uppercase tracking-wider block mb-2">
+        <div className="bg-surface-container-low p-5 rounded-3xl border border-outline-variant/10 shadow-sm">
+          <span className="text-on-surface-variant text-[10px] font-bold uppercase tracking-wider block mb-2 opacity-70">
             Citas
           </span>
-          <span className="text-3xl font-extrabold text-primary">
+          <span className="text-2xl font-extrabold text-primary">
             {appointments.filter((a) => a.status === "completed").length}/
             {appointments.filter((a) => a.status !== "cancelled").length}
           </span>
         </div>
       </div>
 
+
       {/* Próximas Citas */}
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-on-surface">Próximas Citas</h2>
-        <button className="text-primary font-semibold text-sm">Ver todas</button>
+        <Link href="/appointments" className="text-primary font-bold text-sm hover:underline">
+          Ver todas
+        </Link>
       </div>
+
 
       {/* Loading */}
       {loading && (
@@ -132,12 +160,13 @@ export default function Home() {
         </div>
       )}
 
-      {/* Timeline de citas */}
-      {!loading && appointments.length > 0 && (
-        <div className="space-y-6 relative">
+      {/* Timeline de citas: Pendientes/Confirmadas */}
+      {!loading && appointments.filter(a => a.status === "confirmed" || a.status === "pending").length > 0 && (
+        <div className="space-y-6 relative mb-12">
           <div className="absolute left-4 top-0 bottom-0 w-px border-l-2 border-dotted border-outline-variant opacity-30 pointer-events-none"></div>
 
-          {appointments.map((apt) => {
+          {appointments.filter(a => a.status === "confirmed" || a.status === "pending").map((apt) => {
+
             const cfg =
               statusConfig[apt.status] ?? statusConfig["confirmed"];
             const isActive = apt.status === "confirmed" || apt.status === "pending";
@@ -235,6 +264,41 @@ export default function Home() {
           })}
         </div>
       )}
+
+      {/* Citas Realizadas Hoy */}
+      {!loading && appointments.filter(a => a.status === "completed").length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-xl font-bold text-on-surface mb-6">Realizadas Hoy</h2>
+          <div className="space-y-4">
+            {appointments.filter(a => a.status === "completed").map((apt) => {
+              const cfg = statusConfig.completed;
+              return (
+                <div 
+                  key={apt.id} 
+                  className="bg-surface-container-low/40 p-4 rounded-2xl border border-outline-variant/10 flex items-center justify-between group hover:bg-surface-container-low transition-colors"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-tertiary/10 flex items-center justify-center text-tertiary">
+                      <span className="material-symbols-outlined">check_circle</span>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-on-surface leading-tight">{apt.client?.name}</h4>
+                      <p className="text-xs text-on-surface-variant">{apt.service?.name} · {formatTimeES(apt.startTime)}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-tertiary">{formatCurrency(apt.payment?.amount ?? 0)}</p>
+                    <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-tighter opacity-60">
+                      {apt.payment?.method.replace(/_/g, " ")}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
 
       {/* FAB */}
       <button

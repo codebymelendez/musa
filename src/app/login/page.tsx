@@ -155,6 +155,18 @@ export default function Login() {
             </button>
           </form>
 
+          {/* Olvidé mi contraseña */}
+          {!isRegister && (
+            <div className="mt-4 text-center">
+              <a
+                href="/forgot-password"
+                className="text-sm text-on-surface-variant hover:text-primary transition-colors"
+              >
+                ¿Olvidaste tu contraseña?
+              </a>
+            </div>
+          )}
+
           {/* Cambiar modo */}
           <footer className="mt-8 text-center">
             <p className="font-body text-sm text-on-surface-variant">

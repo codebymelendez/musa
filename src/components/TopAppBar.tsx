@@ -15,7 +15,11 @@ export default function TopAppBar() {
     pathname === "/onboarding" ||
     pathname.startsWith("/booking") ||
     pathname.startsWith("/p/") ||
-    pathname.startsWith("/staff/join")
+    pathname.startsWith("/staff/join") ||
+    pathname.startsWith("/explore") ||
+    pathname.startsWith("/client") ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password"
   ) {
     return null;
   }

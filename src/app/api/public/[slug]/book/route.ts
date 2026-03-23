@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { sendNotification } from "@/lib/notifications";
+import { sendNotification, sendClientNotification } from "@/lib/notifications";
 
 const bookSchema = z.object({
   serviceId: z.string(),
@@ -13,6 +13,7 @@ const bookSchema = z.object({
   clientName: z.string().min(2),
   clientPhone: z.string().min(7),
   clientEmail: z.string().email().optional().or(z.literal("")),
+  wantsNotifications: z.boolean().optional(),
 });
 
 type Params = { params: Promise<{ slug: string }> };
@@ -31,10 +32,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
-    const { serviceId, startTime, clientName, clientPhone, clientEmail } =
+    const { serviceId, startTime, clientName, clientPhone, clientEmail, wantsNotifications } =
       parsed.data;
 
-    // Verificar que el profesional y el servicio existen
     const user = await prisma.user.findUnique({
       where: { slug },
       include: { settings: true },
@@ -63,7 +63,6 @@ export async function POST(req: NextRequest, { params }: Params) {
     const start = new Date(startTime);
     const end = new Date(start.getTime() + service.durationMin * 60000);
 
-    // Verificar que la hora no esté ocupada
     const conflict = await prisma.appointment.findFirst({
       where: {
         userId: user.id,
@@ -83,15 +82,22 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
-    // Crear o buscar clienta
+    // Crear o actualizar clienta (incluye businessId para broadcast de promos)
     const client = await prisma.client.upsert({
       where: { userId_phone: { userId: user.id, phone: clientPhone } },
-      update: { name: clientName, email: clientEmail || null },
+      update: {
+        name: clientName,
+        email: clientEmail || null,
+        businessId: user.businessId ?? undefined,
+        ...(wantsNotifications !== undefined && { wantsNotifications }),
+      },
       create: {
         userId: user.id,
+        businessId: user.businessId ?? undefined,
         name: clientName,
         phone: clientPhone,
         email: clientEmail || null,
+        wantsNotifications: wantsNotifications ?? false,
       },
     });
 
@@ -108,18 +114,30 @@ export async function POST(req: NextRequest, { params }: Params) {
       include: { client: true, service: true },
     });
 
-    // Notificar al profesional de la nueva reserva
     const startStr = start.toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" });
     const dateStr = start.toLocaleDateString("es-VE", { weekday: "short", day: "numeric", month: "short" });
+
+    // Push al profesional
     sendNotification(user.id, {
-      title: "Nueva cita confirmada",
+      title: "Nueva cita confirmada 🗓️",
       body: `${clientName} reservó ${service.name} el ${dateStr} a las ${startStr}`,
       url: "/home",
-    }).catch(() => {}); // no bloquear la respuesta
+      appointmentId: appointment.id,
+    }).catch(() => {});
+
+    // Push a la clienta si tiene suscripción previa
+    sendClientNotification(client.id, {
+      title: "¡Reserva confirmada! ✨",
+      body: `Tu cita de ${service.name} con ${user.name} es el ${dateStr} a las ${startStr}.`,
+      url: `/p/${slug}`,
+      appointmentId: appointment.id,
+      tag: `booking-${appointment.id}`,
+    }).catch(() => {});
 
     return NextResponse.json(
       {
         appointment,
+        clientId: client.id,
         professional: {
           name: user.name,
           whatsapp: user.whatsapp,

@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import { TimeSlot, formatCurrency, formatTimeES } from "@/lib/utils";
 import { Service } from "@/types";
+import { usePushSubscription } from "@/hooks/usePushSubscription";
+import PromotionBanner from "@/components/PromotionBanner";
 
 interface PublicProfile {
   name: string;
@@ -30,6 +32,14 @@ interface PublicData {
   slots: TimeSlot[] | null;
 }
 
+interface Promotion {
+  id: string;
+  title: string;
+  description: string;
+  discount: number;
+  validUntil: string;
+}
+
 type BookingStep = "service" | "datetime" | "contact" | "confirmed";
 
 const DAYS_ES = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -50,6 +60,7 @@ export default function PublicBookingPage() {
   const [data, setData] = useState<PublicData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
 
   // Booking state
   const [step, setStep] = useState<BookingStep>("service");
@@ -58,31 +69,59 @@ export default function PublicBookingPage() {
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slots, setSlots] = useState<TimeSlot[]>([]);
+
+  // Contact + opt-in state
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [clientEmail, setClientEmail] = useState("");
+  const [wantsNotifications, setWantsNotifications] = useState(false);
+
   const [booking, setBooking] = useState(false);
   const [confirmed, setConfirmed] = useState<{
     appointmentId: string;
+    clientId: string;
     serviceName: string;
     startTime: string;
     whatsapp: string | null;
   } | null>(null);
 
+  // Push para la clienta (solo se activa post-confirmación)
+  const { subscribe: activatePush, loading: pushLoading, subscribed: pushSubscribed } =
+    usePushSubscription({
+      endpoint: "/api/push/subscribe-client",
+      clientId: confirmed?.clientId,
+    });
+
   const next14Days = getNext14Days();
 
-  // Cargar perfil público
+  // ── Detectar visita repetida via localStorage ──────────────────────────────
+  useEffect(() => {
+    const savedName = localStorage.getItem(`musa_name_${slug}`);
+    const savedPhone = localStorage.getItem(`musa_phone_${slug}`);
+    if (savedName) setClientName(savedName);
+    if (savedPhone) setClientPhone(savedPhone);
+  }, [slug]);
+
+  // ── Cargar perfil público + promociones ────────────────────────────────────
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await fetch(`/api/public/${slug}`);
-        if (!res.ok) {
-          const d = await res.json();
+        const [profileRes, promoRes] = await Promise.all([
+          fetch(`/api/public/${slug}`),
+          fetch(`/api/public/${slug}/promotions`),
+        ]);
+        if (!profileRes.ok) {
+          const d = await profileRes.json();
           setError(d.error ?? "Profesional no encontrada");
           return;
         }
-        const d: PublicData = await res.json();
+        const d: PublicData = await profileRes.json();
         setData(d);
+
+        if (promoRes.ok) {
+          const pd = await promoRes.json();
+          setPromotions(pd.promotions ?? []);
+        }
       } catch {
         setError("Error al cargar el perfil");
       } finally {
@@ -92,7 +131,7 @@ export default function PublicBookingPage() {
     fetchProfile();
   }, [slug]);
 
-  // Cargar slots cuando cambia fecha o servicio
+  // ── Cargar slots ───────────────────────────────────────────────────────────
   useEffect(() => {
     if (!selectedService || step !== "datetime") return;
     const fetchSlots = async () => {
@@ -114,7 +153,7 @@ export default function PublicBookingPage() {
     fetchSlots();
   }, [selectedService, selectedDate, step, slug]);
 
-  const handleBook = async () => {
+  const handleBook = useCallback(async () => {
     if (!selectedService || !selectedSlot || !clientName || !clientPhone) return;
     setBooking(true);
     try {
@@ -127,6 +166,7 @@ export default function PublicBookingPage() {
           clientName,
           clientPhone,
           clientEmail: clientEmail || undefined,
+          wantsNotifications,
         }),
       });
       const d = await res.json();
@@ -134,8 +174,15 @@ export default function PublicBookingPage() {
         alert(d.error ?? "Error al reservar");
         return;
       }
+
+      // Guardar datos para visitas futuras
+      localStorage.setItem(`musa_name_${slug}`, clientName);
+      localStorage.setItem(`musa_phone_${slug}`, clientPhone);
+      localStorage.setItem(`musa_clientId_${slug}`, d.clientId);
+
       setConfirmed({
         appointmentId: d.appointment.id,
+        clientId: d.clientId,
         serviceName: selectedService.name,
         startTime: d.appointment.startTime,
         whatsapp: d.professional.whatsapp,
@@ -146,7 +193,7 @@ export default function PublicBookingPage() {
     } finally {
       setBooking(false);
     }
-  };
+  }, [selectedService, selectedSlot, clientName, clientPhone, clientEmail, wantsNotifications, slug]);
 
   if (loading) {
     return (
@@ -161,24 +208,19 @@ export default function PublicBookingPage() {
   if (error || !data) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4 p-6">
-        <span className="material-symbols-outlined text-5xl text-on-surface-variant">
-          person_off
-        </span>
-        <h2 className="font-headline text-2xl font-bold text-on-surface">
-          {error ?? "No encontrado"}
-        </h2>
-        <p className="text-on-surface-variant text-center">
-          Este enlace de reserva no está disponible.
-        </p>
+        <span className="material-symbols-outlined text-5xl text-on-surface-variant">person_off</span>
+        <h2 className="font-headline text-2xl font-bold text-on-surface">{error ?? "No encontrado"}</h2>
+        <p className="text-on-surface-variant text-center">Este enlace de reserva no está disponible.</p>
       </div>
     );
   }
 
   const { professional, services } = data;
+  const isReturningClient = !!localStorage.getItem(`musa_name_${slug}`);
 
   return (
     <div className="bg-background font-body text-on-surface antialiased min-h-screen">
-      {/* Header del profesional */}
+      {/* Header */}
       <header className="fixed top-0 w-full z-40 bg-white/80 backdrop-blur-lg px-6 py-4 flex items-center justify-between shadow-sm shadow-purple-500/5">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-surface-container-high overflow-hidden relative">
@@ -204,22 +246,41 @@ export default function PublicBookingPage() {
         </button>
       </header>
 
-      <main className="pt-24 pb-32 px-6 max-w-2xl mx-auto space-y-10">
-        {/* Hero */}
-        <section className="space-y-4">
-          <div className="space-y-2">
-            <h2 className="font-headline text-3xl font-extrabold tracking-tighter text-on-surface">
-              Agendar Cita
-            </h2>
-            {professional.bio && (
-              <p className="text-on-surface-variant leading-relaxed max-w-md">
-                {professional.bio}
-              </p>
-            )}
+      <main className="pt-24 pb-32 px-6 max-w-2xl mx-auto space-y-8">
+        {/* Bienvenida a clientas que regresan */}
+        {isReturningClient && step === "service" && (
+          <div className="bg-primary-fixed/30 rounded-2xl px-5 py-3 flex items-center gap-3">
+            <span className="material-symbols-outlined text-primary text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>
+              favorite
+            </span>
+            <p className="text-sm font-medium text-on-surface">
+              ¡Bienvenida de nuevo, <strong>{clientName || "guapa"}</strong>! 👋
+            </p>
           </div>
+        )}
+
+        {/* Banners de promociones activas */}
+        {promotions.length > 0 && step === "service" && (
+          <PromotionBanner
+            promotions={promotions}
+            onBook={() => {
+              // Scroll al selector de servicios
+              window.scrollTo({ top: 300, behavior: "smooth" });
+            }}
+          />
+        )}
+
+        {/* Hero */}
+        <section className="space-y-2">
+          <h2 className="font-headline text-3xl font-extrabold tracking-tighter text-on-surface">
+            Agendar Cita
+          </h2>
+          {professional.bio && (
+            <p className="text-on-surface-variant leading-relaxed max-w-md">{professional.bio}</p>
+          )}
         </section>
 
-        {/* ── PASO 1: Seleccionar servicio ───────────────────────────────── */}
+        {/* ── PASO 1: Seleccionar servicio ─────────────────────────────────── */}
         {step === "service" && (
           <section className="space-y-6">
             <div className="flex items-center justify-between">
@@ -259,7 +320,13 @@ export default function PublicBookingPage() {
                           </span>
                         </div>
                       </div>
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${selectedService?.id === s.id ? "border-primary bg-primary" : "border-outline-variant"}`}>
+                      <div
+                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
+                          selectedService?.id === s.id
+                            ? "border-primary bg-primary"
+                            : "border-outline-variant"
+                        }`}
+                      >
                         {selectedService?.id === s.id && (
                           <span className="material-symbols-outlined text-white text-xs">check</span>
                         )}
@@ -272,7 +339,7 @@ export default function PublicBookingPage() {
           </section>
         )}
 
-        {/* ── PASO 2: Fecha y hora ───────────────────────────────────────── */}
+        {/* ── PASO 2: Fecha y hora ──────────────────────────────────────────── */}
         {step === "datetime" && (
           <section className="space-y-6">
             <div className="flex items-center justify-between">
@@ -282,7 +349,6 @@ export default function PublicBookingPage() {
               </span>
             </div>
 
-            {/* Date Scroller */}
             <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
               {next14Days.map((day, i) => {
                 const isSelected = day.toDateString() === selectedDate.toDateString();
@@ -314,7 +380,6 @@ export default function PublicBookingPage() {
               })}
             </div>
 
-            {/* Time Grid */}
             {slotsLoading ? (
               <div className="flex justify-center py-8">
                 <span className="material-symbols-outlined text-primary animate-spin text-2xl">
@@ -349,7 +414,7 @@ export default function PublicBookingPage() {
           </section>
         )}
 
-        {/* ── PASO 3: Datos de contacto ──────────────────────────────────── */}
+        {/* ── PASO 3: Datos de contacto + opt-in ───────────────────────────── */}
         {step === "contact" && (
           <section className="space-y-6">
             <div className="flex items-center justify-between">
@@ -363,8 +428,12 @@ export default function PublicBookingPage() {
             <div className="p-4 bg-surface-container-low rounded-2xl space-y-1">
               <p className="font-bold text-on-surface">{selectedService?.name}</p>
               <p className="text-sm text-on-surface-variant">
-                {selectedDate.toLocaleDateString("es-VE", { weekday: "long", day: "numeric", month: "long" })} ·{" "}
-                {selectedSlot?.time} ·{" "}
+                {selectedDate.toLocaleDateString("es-VE", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                })}{" "}
+                · {selectedSlot?.time} ·{" "}
                 {formatCurrency(selectedService?.price ?? 0, selectedService?.currency)}
               </p>
             </div>
@@ -372,7 +441,7 @@ export default function PublicBookingPage() {
             <div className="space-y-4">
               <input
                 className="w-full bg-surface-container-high border-none rounded-xl py-4 px-5 focus:ring-2 focus:ring-primary-container text-on-surface placeholder:text-on-surface-variant/50"
-                placeholder="Nombre completo"
+                placeholder="Nombre completo *"
                 type="text"
                 value={clientName}
                 onChange={(e) => setClientName(e.target.value)}
@@ -380,27 +449,56 @@ export default function PublicBookingPage() {
               />
               <input
                 className="w-full bg-surface-container-high border-none rounded-xl py-4 px-5 focus:ring-2 focus:ring-primary-container text-on-surface placeholder:text-on-surface-variant/50"
-                placeholder="Teléfono"
+                placeholder="Teléfono *"
                 type="tel"
                 value={clientPhone}
                 onChange={(e) => setClientPhone(e.target.value)}
                 required
               />
-              <input
-                className="w-full bg-surface-container-high border-none rounded-xl py-4 px-5 focus:ring-2 focus:ring-primary-container text-on-surface placeholder:text-on-surface-variant/50"
-                placeholder="Email (opcional)"
-                type="email"
-                value={clientEmail}
-                onChange={(e) => setClientEmail(e.target.value)}
-              />
+
+              {/* Opt-in de notificaciones */}
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <div
+                  className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                    wantsNotifications
+                      ? "bg-primary border-primary"
+                      : "border-outline-variant group-hover:border-primary"
+                  }`}
+                  onClick={() => setWantsNotifications((v) => !v)}
+                >
+                  {wantsNotifications && (
+                    <span className="material-symbols-outlined text-white text-xs">check</span>
+                  )}
+                </div>
+                <div onClick={() => setWantsNotifications((v) => !v)}>
+                  <p className="text-sm font-semibold text-on-surface">
+                    Quiero recibir notificaciones y promociones
+                  </p>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    Te avisaremos de recordatorios, confirmaciones y ofertas exclusivas de {professional.name}.
+                  </p>
+                </div>
+              </label>
+
+              {/* Email (requerido si quiere notificaciones) */}
+              {wantsNotifications && (
+                <input
+                  className="w-full bg-surface-container-high border-none rounded-xl py-4 px-5 focus:ring-2 focus:ring-primary-container text-on-surface placeholder:text-on-surface-variant/50"
+                  placeholder="Email (para recibir confirmaciones)"
+                  type="email"
+                  value={clientEmail}
+                  onChange={(e) => setClientEmail(e.target.value)}
+                  autoComplete="email"
+                />
+              )}
             </div>
           </section>
         )}
 
-        {/* ── CONFIRMACIÓN ──────────────────────────────────────────────── */}
+        {/* ── CONFIRMACIÓN ─────────────────────────────────────────────────── */}
         {step === "confirmed" && confirmed && (
           <div className="fixed inset-0 z-[100] bg-surface/95 backdrop-blur-md flex items-center justify-center p-6">
-            <div className="bg-surface-container-lowest p-10 rounded-[2.5rem] shadow-2xl shadow-purple-500/10 max-w-sm w-full text-center space-y-8">
+            <div className="bg-surface-container-lowest p-10 rounded-[2.5rem] shadow-2xl shadow-purple-500/10 max-w-sm w-full text-center space-y-6">
               <div className="w-24 h-24 bg-tertiary-fixed rounded-full flex items-center justify-center mx-auto">
                 <span
                   className="material-symbols-outlined text-4xl text-tertiary"
@@ -422,19 +520,46 @@ export default function PublicBookingPage() {
                   a las {formatTimeES(confirmed.startTime)}.
                 </p>
               </div>
+
+              {/* Activar push si marcó opt-in y no tiene suscripción aún */}
+              {wantsNotifications && !pushSubscribed && (
+                <button
+                  onClick={activatePush}
+                  disabled={pushLoading}
+                  className="w-full h-12 bg-primary/10 text-primary font-bold rounded-2xl flex items-center justify-center gap-2 text-sm hover:bg-primary/20 transition-colors disabled:opacity-60"
+                >
+                  {pushLoading ? (
+                    <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                  ) : (
+                    <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>
+                      notifications_active
+                    </span>
+                  )}
+                  {pushLoading ? "Activando..." : "Activar notificaciones en este dispositivo"}
+                </button>
+              )}
+
+              {pushSubscribed && (
+                <p className="text-xs text-on-surface-variant flex items-center justify-center gap-1">
+                  <span className="material-symbols-outlined text-sm text-tertiary" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                  Notificaciones activadas
+                </p>
+              )}
+
               <div className="p-4 bg-surface-container-low rounded-2xl text-left flex items-start gap-4">
                 <span className="material-symbols-outlined text-tertiary">calendar_today</span>
                 <div>
-                  <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-                    Servicio
-                  </p>
+                  <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Servicio</p>
                   <p className="font-bold text-on-surface">{confirmed.serviceName}</p>
                 </div>
               </div>
+
               <div className="space-y-3">
                 {confirmed.whatsapp && (
                   <a
-                    href={`https://wa.me/${confirmed.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(`Hola ${professional.name}, acabo de reservar una cita para ${confirmed.serviceName}. ¡Nos vemos pronto!`)}`}
+                    href={`https://wa.me/${confirmed.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(
+                      `Hola ${professional.name}, acabo de reservar una cita para ${confirmed.serviceName}. ¡Nos vemos pronto!`
+                    )}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full h-14 bg-[#25D366] text-white font-bold rounded-full flex items-center justify-center gap-3 shadow-lg shadow-green-500/20 hover:scale-[1.02] transition-transform"
@@ -452,9 +577,9 @@ export default function PublicBookingPage() {
                     setStep("service");
                     setSelectedService(null);
                     setSelectedSlot(null);
-                    setClientName("");
                     setClientPhone("");
                     setClientEmail("");
+                    setWantsNotifications(false);
                     setConfirmed(null);
                   }}
                 >
@@ -470,7 +595,6 @@ export default function PublicBookingPage() {
       {step !== "confirmed" && (
         <div className="fixed bottom-0 left-0 w-full p-6 bg-white/80 backdrop-blur-xl z-50 rounded-t-[2.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
           <div className="max-w-2xl mx-auto flex items-center justify-between gap-6">
-            {/* Precio y back */}
             <div>
               {step !== "service" && (
                 <button
@@ -491,7 +615,6 @@ export default function PublicBookingPage() {
               )}
             </div>
 
-            {/* CTA */}
             <button
               disabled={
                 (step === "service" && !selectedService) ||
@@ -510,7 +633,11 @@ export default function PublicBookingPage() {
                 <span className="material-symbols-outlined animate-spin">progress_activity</span>
               ) : (
                 <>
-                  {step === "service" ? "Seleccionar Fecha" : step === "datetime" ? "Datos de Contacto" : "Reservar Ahora"}
+                  {step === "service"
+                    ? "Seleccionar Fecha"
+                    : step === "datetime"
+                    ? "Datos de Contacto"
+                    : "Reservar Ahora"}
                   <span className="material-symbols-outlined">arrow_forward</span>
                 </>
               )}

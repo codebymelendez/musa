@@ -34,6 +34,7 @@ model Business {
 
   users                User[]
   invitations          Invitation[]
+  promotions           Promotion[]
 }
 
 // ─────────────────────────────────────────────
@@ -75,12 +76,13 @@ model User {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  services         Service[]
-  clients          Client[]
-  appointments     Appointment[]
-  settings         ProfessionalSettings?
-  notifications    Notification[]
-  pushSubscriptions PushSubscription[]
+  services              Service[]
+  clients               Client[]
+  appointments          Appointment[]
+  settings              ProfessionalSettings?
+  notifications         Notification[]
+  pushSubscriptions     PushSubscription[]
+  passwordResetTokens   PasswordResetToken[]
 }
 
 // ─────────────────────────────────────────────
@@ -103,15 +105,16 @@ model Invitation {
 // CLIENT (Clienta del negocio)
 // ─────────────────────────────────────────────
 model Client {
-  id         String   @id @default(cuid())
-  businessId String?                          // Ahora pertenece al negocio
-  userId     String?                          // Opcional: profesional preferida/asignada
-  name       String
-  phone      String
-  email      String?
-  notes      String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  businessId         String?                          // Ahora pertenece al negocio
+  userId             String?                          // Opcional: profesional preferida/asignada
+  name               String
+  phone              String
+  email              String?
+  notes              String?
+  wantsNotifications Boolean  @default(false)         // Opt-in para push y promos
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   user         User?         @relation(fields: [userId], references: [id])
   appointments Appointment[]
@@ -239,6 +242,39 @@ model ProfessionalSettings {
   updatedAt      DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────────
+// PASSWORD RESET TOKEN
+// ─────────────────────────────────────────────
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────────
+// PROMOTION (Promociones del negocio)
+// ─────────────────────────────────────────────
+model Promotion {
+  id           String   @id @default(cuid())
+  businessId   String
+  title        String                           // "20% off en pedicure"
+  description  String
+  discount     Float                            // 20.0 (%)
+  validFrom    DateTime
+  validUntil   DateTime
+  targetUserId String?                          // Solo para staff específico (null = todos)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
 
 

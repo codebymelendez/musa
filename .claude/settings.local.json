@@ -9,7 +9,11 @@
       "Bash(npm run:*)",
       "Bash(node -e \"require\\(''web-push''\\)\")",
       "Bash(node -e \"require\\(''nanoid''\\)\")",
-      "Bash(node -e \"const webpush = require\\(''web-push''\\); const keys = webpush.generateVAPIDKeys\\(\\); console.log\\(''NEXT_PUBLIC_VAPID_PUBLIC_KEY='' + keys.publicKey\\); console.log\\(''VAPID_PRIVATE_KEY='' + keys.privateKey\\);\")"
+      "Bash(node -e \"const webpush = require\\(''web-push''\\); const keys = webpush.generateVAPIDKeys\\(\\); console.log\\(''NEXT_PUBLIC_VAPID_PUBLIC_KEY='' + keys.publicKey\\); console.log\\(''VAPID_PRIVATE_KEY='' + keys.privateKey\\);\")",
+      "Bash(find /c/musa/src -type f -name *.test.* -o -name *.spec.*)",
+      "Bash(find /c/musa/node_modules/next/dist/docs -type f -name *.md)",
+      "Bash(find c:musasrcappp[slug] -type f)",
+      "Bash(npx tsc:*)"
     ]
   }
 }
