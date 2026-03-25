@@ -133,6 +133,7 @@ export async function POST(req: NextRequest) {
     const { data: appointment, error: createError } = await supabase
       .from('Appointment')
       .insert({
+        id: crypto.randomUUID(),
         userId: session.userId,
         clientId,
         serviceId,

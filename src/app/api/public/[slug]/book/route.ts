@@ -107,6 +107,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { data: client, error: clientError } = await supabase
       .from('Client')
       .upsert({
+        id: randomUUID(),
         userId: user.id,
         businessId: user.businessId,
         name: clientName,
@@ -127,6 +128,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { data: appointment, error: appoError } = await supabase
       .from('Appointment')
       .insert({
+        id: randomUUID(),
         userId: user.id,
         clientId: client.id,
         serviceId: service.id,

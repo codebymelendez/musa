@@ -140,6 +140,7 @@ export async function PATCH(req: NextRequest) {
         const { data: business } = await supabase
           .from('Business')
           .insert({
+            id: crypto.randomUUID(),
             name: businessName,
             slug: `${slug}-${Date.now().toString(36)}`,
             city: city || null,

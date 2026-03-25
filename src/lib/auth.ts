@@ -25,4 +25,16 @@ export async function getSession(req?: NextRequest, res?: NextResponse) {
 export async function signOut(res?: NextResponse) {
   const supabase = await createClient(undefined, res);
   await supabase.auth.signOut();
+  
+  // Forzar limpieza de cookies si el signOut de Supabase no fue suficiente
+  if (res) {
+    const cookiesToClear = [
+      "sb-access-token", 
+      "sb-refresh-token", 
+      "supabase-auth-token"
+    ];
+    cookiesToClear.forEach(name => {
+      res.cookies.set(name, "", { maxAge: -1, path: "/" });
+    });
+  }
 }

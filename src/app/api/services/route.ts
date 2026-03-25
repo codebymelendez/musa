@@ -52,10 +52,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = await createClient(req);
+    
+    // Obtener el businessId del usuario
+    const { data: userProfile } = await supabase
+      .from('User')
+      .select('businessId')
+      .eq('id', session.userId)
+      .single();
+
+    if (!userProfile?.businessId) {
+      return NextResponse.json({ error: "No tienes un negocio configurado" }, { status: 400 });
+    }
+
     const { data: service, error } = await supabase
       .from('Service')
-      .insert({ ...parsed.data, userId: session.userId })
+      .insert({ 
+        ...parsed.data, 
+        id: crypto.randomUUID(),
+        userId: session.userId,
+        businessId: userProfile.businessId 
+      })
       .select()
       .single();
 
