@@ -1,15 +1,11 @@
-// POST /api/promotions/broadcast
-// Envía push de una promo a todas las clientas del negocio con opt-in.
-export const dynamic = "force-dynamic";
-
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
 import { broadcastToBusinessClients } from "@/lib/notifications";
+import { createClient } from "@/lib/supabase-server";
 
 const schema = z.object({
-  promotionId: z.string().cuid(),
+  promotionId: z.string(),
 });
 
 export async function POST(req: NextRequest) {
@@ -17,12 +13,14 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: session.userId },
-      select: { role: true, businessId: true },
-    });
+    const supabase = await createClient();
+    const { data: user } = await supabase
+      .from('User')
+      .select('role, businessId, business:Business(slug)')
+      .eq('id', session.userId)
+      .single();
 
-    if (user?.role !== "OWNER") {
+    if (user?.role !== "OWNER" || !user.businessId) {
       return NextResponse.json({ error: "Solo el propietario puede enviar promos" }, { status: 403 });
     }
 
@@ -32,18 +30,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
     }
 
-    const promotion = await prisma.promotion.findUnique({
-      where: { id: parsed.data.promotionId },
-    });
+    const { data: promotion } = await supabase
+      .from('Promotion')
+      .select('*')
+      .eq('id', parsed.data.promotionId)
+      .single();
 
     if (!promotion || promotion.businessId !== user.businessId) {
       return NextResponse.json({ error: "Promoción no encontrada" }, { status: 404 });
     }
 
-    await broadcastToBusinessClients(user.businessId!, {
+    const slug = (user as any).business?.slug;
+
+    await broadcastToBusinessClients(user.businessId, {
       title: `✨ ${promotion.title}`,
       body: promotion.description,
-      url: `/p/${session.slug}`,
+      url: `/p/${slug}`,
       tag: `promo-${promotion.id}`,
     });
 

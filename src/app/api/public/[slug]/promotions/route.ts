@@ -1,9 +1,5 @@
-// GET /api/public/[slug]/promotions
-// Devuelve promos activas del negocio para mostrar en la página pública de reservas.
-export const dynamic = "force-dynamic";
-
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase-server";
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -11,28 +7,30 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const { slug } = await params;
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { slug },
-      select: { businessId: true },
-    });
+    const supabase = await createClient();
+    
+    const { data: user } = await supabase
+      .from('User')
+      .select('businessId')
+      .eq('slug', slug)
+      .single();
 
     if (!user?.businessId) {
       return NextResponse.json({ promotions: [] });
     }
 
-    const now = new Date();
-    const promotions = await prisma.promotion.findMany({
-      where: {
-        businessId: user.businessId,
-        isActive: true,
-        validFrom: { lte: now },
-        validUntil: { gte: now },
-      },
-      orderBy: { discount: "desc" },
-      take: 3,
-    });
+    const now = new Date().toISOString();
+    const { data: promotions } = await supabase
+      .from('Promotion')
+      .select('*')
+      .eq('businessId', user.businessId)
+      .eq('isActive', true)
+      .lte('validFrom', now)
+      .gte('validUntil', now)
+      .order('discount', { ascending: false })
+      .limit(3);
 
-    return NextResponse.json({ promotions });
+    return NextResponse.json({ promotions: promotions || [] });
   } catch (error) {
     console.error("[public promotions GET]", error);
     return NextResponse.json({ promotions: [] });

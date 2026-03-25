@@ -1,9 +1,5 @@
-// GET /api/public/[slug]?date=YYYY-MM-DD&serviceId=...
-// Devuelve perfil público + servicios + slots disponibles en una fecha dada.
-export const dynamic = "force-dynamic";
-
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase-server";
 import { generateTimeSlots, dayRange } from "@/lib/utils";
 import { ProfessionalSettings } from "@/types";
 
@@ -16,20 +12,23 @@ export async function GET(req: NextRequest, { params }: Params) {
   const serviceId = searchParams.get("serviceId");
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { slug },
-      include: {
-        services: { where: { isActive: true }, orderBy: { createdAt: "asc" } },
-        settings: true,
-      },
-    });
+    const supabase = await createClient();
 
-    if (!user) {
+    // Buscar profesional por slug + servicios + settings
+    const { data: user, error: userError } = await supabase
+      .from('User')
+      .select('*, services:Service(*), settings:ProfessionalSettings(*)')
+      .eq('slug', slug)
+      .eq('Service.isActive', true)
+      .single();
+
+    if (userError || !user) {
       return NextResponse.json({ error: "Profesional no encontrada" }, { status: 404 });
     }
 
-    const settings = user.settings
-      ? { ...user.settings, workDays: JSON.parse(user.settings.workDays) }
+    const rawSettings = user.settings;
+    const settings = rawSettings
+      ? { ...rawSettings, workDays: typeof rawSettings.workDays === 'string' ? JSON.parse(rawSettings.workDays) : rawSettings.workDays }
       : {
           workDays: [1, 2, 3, 4, 5],
           startHour: 9,
@@ -46,34 +45,38 @@ export async function GET(req: NextRequest, { params }: Params) {
       );
     }
 
-    // Slots disponibles si se solicita una fecha + servicio
+    // Slots disponibles
     let slots = null;
     if (dateParam && serviceId) {
       const selectedDate = new Date(dateParam);
       const { start, end } = dayRange(selectedDate);
 
-      const selectedService = user.services.find((s) => s.id === serviceId);
+      const services = user.services || [];
+      const selectedService = services.find((s: any) => s.id === serviceId);
       if (!selectedService) {
         return NextResponse.json({ error: "Servicio no encontrado" }, { status: 404 });
       }
 
       // Citas existentes en el día
-      const bookedAppointments = await prisma.appointment.findMany({
-        where: {
-          userId: user.id,
-          status: { notIn: ["cancelled", "no_show"] },
-          startTime: { gte: start, lte: end },
-        },
-        select: { startTime: true, endTime: true, service: { select: { durationMin: true } } },
-      });
+      const { data: bookedAppointments, error: appointmentsError } = await supabase
+        .from('Appointment')
+        .select('startTime, endTime, service:Service(durationMin)')
+        .eq('userId', user.id)
+        .not('status', 'in', '("cancelled","no_show")')
+        .gte('startTime', start.toISOString())
+        .lte('startTime', end.toISOString());
+
+      if (appointmentsError) {
+        console.error("[fetch appointments error]", appointmentsError);
+      }
 
       slots = generateTimeSlots(
         selectedDate,
         settings as ProfessionalSettings,
-        bookedAppointments.map((a) => ({
-          startTime: a.startTime.toISOString(),
-          endTime: a.endTime.toISOString(),
-          durationMin: a.service.durationMin,
+        (bookedAppointments || []).map((a: any) => ({
+          startTime: a.startTime,
+          endTime: a.endTime,
+          durationMin: a.service?.durationMin || 0,
         })),
         selectedService.durationMin
       );

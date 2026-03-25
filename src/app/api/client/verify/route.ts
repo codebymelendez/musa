@@ -1,11 +1,6 @@
-// POST /api/client/verify
-// Verifica identidad de clienta por teléfono + nombre.
-// No requiere contraseña. Devuelve JWT para el portal de clientas.
-export const dynamic = "force-dynamic";
-
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase-server";
 import { signClientToken } from "@/lib/clientAuth";
 
 const schema = z.object({
@@ -22,12 +17,15 @@ export async function POST(req: NextRequest) {
     }
 
     const { phone, name } = parsed.data;
+    const supabase = await createClient();
 
     // Buscar clienta por teléfono en cualquier negocio
-    const client = await prisma.client.findFirst({
-      where: { phone },
-      select: { id: true, name: true, phone: true },
-    });
+    const { data: client } = await supabase
+      .from('Client')
+      .select('id, name, phone')
+      .eq('phone', phone)
+      .limit(1)
+      .maybeSingle();
 
     if (!client) {
       return NextResponse.json(
@@ -56,16 +54,17 @@ export async function POST(req: NextRequest) {
     }
 
     // Contar reservas para confirmar que es usuaria real
-    const appointmentsCount = await prisma.appointment.count({
-      where: { client: { phone } },
-    });
+    const { count: appointmentsCount } = await supabase
+      .from('Appointment')
+      .select('*', { count: 'exact', head: true })
+      .eq('clientId', client.id);
 
     const token = await signClientToken({ clientPhone: phone, clientName: client.name });
 
     return NextResponse.json({
       token,
       clientName: client.name,
-      appointmentsCount,
+      appointmentsCount: appointmentsCount || 0,
     });
   } catch (error) {
     console.error("[client verify POST]", error);

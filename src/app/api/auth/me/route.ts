@@ -1,45 +1,53 @@
 import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase-server";
 
 export async function GET(req: NextRequest) {
-  const session = await getSession(req);
+  const response = NextResponse.json({ user: null });
+  const session = await getSession(req, response);
+  
   if (!session) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: session.userId },
-      include: { settings: true, business: { include: { plan: true } } },
-    });
+    const supabase = await createClient(req, response);
+    const { data: user, error } = await supabase
+      .from('User')
+      .select('*, settings:ProfessionalSettings(*), business:Business(*, plan:Plan(*))')
+      .eq('id', session.userId)
+      .single();
 
-    if (!user) {
+    if (error || !user) {
       return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
     }
 
-    return NextResponse.json({
+    const userToReturn = {
       id: user.id,
       name: user.name,
       phone: user.phone,
       email: user.email,
       slug: user.slug,
+      role: user.role,
       serviceType: user.serviceType,
       bio: user.bio,
       avatarUrl: user.avatarUrl,
       whatsapp: user.whatsapp,
       instagram: user.instagram,
       onboardingDone: user.onboardingDone,
-      settings: user.settings
-        ? { ...user.settings, workDays: JSON.parse(user.settings.workDays) }
-        : null,
-      role: user.role,
-      businessId: user.businessId,
       business: user.business,
+      settings: user.settings
+        ? { ...user.settings, workDays: JSON.parse(user.settings.workDays || "[1,2,3,4,5]") }
+        : null,
+    };
+
+    return new NextResponse(JSON.stringify(userToReturn), {
+      status: 200,
+      headers: response.headers,
     });
   } catch (error) {
-    console.error("[me]", error);
+    console.error("[me GET]", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }

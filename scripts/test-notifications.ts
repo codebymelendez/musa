@@ -1,8 +1,14 @@
-import { prisma } from "../src/lib/prisma";
+import { createClient } from "../src/lib/supabase-server";
 import { sendNotification } from "../src/lib/notifications";
 
 async function main() {
-  const user = await prisma.user.findFirst();
+  const supabase = await createClient();
+  const { data: user } = await supabase
+    .from('User')
+    .select('id, name')
+    .limit(1)
+    .maybeSingle();
+
   if (!user) {
     console.log("No hay usuarios para probar.");
     return;
@@ -20,5 +26,4 @@ async function main() {
 }
 
 main()
-  .catch(console.error)
-  .finally(() => prisma.$disconnect());
+  .catch(console.error);

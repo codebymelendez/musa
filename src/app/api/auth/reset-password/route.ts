@@ -1,11 +1,7 @@
-// POST /api/auth/reset-password
-// Valida token y actualiza contraseña.
-export const dynamic = "force-dynamic";
-
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase-server";
 
 const schema = z.object({
   token: z.string().min(10),
@@ -24,11 +20,13 @@ export async function POST(req: NextRequest) {
     }
 
     const { token, password } = parsed.data;
+    const supabase = await createClient();
 
-    const resetToken = await prisma.passwordResetToken.findUnique({
-      where: { token },
-      include: { user: true },
-    });
+    const { data: resetToken } = await supabase
+      .from('PasswordResetToken')
+      .select('*, user:User(*)')
+      .eq('token', token)
+      .single();
 
     if (!resetToken) {
       return NextResponse.json(
@@ -44,7 +42,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (new Date() > resetToken.expiresAt) {
+    if (new Date() > new Date(resetToken.expiresAt)) {
       return NextResponse.json(
         { error: "Este enlace ha expirado. Solicita uno nuevo." },
         { status: 400 }
@@ -53,16 +51,20 @@ export async function POST(req: NextRequest) {
 
     const passwordHash = await bcrypt.hash(password, 12);
 
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: resetToken.userId },
-        data: { passwordHash },
-      }),
-      prisma.passwordResetToken.update({
-        where: { id: resetToken.id },
-        data: { usedAt: new Date() },
-      }),
-    ]);
+    // Actualizar usuario y marcar token como usado
+    const { error: userError } = await supabase
+      .from('User')
+      .update({ passwordHash })
+      .eq('id', resetToken.userId);
+
+    if (userError) throw userError;
+
+    const { error: tokenError } = await supabase
+      .from('PasswordResetToken')
+      .update({ usedAt: new Date().toISOString() })
+      .eq('id', resetToken.id);
+
+    if (tokenError) throw tokenError;
 
     return NextResponse.json({ success: true });
   } catch (error) {

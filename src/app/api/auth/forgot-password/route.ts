@@ -1,12 +1,8 @@
-// POST /api/auth/forgot-password
-// Genera token de reset y envía email via Resend.
-export const dynamic = "force-dynamic";
-
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { randomBytes } from "crypto";
 import { Resend } from "resend";
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase-server";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -23,8 +19,13 @@ export async function POST(req: NextRequest) {
     }
 
     const { email } = parsed.data;
+    const supabase = await createClient();
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const { data: user } = await supabase
+      .from('User')
+      .select('id, name, email')
+      .eq('email', email)
+      .single();
 
     // Siempre responder igual para no exponer si el email existe
     if (!user) {
@@ -32,14 +33,17 @@ export async function POST(req: NextRequest) {
     }
 
     // Invalidar tokens anteriores
-    await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
+    await supabase
+      .from('PasswordResetToken')
+      .delete()
+      .eq('userId', user.id);
 
     const token = randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
 
-    await prisma.passwordResetToken.create({
-      data: { userId: user.id, token, expiresAt },
-    });
+    await supabase
+      .from('PasswordResetToken')
+      .insert({ userId: user.id, token, expiresAt });
 
     const resetUrl = `${APP_URL}/reset-password?token=${token}`;
 
@@ -56,14 +60,12 @@ export async function POST(req: NextRequest) {
           <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f3ff;padding:40px 16px">
             <tr><td align="center">
               <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 4px 24px rgba(109,40,217,.08)">
-                <!-- Header -->
                 <tr>
                   <td style="background:linear-gradient(135deg,#7c3aed,#a855f7);padding:40px 40px 32px;text-align:center">
                     <h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:800;letter-spacing:-0.5px">Musa ✨</h1>
                     <p style="margin:8px 0 0;color:#e9d5ff;font-size:14px">Tu asistente de belleza</p>
                   </td>
                 </tr>
-                <!-- Body -->
                 <tr>
                   <td style="padding:40px">
                     <h2 style="margin:0 0 8px;color:#1a1a2e;font-size:22px;font-weight:700">¿Olvidaste tu contraseña?</h2>
@@ -82,15 +84,8 @@ export async function POST(req: NextRequest) {
                         </td>
                       </tr>
                     </table>
-                    <p style="margin:32px 0 0;color:#9ca3af;font-size:13px;line-height:1.5">
-                      Si no solicitaste este cambio, puedes ignorar este correo de forma segura. Tu contraseña no cambiará.
-                    </p>
-                    <p style="margin:8px 0 0;color:#d1d5db;font-size:12px">
-                      O copia este enlace: <span style="color:#7c3aed">${resetUrl}</span>
-                    </p>
                   </td>
                 </tr>
-                <!-- Footer -->
                 <tr>
                   <td style="padding:24px 40px;background:#faf5ff;border-top:1px solid #ede9fe;text-align:center">
                     <p style="margin:0;color:#9ca3af;font-size:12px">© 2025 Musa. Todos los derechos reservados.</p>

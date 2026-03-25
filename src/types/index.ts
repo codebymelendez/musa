@@ -179,13 +179,14 @@ export interface UpdateAppointmentStatusPayload {
 }
 
 export interface RegisterPayload {
-  phone: string;
+  email: string;
   name: string;
   password: string;
+  phone?: string;
 }
 
 export interface LoginPayload {
-  phone: string;
+  email: string;
   password: string;
 }
 

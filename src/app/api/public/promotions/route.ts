@@ -1,49 +1,47 @@
-// GET /api/public/promotions
-// Devuelve todas las promociones activas de todos los negocios.
-// Usada en la home page pública para descubrir ofertas.
-export const dynamic = "force-dynamic";
-
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase-server";
 
 export async function GET() {
   try {
-    const now = new Date();
+    const supabase = await createClient();
+    const now = new Date().toISOString();
 
-    const promotions = await prisma.promotion.findMany({
-      where: {
-        isActive: true,
-        validFrom: { lte: now },
-        validUntil: { gte: now },
-      },
-      include: {
-        business: {
-          include: {
-            users: {
-              where: { role: "OWNER" },
-              select: {
-                name: true,
-                slug: true,
-                avatarUrl: true,
-                serviceType: true,
-              },
-              take: 1,
-            },
-          },
-        },
-      },
-      orderBy: { discount: "desc" },
-      take: 12,
-    });
+    const { data: promotions } = await supabase
+      .from('Promotion')
+      .select(`
+        *,
+        business:Business(
+          id,
+          name,
+          category,
+          city,
+          users:User(
+            name,
+            slug,
+            avatarUrl,
+            serviceType,
+            role
+          )
+        )
+      `)
+      .eq('isActive', true)
+      .lte('validFrom', now)
+      .gte('validUntil', now)
+      .order('discount', { ascending: false })
+      .limit(12);
 
-    const result = promotions.map((p) => {
-      const owner = p.business.users[0] ?? null;
+    if (!promotions) {
+      return NextResponse.json({ promotions: [] });
+    }
+
+    const result = promotions.map((p: any) => {
+      const owner = p.business.users.find((u: any) => u.role === 'OWNER') ?? null;
       return {
         id: p.id,
         title: p.title,
         description: p.description,
         discount: p.discount,
-        validUntil: p.validUntil.toISOString(),
+        validUntil: p.validUntil,
         business: {
           id: p.business.id,
           name: p.business.name,

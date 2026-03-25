@@ -1,12 +1,7 @@
-// GET    /api/appointments/[id]
-// PATCH  /api/appointments/[id]  – actualizar estado, notas, pago
-// DELETE /api/appointments/[id]
-export const dynamic = "force-dynamic";
-
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase-server";
 
 const patchSchema = z.object({
   status: z
@@ -36,11 +31,14 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const { id } = await params;
+  const supabase = await createClient();
 
-  const appointment = await prisma.appointment.findFirst({
-    where: { id, userId: session.userId },
-    include: { client: true, service: true, payment: true },
-  });
+  const { data: appointment } = await supabase
+    .from('Appointment')
+    .select('*, client:Client(*), service:Service(*), payment:Payment(*)')
+    .eq('id', id)
+    .eq('userId', session.userId)
+    .single();
 
   if (!appointment) {
     return NextResponse.json({ error: "Cita no encontrada" }, { status: 404 });
@@ -54,10 +52,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const { id } = await params;
+  const supabase = await createClient();
 
-  const appointment = await prisma.appointment.findFirst({
-    where: { id, userId: session.userId },
-  });
+  const { data: appointment } = await supabase
+    .from('Appointment')
+    .select('id')
+    .eq('id', id)
+    .eq('userId', session.userId)
+    .single();
 
   if (!appointment) {
     return NextResponse.json({ error: "Cita no encontrada" }, { status: 404 });
@@ -77,43 +79,40 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const { status, notes, payment } = parsed.data;
 
     // Actualizar cita
-    const updated = await prisma.appointment.update({
-      where: { id },
-      data: {
+    const { error: updateError } = await supabase
+      .from('Appointment')
+      .update({
         ...(status && { status }),
         ...(notes !== undefined && { notes }),
-      },
-    });
+      })
+      .eq('id', id);
+
+    if (updateError) throw updateError;
 
     // Registrar/actualizar pago si se envía
     if (payment) {
       const { amount, method, isPaid = true, notes: payNotes } = payment;
 
-      await prisma.payment.upsert({
-        where: { appointmentId: id },
-        update: {
-          amount,
-          method,
-          isPaid,
-          notes: payNotes,
-          paidAt: isPaid ? new Date() : null,
-        },
-        create: {
+      const { error: paymentError } = await supabase
+        .from('Payment')
+        .upsert({
           appointmentId: id,
           amount,
           currency: "USD",
           method,
           isPaid,
           notes: payNotes,
-          paidAt: isPaid ? new Date() : null,
-        },
-      });
+          paidAt: isPaid ? new Date().toISOString() : null,
+        }, { onConflict: 'appointmentId' });
+      
+      if (paymentError) throw paymentError;
     }
 
-    const result = await prisma.appointment.findUnique({
-      where: { id },
-      include: { client: true, service: true, payment: true },
-    });
+    const { data: result } = await supabase
+      .from('Appointment')
+      .select('*, client:Client(*), service:Service(*), payment:Payment(*)')
+      .eq('id', id)
+      .single();
 
     return NextResponse.json(result);
   } catch (error) {
@@ -127,20 +126,24 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const { id } = await params;
+  const supabase = await createClient();
 
-  const appointment = await prisma.appointment.findFirst({
-    where: { id, userId: session.userId },
-  });
+  const { data: appointment } = await supabase
+    .from('Appointment')
+    .select('id')
+    .eq('id', id)
+    .eq('userId', session.userId)
+    .single();
 
   if (!appointment) {
     return NextResponse.json({ error: "Cita no encontrada" }, { status: 404 });
   }
 
   // Soft delete: cambiar estado a "cancelled"
-  await prisma.appointment.update({
-    where: { id },
-    data: { status: "cancelled" },
-  });
+  await supabase
+    .from('Appointment')
+    .update({ status: "cancelled" })
+    .eq('id', id);
 
   return NextResponse.json({ ok: true });
 }

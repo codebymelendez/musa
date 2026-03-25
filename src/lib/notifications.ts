@@ -1,5 +1,5 @@
 import webpush from "web-push";
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase-server";
 
 const publicVapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
 const privateVapidKey = process.env.VAPID_PRIVATE_KEY || "";
@@ -19,19 +19,20 @@ interface PushPayload {
 }
 
 async function sendPushToSubscriptions(
-  subscriptions: { id: string; endpoint: string; keys: unknown }[],
+  subscriptions: { id: string; endpoint: string; keys: any }[],
   payload: PushPayload
 ) {
+  const supabase = await createClient();
   for (const sub of subscriptions) {
     try {
+      const keys = typeof sub.keys === 'string' ? JSON.parse(sub.keys) : sub.keys;
       await webpush.sendNotification(
-        { endpoint: sub.endpoint, keys: JSON.parse(sub.keys as string) },
+        { endpoint: sub.endpoint, keys },
         JSON.stringify(payload)
       );
-    } catch (err: unknown) {
-      const status = (err as { statusCode?: number }).statusCode;
-      if (status === 410 || status === 404) {
-        await prisma.pushSubscription.delete({ where: { id: sub.id } });
+    } catch (err: any) {
+      if (err.statusCode === 410 || err.statusCode === 404) {
+        await supabase.from('PushSubscription').delete().eq('id', sub.id);
       }
     }
   }
@@ -43,21 +44,27 @@ export async function sendNotification(
   data: PushPayload
 ) {
   try {
-    const localNotification = await prisma.notification.create({
-      data: {
+    const supabase = await createClient();
+    const { data: localNotification } = await supabase
+      .from('Notification')
+      .insert({
         userId,
         title: data.title,
         body: data.body,
         url: data.url,
         data: data.appointmentId ? { appointmentId: data.appointmentId } : undefined,
-      },
-    });
+      })
+      .select()
+      .single();
 
-    const subscriptions = await prisma.pushSubscription.findMany({
-      where: { userId },
-    });
+    const { data: subscriptions } = await supabase
+      .from('PushSubscription')
+      .select('id, endpoint, keys')
+      .eq('userId', userId);
 
-    await sendPushToSubscriptions(subscriptions, data);
+    if (subscriptions) {
+      await sendPushToSubscriptions(subscriptions, data);
+    }
     return localNotification;
   } catch (error) {
     console.error("[sendNotification]", error);
@@ -70,21 +77,27 @@ export async function sendClientNotification(
   data: PushPayload
 ) {
   try {
-    const localNotification = await prisma.notification.create({
-      data: {
+    const supabase = await createClient();
+    const { data: localNotification } = await supabase
+      .from('Notification')
+      .insert({
         clientId,
         title: data.title,
         body: data.body,
         url: data.url,
         data: data.appointmentId ? { appointmentId: data.appointmentId } : undefined,
-      },
-    });
+      })
+      .select()
+      .single();
 
-    const subscriptions = await prisma.pushSubscription.findMany({
-      where: { clientId },
-    });
+    const { data: subscriptions } = await supabase
+      .from('PushSubscription')
+      .select('id, endpoint, keys')
+      .eq('clientId', clientId);
 
-    await sendPushToSubscriptions(subscriptions, data);
+    if (subscriptions) {
+      await sendPushToSubscriptions(subscriptions, data);
+    }
     return localNotification;
   } catch (error) {
     console.error("[sendClientNotification]", error);
@@ -97,14 +110,19 @@ export async function broadcastToBusinessClients(
   data: PushPayload
 ) {
   try {
-    const clients = await prisma.client.findMany({
-      where: { businessId, wantsNotifications: true },
-      include: { pushSubscriptions: true },
-    });
+    const supabase = await createClient();
+    const { data: clients } = await supabase
+      .from('Client')
+      .select('id, pushSubscriptions:PushSubscription(id, endpoint, keys)')
+      .eq('businessId', businessId)
+      .eq('wantsNotifications', true);
 
-    for (const client of clients) {
-      if (client.pushSubscriptions.length > 0) {
-        await sendPushToSubscriptions(client.pushSubscriptions, data);
+    if (clients) {
+      for (const client of clients) {
+        const subs = (client as any).pushSubscriptions;
+        if (subs && subs.length > 0) {
+          await sendPushToSubscriptions(subs, data);
+        }
       }
     }
   } catch (error) {

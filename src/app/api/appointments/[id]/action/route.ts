@@ -1,9 +1,5 @@
-// POST /api/appointments/[id]/action?action=confirm|cancel
-// Invocado desde el Service Worker cuando la clienta pulsa botón en la push notification.
-export const dynamic = "force-dynamic";
-
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase-server";
 import { sendClientNotification } from "@/lib/notifications";
 
 type Params = { params: Promise<{ id: string }> };
@@ -17,10 +13,12 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   try {
-    const appointment = await prisma.appointment.findUnique({
-      where: { id },
-      include: { service: true, user: true, client: true },
-    });
+    const supabase = await createClient();
+    const { data: appointment } = await supabase
+      .from('Appointment')
+      .select('*, service:Service(*), user:User(*), client:Client(*)')
+      .eq('id', id)
+      .single();
 
     if (!appointment) {
       return NextResponse.json({ error: "Cita no encontrada" }, { status: 404 });
@@ -28,16 +26,20 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const newStatus = action === "confirm" ? "confirmed" : "cancelled";
 
-    await prisma.appointment.update({
-      where: { id },
-      data: { status: newStatus },
-    });
+    const { error: updateError } = await supabase
+      .from('Appointment')
+      .update({ status: newStatus })
+      .eq('id', id);
+
+    if (updateError) throw updateError;
 
     // Notificar al profesional del cambio
-    const startStr = appointment.startTime.toLocaleTimeString("es-VE", {
+    const startTime = new Date(appointment.startTime);
+    const startStr = startTime.toLocaleTimeString("es-VE", {
       hour: "2-digit",
       minute: "2-digit",
     });
+
     if (action === "cancel") {
       await sendClientNotification(appointment.clientId, {
         title: "Cita cancelada",

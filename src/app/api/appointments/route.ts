@@ -1,11 +1,7 @@
-// GET  /api/appointments?date=YYYY-MM-DD&from=ISO&to=ISO
-// POST /api/appointments
-export const dynamic = "force-dynamic";
-
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase-server";
 import { checkAppointmentLimit, incrementAppointmentCount } from "@/lib/limits";
 
 const createSchema = z.object({
@@ -24,34 +20,41 @@ export async function GET(req: NextRequest) {
   const from = searchParams.get("from");
   const to = searchParams.get("to");
 
-  let startFilter: Date;
-  let endFilter: Date;
+  let startFilter: string;
+  let endFilter: string;
 
   if (date) {
-    startFilter = new Date(date);
-    startFilter.setHours(0, 0, 0, 0);
-    endFilter = new Date(date);
-    endFilter.setHours(23, 59, 59, 999);
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    startFilter = d.toISOString();
+    d.setHours(23, 59, 59, 999);
+    endFilter = d.toISOString();
   } else if (from && to) {
-    startFilter = new Date(from);
-    endFilter = new Date(to);
+    startFilter = new Date(from).toISOString();
+    endFilter = new Date(to).toISOString();
   } else {
     // Default: hoy
-    startFilter = new Date();
-    startFilter.setHours(0, 0, 0, 0);
-    endFilter = new Date();
-    endFilter.setHours(23, 59, 59, 999);
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    startFilter = d.toISOString();
+    d.setHours(23, 59, 59, 999);
+    endFilter = d.toISOString();
   }
 
   try {
-    const appointments = await prisma.appointment.findMany({
-      where: {
-        userId: session.userId,
-        startTime: { gte: startFilter, lte: endFilter },
-      },
-      include: { client: true, service: true, payment: true },
-      orderBy: { startTime: "asc" },
-    });
+    const supabase = await createClient();
+    const { data: appointments, error } = await supabase
+      .from('Appointment')
+      .select('*, client:Client(*), service:Service(*), payment:Payment(*)')
+      .eq('userId', session.userId)
+      .gte('startTime', startFilter)
+      .lte('startTime', endFilter)
+      .order('startTime', { ascending: true });
+
+    if (error) {
+      console.error("[appointments fetch error]", error);
+      return NextResponse.json({ error: "Error al obtener citas" }, { status: 500 });
+    }
 
     return NextResponse.json(appointments);
   } catch (error) {
@@ -76,12 +79,14 @@ export async function POST(req: NextRequest) {
     }
 
     const { clientId, serviceId, startTime, notes } = parsed.data;
+    const supabase = await createClient();
 
     // 0. Verificar límites del plan
-    const user = await prisma.user.findUnique({
-      where: { id: session.userId },
-      select: { businessId: true },
-    });
+    const { data: user } = await supabase
+      .from('User')
+      .select('businessId')
+      .eq('id', session.userId)
+      .single();
 
     if (user?.businessId) {
       const canCreate = await checkAppointmentLimit(user.businessId);
@@ -94,9 +99,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Obtener duración del servicio
-    const service = await prisma.service.findFirst({
-      where: { id: serviceId, userId: session.userId },
-    });
+    const { data: service } = await supabase
+      .from('Service')
+      .select('durationMin')
+      .eq('id', serviceId)
+      .eq('userId', session.userId)
+      .single();
 
     if (!service) {
       return NextResponse.json({ error: "Servicio no encontrado" }, { status: 404 });
@@ -106,37 +114,40 @@ export async function POST(req: NextRequest) {
     const end = new Date(start.getTime() + service.durationMin * 60000);
 
     // Detectar conflicto de horario
-    const conflict = await prisma.appointment.findFirst({
-      where: {
-        userId: session.userId,
-        status: { notIn: ["cancelled", "no_show"] },
-        OR: [
-          { startTime: { gte: start, lt: end } },
-          { endTime: { gt: start, lte: end } },
-          { startTime: { lte: start }, endTime: { gte: end } },
-        ],
-      },
-    });
+    const { data: conflict } = await supabase
+      .from('Appointment')
+      .select('id')
+      .eq('userId', session.userId)
+      .not('status', 'in', '("cancelled","no_show")')
+      .filter('startTime', 'lt', end.toISOString())
+      .filter('endTime', 'gt', start.toISOString())
+      .limit(1);
 
-    if (conflict) {
+    if (conflict && conflict.length > 0) {
       return NextResponse.json(
         { error: "Ya tienes una cita en ese horario" },
         { status: 409 }
       );
     }
 
-    const appointment = await prisma.appointment.create({
-      data: {
+    const { data: appointment, error: createError } = await supabase
+      .from('Appointment')
+      .insert({
         userId: session.userId,
         clientId,
         serviceId,
-        startTime: start,
-        endTime: end,
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
         status: "confirmed",
         notes,
-      },
-      include: { client: true, service: true },
-    });
+      })
+      .select('*, client:Client(*), service:Service(*)')
+      .single();
+
+    if (createError) {
+      console.error("[appointment create error]", createError);
+      return NextResponse.json({ error: "Error al crear la cita" }, { status: 500 });
+    }
 
     // 3. Incrementar contador de citas del negocio
     if (user?.businessId) {

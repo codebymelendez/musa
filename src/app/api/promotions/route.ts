@@ -1,11 +1,7 @@
-// GET  /api/promotions        → lista promos del negocio del usuario
-// POST /api/promotions        → crear nueva promo
-export const dynamic = "force-dynamic";
-
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase-server";
 
 const createSchema = z.object({
   title: z.string().min(3),
@@ -13,7 +9,7 @@ const createSchema = z.object({
   discount: z.number().min(1).max(100),
   validFrom: z.string().datetime(),
   validUntil: z.string().datetime(),
-  targetUserId: z.string().cuid().optional().nullable(),
+  targetUserId: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
 });
 
@@ -22,19 +18,27 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: session.userId },
-      select: { businessId: true },
-    });
+    const supabase = await createClient();
+    const { data: user } = await supabase
+      .from('User')
+      .select('businessId')
+      .eq('id', session.userId)
+      .single();
 
     if (!user?.businessId) {
       return NextResponse.json({ promotions: [] });
     }
 
-    const promotions = await prisma.promotion.findMany({
-      where: { businessId: user.businessId },
-      orderBy: { createdAt: "desc" },
-    });
+    const { data: promotions, error } = await supabase
+      .from('Promotion')
+      .select('*')
+      .eq('businessId', user.businessId)
+      .order('createdAt', { ascending: false });
+
+    if (error) {
+       console.error("[promotions fetch error]", error);
+       return NextResponse.json({ error: "Error al obtener promociones" }, { status: 500 });
+    }
 
     return NextResponse.json({ promotions });
   } catch (error) {
@@ -48,10 +52,12 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: session.userId },
-      select: { role: true, businessId: true },
-    });
+    const supabase = await createClient();
+    const { data: user } = await supabase
+      .from('User')
+      .select('role, businessId')
+      .eq('id', session.userId)
+      .single();
 
     if (user?.role !== "OWNER") {
       return NextResponse.json({ error: "Solo el propietario puede crear promociones" }, { status: 403 });
@@ -70,14 +76,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const promotion = await prisma.promotion.create({
-      data: {
+    const { data: promotion, error: createError } = await supabase
+      .from('Promotion')
+      .insert({
         ...parsed.data,
         businessId: user.businessId,
-        validFrom: new Date(parsed.data.validFrom),
-        validUntil: new Date(parsed.data.validUntil),
-      },
-    });
+        validFrom: new Date(parsed.data.validFrom).toISOString(),
+        validUntil: new Date(parsed.data.validUntil).toISOString(),
+      })
+      .select()
+      .single();
+
+    if (createError) {
+       console.error("[promotion create error]", createError);
+       return NextResponse.json({ error: "Error al crear promoción" }, { status: 500 });
+    }
 
     return NextResponse.json({ promotion }, { status: 201 });
   } catch (error) {

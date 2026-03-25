@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-export const dynamic = "force-dynamic";
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase-server";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -9,17 +8,21 @@ export async function GET(req: NextRequest) {
   if (!token) return NextResponse.json({ error: "Token faltante" }, { status: 400 });
 
   try {
-    const invitation = await prisma.invitation.findUnique({
-      where: { token, usedAt: null },
-      include: { business: { select: { name: true } } },
-    });
+    const supabase = await createClient();
+    const { data: invitation, error } = await supabase
+      .from('Invitation')
+      .select('*, business:Business(name)')
+      .eq('token', token)
+      .is('usedAt', null)
+      .single();
 
-    if (!invitation || (invitation.expiresAt && invitation.expiresAt < new Date())) {
+    if (error || !invitation || (invitation.expiresAt && new Date(invitation.expiresAt) < new Date())) {
       return NextResponse.json({ error: "Invitación inválida o expirada" }, { status: 404 });
     }
 
     return NextResponse.json({ business: invitation.business });
   } catch (error) {
+    console.error("[team invite validate GET]", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }

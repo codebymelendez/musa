@@ -1,14 +1,9 @@
-// POST /api/push/subscribe-client
-// Guarda suscripción push para una clienta (sin autenticación de staff).
-// Se llama después del booking con el clientId devuelto por /api/public/[slug]/book.
-export const dynamic = "force-dynamic";
-
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase-server";
 
 const schema = z.object({
-  clientId: z.string().cuid(),
+  clientId: z.string(),
   subscription: z.object({
     endpoint: z.string().url(),
     keys: z.object({
@@ -27,31 +22,33 @@ export async function POST(req: NextRequest) {
     }
 
     const { clientId, subscription } = parsed.data;
+    const supabase = await createClient();
 
     // Verificar que la clienta existe
-    const client = await prisma.client.findUnique({ where: { id: clientId } });
+    const { data: client } = await supabase
+      .from('Client')
+      .select('id')
+      .eq('id', clientId)
+      .single();
+
     if (!client) {
       return NextResponse.json({ error: "Clienta no encontrada" }, { status: 404 });
     }
 
-    await prisma.pushSubscription.upsert({
-      where: { endpoint: subscription.endpoint },
-      update: {
-        clientId,
-        keys: JSON.stringify(subscription.keys),
-      },
-      create: {
+    const { error: upsertError } = await supabase
+      .from('PushSubscription')
+      .upsert({
         clientId,
         endpoint: subscription.endpoint,
         keys: JSON.stringify(subscription.keys),
-      },
-    });
+      }, { onConflict: 'endpoint' });
+
+    if (upsertError) {
+       console.error("[push subscribe-client upsert error]", upsertError);
+    }
 
     // Marcar que la clienta quiere notificaciones
-    await prisma.client.update({
-      where: { id: clientId },
-      data: { wantsNotifications: true },
-    });
+    await supabase.from('Client').update({ wantsNotifications: true }).eq('id', clientId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

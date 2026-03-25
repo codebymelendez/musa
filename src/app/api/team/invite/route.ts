@@ -1,11 +1,6 @@
-// POST   /api/team/invite -> Crear invitación
-// GET    /api/team/invites -> Listar invitaciones
-// DELETE /api/team/invite/[id] -> Revocar invitación
-export const dynamic = "force-dynamic";
-
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase-server";
 import { nanoid } from "nanoid";
 
 export async function POST(req: NextRequest) {
@@ -13,10 +8,12 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: session.userId },
-      select: { role: true, businessId: true },
-    });
+    const supabase = await createClient();
+    const { data: user } = await supabase
+      .from('User')
+      .select('role, businessId')
+      .eq('id', session.userId)
+      .single();
 
     if (user?.role !== "OWNER" || !user.businessId) {
       return NextResponse.json({ error: "Solo el dueño puede invitar personal" }, { status: 403 });
@@ -26,15 +23,22 @@ export async function POST(req: NextRequest) {
     const token = nanoid(32);
     const code = nanoid(8).toUpperCase();
 
-    const invitation = await prisma.invitation.create({
-      data: {
+    const { data: invitation, error } = await supabase
+      .from('Invitation')
+      .insert({
         businessId: user.businessId,
         token,
         code,
         role: "STAFF",
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 días
-      },
-    });
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 días
+      })
+      .select()
+      .single();
+
+    if (error) {
+       console.error("[team invite create error]", error);
+       return NextResponse.json({ error: "Error al crear invitación" }, { status: 500 });
+    }
 
     return NextResponse.json(invitation);
   } catch (error) {
@@ -48,24 +52,27 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: session.userId },
-      select: { businessId: true },
-    });
+    const supabase = await createClient();
+    const { data: user } = await supabase
+      .from('User')
+      .select('businessId')
+      .eq('id', session.userId)
+      .single();
 
     if (!user?.businessId) return NextResponse.json([]);
 
-    const invitations = await prisma.invitation.findMany({
-      where: { 
-        businessId: user.businessId,
-        usedAt: null,
-        OR: [
-          { expiresAt: null },
-          { expiresAt: { gt: new Date() } }
-        ]
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const { data: invitations, error } = await supabase
+      .from('Invitation')
+      .select('*')
+      .eq('businessId', user.businessId)
+      .is('usedAt', null)
+      .or(`expiresAt.is.null,expiresAt.gt.${new Date().toISOString()}`)
+      .order('createdAt', { ascending: false });
+
+    if (error) {
+       console.error("[team invites fetch error]", error);
+       return NextResponse.json({ error: "Error al obtener invitaciones" }, { status: 500 });
+    }
 
     return NextResponse.json(invitations);
   } catch (error) {

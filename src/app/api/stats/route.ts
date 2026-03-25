@@ -1,9 +1,6 @@
-// GET /api/stats?period=month&year=2025&month=3
-export const dynamic = "force-dynamic";
-
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase-server";
 
 export async function GET(req: NextRequest) {
   const session = await getSession(req);
@@ -14,32 +11,38 @@ export async function GET(req: NextRequest) {
   const year = parseInt(searchParams.get("year") ?? String(now.getFullYear()));
   const month = parseInt(searchParams.get("month") ?? String(now.getMonth() + 1));
 
-  const startOfMonth = new Date(year, month - 1, 1);
-  const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
+  const startOfMonth = new Date(year, month - 1, 1).toISOString();
+  const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999).toISOString();
 
   try {
-    // ── Citas completadas del mes ─────────────────────────────────────────────
-    const completedAppointments = await prisma.appointment.findMany({
-      where: {
-        userId: session.userId,
-        status: "completed",
-        startTime: { gte: startOfMonth, lte: endOfMonth },
-      },
-      include: { service: true, payment: true },
-    });
+    const supabase = await createClient();
 
-    // ── Ingresos del mes ──────────────────────────────────────────────────────
-    const monthlyRevenue = completedAppointments.reduce((sum, apt) => {
-      if (apt.payment?.isPaid) return sum + apt.payment.amount;
+    // ── Citas completadas del mes + Ingresos ──────────────────────────────────
+    const { data: completedAppointments, error: appointmentsError } = await supabase
+      .from('Appointment')
+      .select('serviceId, service:Service(name), payment:Payment(isPaid, amount)')
+      .eq('userId', session.userId)
+      .eq('status', 'completed')
+      .gte('startTime', startOfMonth)
+      .lte('startTime', endOfMonth);
+
+    if (appointmentsError) {
+      console.error("[stats appointments error]", appointmentsError);
+    }
+
+    const appointments = completedAppointments || [];
+
+    const monthlyRevenue = appointments.reduce((sum, apt: any) => {
+      if (apt.payment?.isPaid) return sum + (apt.payment.amount || 0);
       return sum;
     }, 0);
 
     // ── Top 3 servicios ───────────────────────────────────────────────────────
     const serviceCounts: Record<string, { name: string; count: number }> = {};
-    for (const apt of completedAppointments) {
+    for (const apt of appointments as any[]) {
       const key = apt.serviceId;
       if (!serviceCounts[key]) {
-        serviceCounts[key] = { name: apt.service.name, count: 0 };
+        serviceCounts[key] = { name: apt.service?.name || "Desconocido", count: 0 };
       }
       serviceCounts[key].count++;
     }
@@ -50,42 +53,53 @@ export async function GET(req: NextRequest) {
       .map(({ name, count }) => ({ serviceName: name, count }));
 
     // ── Total de clientas ─────────────────────────────────────────────────────
-    const totalClients = await prisma.client.count({
-      where: { userId: session.userId },
-    });
+    const { count: totalClients, error: clientCountError } = await supabase
+      .from('Client')
+      .select('*', { count: 'exact', head: true })
+      .eq('userId', session.userId);
 
     // ── Ticket promedio ───────────────────────────────────────────────────────
-    const paidPayments = completedAppointments.filter((a) => a.payment?.isPaid);
+    const paidPayments = appointments.filter((a: any) => a.payment?.isPaid);
     const avgTicket =
       paidPayments.length > 0
-        ? paidPayments.reduce((s, a) => s + (a.payment?.amount ?? 0), 0) /
+        ? paidPayments.reduce((s, a: any) => s + (a.payment?.amount ?? 0), 0) /
           paidPayments.length
         : 0;
 
     // ── Ingresos acumulados del año ───────────────────────────────────────────
-    const startOfYear = new Date(year, 0, 1);
-    const endOfYear = new Date(year, 11, 31, 23, 59, 59, 999);
+    const startOfYear = new Date(year, 0, 1).toISOString();
+    const endOfYear = new Date(year, 11, 31, 23, 59, 59, 999).toISOString();
 
-    const yearPayments = await prisma.payment.findMany({
-      where: {
-        isPaid: true,
-        appointment: {
-          userId: session.userId,
-          startTime: { gte: startOfYear, lte: endOfYear },
-          status: "completed",
-        },
-      },
-    });
+    const { data: yearPayments, error: yearRevenueError } = await supabase
+      .from('Payment')
+      .select('amount, appointment:Appointment(startTime, status, userId)')
+      .eq('isPaid', true)
+      .eq('Appointment.userId', session.userId)
+      .eq('Appointment.status', 'completed')
+      .gte('Appointment.startTime', startOfYear)
+      .lte('Appointment.startTime', endOfYear);
 
-    const yearlyRevenue = yearPayments.reduce((s, p) => s + p.amount, 0);
+    const yearlyRevenue = (yearPayments || [])
+      .filter((p: any) => p.appointment) // Asegurar que el join fue exitoso
+      .reduce((s, p) => s + (p.amount || 0), 0);
+
+    // ── Reprogramaciones del mes ──────────────────────────────────────────────
+    const { count: rescheduledThisMonth } = await supabase
+      .from('Appointment')
+      .select('*', { count: 'exact', head: true })
+      .eq('userId', session.userId)
+      .eq('status', 'reprogrammed')
+      .gte('updatedAt', startOfMonth)
+      .lte('updatedAt', endOfMonth);
 
     return NextResponse.json({
       monthlyRevenue,
-      completedAppointments: completedAppointments.length,
+      completedAppointments: appointments.length,
       topServices,
-      totalClients,
+      totalClients: totalClients || 0,
       avgTicket,
       yearlyRevenue,
+      rescheduledThisMonth: rescheduledThisMonth || 0,
       currency: "USD",
     });
   } catch (error) {

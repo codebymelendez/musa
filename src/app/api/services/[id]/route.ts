@@ -1,11 +1,7 @@
-// GET    /api/services/[id]
-// PATCH  /api/services/[id]
-// DELETE /api/services/[id]
-
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase-server";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -24,9 +20,14 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const { id } = await params;
 
-  const service = await prisma.service.findFirst({
-    where: { id, userId: session.userId },
-  });
+  const supabase = await createClient();
+  const { data: service } = await supabase
+    .from('Service')
+    .select('*')
+    .eq('id', id)
+    .eq('userId', session.userId)
+    .maybeSingle();
+
   if (!service) return NextResponse.json({ error: "Servicio no encontrado" }, { status: 404 });
 
   return NextResponse.json(service);
@@ -37,9 +38,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const { id } = await params;
 
-  const service = await prisma.service.findFirst({
-    where: { id, userId: session.userId },
-  });
+  const supabase = await createClient();
+  const { data: service } = await supabase
+    .from('Service')
+    .select('id')
+    .eq('id', id)
+    .eq('userId', session.userId)
+    .maybeSingle();
+
   if (!service) return NextResponse.json({ error: "Servicio no encontrado" }, { status: 404 });
 
   try {
@@ -49,10 +55,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Datos inválidos" }, { status: 400 });
     }
 
-    const updated = await prisma.service.update({
-      where: { id },
-      data: parsed.data,
-    });
+    const { data: updated, error } = await supabase
+      .from('Service')
+      .update(parsed.data)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json(updated);
   } catch (error) {
@@ -66,16 +76,23 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const { id } = await params;
 
-  const service = await prisma.service.findFirst({
-    where: { id, userId: session.userId },
-  });
+  const supabase = await createClient();
+  const { data: service } = await supabase
+    .from('Service')
+    .select('id')
+    .eq('id', id)
+    .eq('userId', session.userId)
+    .maybeSingle();
+
   if (!service) return NextResponse.json({ error: "Servicio no encontrado" }, { status: 404 });
 
   // Soft delete
-  await prisma.service.update({
-    where: { id },
-    data: { isActive: false },
-  });
+  const { error } = await supabase
+    .from('Service')
+    .update({ isActive: false })
+    .eq('id', id);
+
+  if (error) throw error;
 
   return NextResponse.json({ ok: true });
 }

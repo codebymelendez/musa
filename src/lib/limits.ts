@@ -1,12 +1,14 @@
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase-server";
 
 export async function checkAppointmentLimit(businessId: string) {
-  const business = await prisma.business.findUnique({
-    where: { id: businessId },
-    include: { plan: true },
-  });
+  const supabase = await createClient();
+  const { data: business, error } = await supabase
+    .from('Business')
+    .select('*, plan:Plan(*)')
+    .eq('id', businessId)
+    .single();
 
-  if (!business || !business.plan) return true; // Si no hay plan, no hay límite? O asumir FREE?
+  if (error || !business || !business.plan) return true;
 
   const limits = business.plan.limits as any;
   const maxAppointments = limits?.maxMonthlyAppointments || 30;
@@ -19,8 +21,19 @@ export async function checkAppointmentLimit(businessId: string) {
 }
 
 export async function incrementAppointmentCount(businessId: string) {
-  await prisma.business.update({
-    where: { id: businessId },
-    data: { currentMonthBookings: { increment: 1 } },
-  });
+  const supabase = await createClient();
+  
+  // Obtenemos el valor actual (no es idealmente atómico pero similar a la implementación previa si no usamos RPC)
+  const { data: business } = await supabase
+    .from('Business')
+    .select('currentMonthBookings')
+    .eq('id', businessId)
+    .single();
+
+  if (business) {
+    await supabase
+      .from('Business')
+      .update({ currentMonthBookings: (business.currentMonthBookings || 0) + 1 })
+      .eq('id', businessId);
+  }
 }

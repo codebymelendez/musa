@@ -1,11 +1,7 @@
-// GET  /api/services
-// POST /api/services
-export const dynamic = "force-dynamic";
-
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase-server";
 
 const createSchema = z.object({
   name: z.string().min(1, "El nombre es obligatorio"),
@@ -21,10 +17,19 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   try {
-    const services = await prisma.service.findMany({
-      where: { userId: session.userId, isActive: true },
-      orderBy: { createdAt: "asc" },
-    });
+    const supabase = await createClient();
+    const { data: services, error } = await supabase
+      .from('Service')
+      .select('*')
+      .eq('userId', session.userId)
+      .eq('isActive', true)
+      .order('createdAt', { ascending: true });
+
+    if (error) {
+       console.error("[services fetch error]", error);
+       return NextResponse.json({ error: "Error al obtener servicios" }, { status: 500 });
+    }
+
     return NextResponse.json(services);
   } catch (error) {
     console.error("[services GET]", error);
@@ -47,9 +52,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const service = await prisma.service.create({
-      data: { ...parsed.data, userId: session.userId },
-    });
+    const supabase = await createClient();
+    const { data: service, error } = await supabase
+      .from('Service')
+      .insert({ ...parsed.data, userId: session.userId })
+      .select()
+      .single();
+
+    if (error) {
+       console.error("[service create error]", error);
+       return NextResponse.json({ error: "Error al crear servicio" }, { status: 500 });
+    }
 
     return NextResponse.json(service, { status: 201 });
   } catch (error) {

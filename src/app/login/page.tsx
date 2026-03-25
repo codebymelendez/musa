@@ -8,10 +8,9 @@ import { useAuth } from "@/hooks/useAuth";
 export default function Login() {
   const { login, register } = useAuth();
   const [isRegister, setIsRegister] = useState(false);
-  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
-  const [countryCode, setCountryCode] = useState("+58");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,13 +19,11 @@ export default function Login() {
     setError(null);
     setLoading(true);
 
-    const fullPhone = `${countryCode}${phone.replace(/\D/g, "")}`;
-
     try {
       if (isRegister) {
-        await register({ phone: fullPhone, name, password });
+        await register({ email, name, password });
       } else {
-        await login({ phone: fullPhone, password });
+        await login({ email, password });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error inesperado");
@@ -85,39 +82,19 @@ export default function Login() {
               </div>
             )}
 
-            {/* Teléfono */}
+            {/* Email */}
             <div className="space-y-2">
               <label className="font-label text-sm font-semibold uppercase tracking-wider text-on-surface-variant ml-1">
-                Número de Teléfono
+                Correo Electrónico
               </label>
-              <div className="flex gap-3">
-                <div className="relative flex-none">
-                  <select
-                    className="appearance-none h-14 pl-4 pr-10 bg-surface-container-high border-none rounded-xl font-body text-on-surface focus:ring-2 focus:ring-primary focus:bg-surface-bright transition-all cursor-pointer"
-                    value={countryCode}
-                    onChange={(e) => setCountryCode(e.target.value)}
-                  >
-                    <option value="+58">+58</option>
-                    <option value="+1">+1</option>
-                    <option value="+34">+34</option>
-                    <option value="+54">+54</option>
-                    <option value="+57">+57</option>
-                  </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">
-                    <span className="material-symbols-outlined">expand_more</span>
-                  </div>
-                </div>
-                <div className="flex-grow">
-                  <input
-                    className="w-full h-14 px-5 bg-surface-container-high border-none rounded-xl font-body text-lg text-on-surface placeholder:text-outline focus:ring-2 focus:ring-primary focus:bg-surface-bright transition-all"
-                    placeholder="(000) 000-0000"
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
+              <input
+                className="w-full h-14 px-5 bg-surface-container-high border-none rounded-xl font-body text-lg text-on-surface placeholder:text-outline focus:ring-2 focus:ring-primary focus:bg-surface-bright transition-all"
+                placeholder="tu@email.com"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
             </div>
 
             {/* Contraseña */}
@@ -188,7 +165,7 @@ export default function Login() {
         {/* Editorial aesthetic */}
         <div className="mt-12 flex flex-col items-center gap-6 opacity-40 grayscale pointer-events-none">
           <div className="grid grid-cols-2 gap-4 max-w-[280px]">
-            <div className="h-24 w-24 rounded-2xl bg-surface-container-highest overflow-hidden relative">
+             <div className="h-24 w-24 rounded-2xl bg-surface-container-highest overflow-hidden relative">
               <Image
                 className="object-cover"
                 alt="Beauty professional tools"

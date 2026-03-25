@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-export const dynamic = "force-dynamic";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase-server";
 
 export async function POST(req: NextRequest) {
   const session = await getSession(req);
@@ -14,20 +13,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Suscripción inválida" }, { status: 400 });
     }
 
+    const supabase = await createClient();
     // Guardar o actualizar suscripción
-    await prisma.pushSubscription.upsert({
-      where: { 
-        endpoint: subscription.endpoint 
-      },
-      update: {
-        keys: JSON.stringify(subscription.keys),
-      },
-      create: {
+    const { error } = await supabase
+      .from('PushSubscription')
+      .upsert({
         userId: session.userId,
         endpoint: subscription.endpoint,
         keys: JSON.stringify(subscription.keys),
-      },
-    });
+      }, { onConflict: 'endpoint' });
+
+    if (error) {
+       console.error("[push subscribe upsert error]", error);
+       return NextResponse.json({ error: "Error al registrar suscripción" }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

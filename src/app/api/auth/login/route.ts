@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
-import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
-import { signToken, sessionCookieOptions } from "@/lib/auth";
+import { createClient } from "@/lib/supabase-server";
 
 const loginSchema = z.object({
-  phone: z.string().min(7),
-  password: z.string().min(1),
+  email: z.string().email(),
+  password: z.string().min(6),
 });
 
 export async function POST(req: NextRequest) {
@@ -22,60 +20,50 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { phone, password } = parsed.data;
+    const { email, password } = parsed.data;
+    
+    // IMPORTANTE: Crear la respuesta primero para que Supabase pueda setear las cookies
+    const response = NextResponse.json({ user: null });
+    const supabase = await createClient(req, response);
 
-    const user = await prisma.user.findUnique({
-      where: { phone },
-      include: { settings: true, business: { include: { plan: true } } },
+    // 1. Login en Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     });
 
-    if (!user) {
-      return NextResponse.json(
-        { error: "Número no registrado" },
-        { status: 401 }
-      );
+    if (authError) {
+      // Mensaje amigable para el usuario
+      const message = authError.message === "Invalid login credentials"
+        ? "Credenciales incorrectas"
+        : authError.message;
+      return NextResponse.json({ error: message }, { status: 401 });
     }
 
-    const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) {
-      return NextResponse.json(
-        { error: "Contraseña incorrecta" },
-        { status: 401 }
-      );
+    if (!authData.user) {
+      return NextResponse.json({ error: "Error de autenticación" }, { status: 500 });
     }
 
-    const token = await signToken({
-      userId: user.id,
-      phone: user.phone,
-      slug: user.slug,
+    // El cliente de Supabase server ya maneja las cookies por nosotros a través de createClient
+    
+    // 2. Obtener perfil del usuario
+    const { data: userProfile, error: profileError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('id', authData.user.id)
+      .single();
+
+    if (profileError || !userProfile) {
+      console.error("[login profile error]", profileError);
+      return NextResponse.json({ error: "Perfil de usuario no encontrado" }, { status: 404 });
+    }
+
+    // Sobrescribir el cuerpo de la respuesta original (que ya tiene las cookies de sesión seteadas)
+    return new NextResponse(JSON.stringify({ user: userProfile }), {
+      status: 200,
+      headers: response.headers,
     });
 
-    const response = NextResponse.json({
-      user: {
-        id: user.id,
-        name: user.name,
-        phone: user.phone,
-        slug: user.slug,
-        serviceType: user.serviceType,
-        bio: user.bio,
-        avatarUrl: user.avatarUrl,
-        whatsapp: user.whatsapp,
-        instagram: user.instagram,
-        onboardingDone: user.onboardingDone,
-        settings: user.settings
-          ? {
-              ...user.settings,
-              workDays: JSON.parse(user.settings.workDays),
-            }
-          : null,
-        role: user.role,
-        businessId: user.businessId,
-        business: user.business,
-      },
-    });
-
-    response.cookies.set(sessionCookieOptions(token));
-    return response;
   } catch (error) {
     console.error("[login]", error);
     return NextResponse.json(

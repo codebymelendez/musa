@@ -1,10 +1,5 @@
-// GET /api/client/bookings
-// Devuelve todas las citas de la clienta identificada por JWT.
-// Authorization: Bearer <token>
-export const dynamic = "force-dynamic";
-
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase-server";
 import { getClientSession } from "@/lib/clientAuth";
 
 export async function GET(req: NextRequest) {
@@ -14,37 +9,73 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const appointments = await prisma.appointment.findMany({
-      where: {
-        client: { phone: session.clientPhone },
-      },
-      include: {
-        service: {
-          select: { name: true, durationMin: true, price: true, currency: true },
-        },
-        user: {
-          select: {
-            name: true,
-            slug: true,
-            avatarUrl: true,
-            serviceType: true,
-            whatsapp: true,
-            business: { select: { name: true, city: true } },
-          },
-        },
-        client: {
-          select: { name: true, phone: true },
-        },
-      },
-      orderBy: { startTime: "desc" },
-    });
+    const supabase = await createClient();
+    const { data: appointments } = await supabase
+      .from('Appointment')
+      .select(`
+        *,
+        service:Service(name, durationMin, price, currency),
+        user:User(
+          name,
+          slug,
+          avatarUrl,
+          serviceType,
+          whatsapp,
+          business:Business(name, city)
+        ),
+        client:Client(name, phone)
+      `)
+      .eq('client.phone', session.clientPhone)
+      .order('startTime', { ascending: false });
+
+    if (!appointments) {
+       return NextResponse.json({ clientName: session.clientName, upcoming: [], past: [], total: 0 });
+    }
+
+    // Supabase filtering for nested objects is tricky in a single query if the join is many-to-one.
+    // However, the eq('client.phone', ...) only works if we join correctly.
+    // In Supabase JS, we might need to filter after or use a more complex query.
+    // Let's use a simpler join and filter by clientId if we had it, but we only have phone.
+    // So we'll fetch based on client phone.
+    
+    // Alternative: fetch client id first.
+    const { data: client } = await supabase
+      .from('Client')
+      .select('id')
+      .eq('phone', session.clientPhone)
+      .limit(1)
+      .maybeSingle();
+    
+    if (!client) {
+       return NextResponse.json({ clientName: session.clientName, upcoming: [], past: [], total: 0 });
+    }
+
+    const { data: clientAppointments } = await supabase
+      .from('Appointment')
+      .select(`
+        *,
+        service:Service(name, durationMin, price, currency),
+        user:User(
+          name,
+          slug,
+          avatarUrl,
+          serviceType,
+          whatsapp,
+          business:Business(name, city)
+        ),
+        client:Client(name, phone)
+      `)
+      .eq('clientId', client.id)
+      .order('startTime', { ascending: false });
+
+    const results = clientAppointments || [];
 
     // Separar próximas y pasadas
     const now = new Date();
-    const upcoming = appointments.filter(
+    const upcoming = results.filter(
       (a) => new Date(a.startTime) >= now && a.status !== "cancelled"
     );
-    const past = appointments.filter(
+    const past = results.filter(
       (a) => new Date(a.startTime) < now || a.status === "cancelled"
     );
 
@@ -52,7 +83,7 @@ export async function GET(req: NextRequest) {
       clientName: session.clientName,
       upcoming,
       past,
-      total: appointments.length,
+      total: results.length,
     });
   } catch (error) {
     console.error("[client bookings GET]", error);

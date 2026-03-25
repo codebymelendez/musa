@@ -18,6 +18,7 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
     pathname.startsWith("/p/") ||   // booking público - siempre accesible
+    pathname.startsWith("/cita/") || // portal cliente self-service - siempre accesible
     pathname.includes(".") // archivos estáticos (.ico, .png, etc.)
   ) {
     return NextResponse.next();
@@ -36,10 +37,6 @@ export async function middleware(req: NextRequest) {
     loginUrl.searchParams.set("from", pathname);
     return NextResponse.redirect(loginUrl);
   }
-
-  // ── Onboarding: si el user existe pero no ha hecho onboarding ─────────────
-  // (La verificación de onboardingDone se hace en la propia página de home
-  //  para no hacer una query DB en el middleware Edge)
 
   return NextResponse.next();
 }
