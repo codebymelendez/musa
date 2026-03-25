@@ -112,8 +112,28 @@ export async function PATCH(req: NextRequest) {
       } else {
         // Crear nuevo negocio
         const slug = businessName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-        const { data: freePlan } = await supabase.from('Plan').select('id').eq('name', 'FREE').single();
-        if (!freePlan) throw new Error("Plan FREE no inicializado");
+        let { data: freePlan } = await supabase.from('Plan').select('id').eq('name', 'FREE').single();
+        if (!freePlan) {
+          // Auto-inicializar plan FREE si no existe en la base de datos (por ejemplo, recién creada)
+          const limitsInfo = { appointments: 50, staff: 1, services: 10 };
+          const { data: newPlan, error: planError } = await supabase
+            .from('Plan')
+            .insert({
+              id: `plan-free-${Date.now()}`,
+              name: 'FREE',
+              price: 0,
+              currency: 'USD',
+              limits: limitsInfo,
+            })
+            .select('id')
+            .single();
+
+          if (planError || !newPlan) {
+            console.error("Error creando plan FREE:", planError);
+            throw new Error("No se pudo inicializar el plan FREE");
+          }
+          freePlan = newPlan;
+        }
 
         const { data: business } = await supabase
           .from('Business')
