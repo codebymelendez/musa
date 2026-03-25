@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { getSession } from "@/lib/auth";
-import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
 
 export async function GET(req: NextRequest) {
   const response = NextResponse.json({ user: null });
@@ -12,8 +12,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const supabase = await createClient(req, response);
-    const { data: user, error } = await supabase
+    const admin = createAdminClient();
+    const { data: user, error } = await admin
       .from('User')
       .select('*, settings:ProfessionalSettings(*), business:Business(*, plan:Plan(*))')
       .eq('id', session.userId)
@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
       whatsapp: user.whatsapp,
       instagram: user.instagram,
       onboardingDone: user.onboardingDone,
+      businessId: user.businessId,
       business: user.business,
       settings: user.settings
         ? { ...user.settings, workDays: JSON.parse(user.settings.workDays || "[1,2,3,4,5]") }

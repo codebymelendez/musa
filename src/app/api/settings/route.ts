@@ -31,8 +31,8 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   try {
-    const supabase = await createClient(req, response);
-    const { data: user, error } = await supabase
+    const admin = createAdminClient();
+    const { data: user, error } = await admin
       .from('User')
       .select('*, settings:ProfessionalSettings(*), business:Business(*, plan:Plan(*))')
       .eq('id', session.userId)
@@ -53,6 +53,7 @@ export async function GET(req: NextRequest) {
       whatsapp: user.whatsapp,
       instagram: user.instagram,
       onboardingDone: user.onboardingDone,
+      businessId: user.businessId,
       business: user.business,
       settings: user.settings
         ? { ...user.settings, workDays: JSON.parse(user.settings.workDays || "[1,2,3,4,5]") }
@@ -86,13 +87,14 @@ export async function PATCH(req: NextRequest) {
     }
 
     const { name, bio, whatsapp, instagram, avatarUrl, settings, serviceType, businessName, city } = parsed.data;
-    const supabase = await createClient(req, response);
+    // Usar admin client para todas las operaciones de escritura (bypasa RLS)
+    const admin = createAdminClient();
 
     // 1. Manejar creación/actualización de Business
     let businessId: string | undefined;
 
     if (businessName) {
-      const { data: currentUser } = await supabase
+      const { data: currentUser } = await admin
         .from('User')
         .select('businessId')
         .eq('id', session.userId)
@@ -100,23 +102,19 @@ export async function PATCH(req: NextRequest) {
 
       if (currentUser?.businessId) {
         // Actualizar negocio existente
-        const { data: business } = await supabase
+        await admin
           .from('Business')
           .update({
             name: businessName,
             ...(city !== undefined && { city: city || null }),
           })
-          .eq('id', currentUser.businessId)
-          .select()
-          .single();
-        businessId = business?.id;
+          .eq('id', currentUser.businessId);
+        businessId = currentUser.businessId;
       } else {
         // Crear nuevo negocio
         const slug = businessName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-        let { data: freePlan } = await supabase.from('Plan').select('id').eq('name', 'FREE').single();
+        let { data: freePlan } = await admin.from('Plan').select('id').eq('name', 'FREE').single();
         if (!freePlan) {
-          // Auto-inicializar plan FREE si no existe en la base de datos
-          const admin = createAdminClient();
           const limitsInfo = { appointments: 50, staff: 1, services: 10 };
           const { data: newPlan, error: planError } = await admin
             .from('Plan')
@@ -137,7 +135,7 @@ export async function PATCH(req: NextRequest) {
           freePlan = newPlan;
         }
 
-        const { data: business } = await supabase
+        const { data: business, error: bizError } = await admin
           .from('Business')
           .insert({
             id: crypto.randomUUID(),
@@ -148,6 +146,11 @@ export async function PATCH(req: NextRequest) {
           })
           .select()
           .single();
+
+        if (bizError) {
+          console.error("[settings PATCH] Error creando Business:", bizError);
+          throw new Error(`Error al crear el negocio: ${bizError.message}`);
+        }
         businessId = business?.id;
       }
     }
@@ -155,6 +158,7 @@ export async function PATCH(req: NextRequest) {
     // 2. Actualizar usuario
     const userUpdate: Record<string, any> = {
       onboardingDone: true,
+      updatedAt: new Date().toISOString(),
     };
     if (name) userUpdate.name = name;
     if (bio !== undefined) userUpdate.bio = bio;
@@ -167,19 +171,11 @@ export async function PATCH(req: NextRequest) {
       userUpdate.role = "OWNER";
     }
 
-    await supabase.from('User').update(userUpdate).eq('id', session.userId);
+    await admin.from('User').update(userUpdate).eq('id', session.userId);
 
     // 3. Actualizar settings de horario
     if (settings) {
-      const settingsUpdate: Record<string, any> = {};
-      if (settings.workDays) settingsUpdate.workDays = JSON.stringify(settings.workDays);
-      if (settings.startHour !== undefined) settingsUpdate.startHour = settings.startHour;
-      if (settings.endHour !== undefined) settingsUpdate.endHour = settings.endHour;
-      if (settings.slotDuration !== undefined) settingsUpdate.slotDuration = settings.slotDuration;
-      if (settings.currency) settingsUpdate.currency = settings.currency;
-      if (settings.bookingEnabled !== undefined) settingsUpdate.bookingEnabled = settings.bookingEnabled;
-
-      await supabase
+      await admin
         .from('ProfessionalSettings')
         .upsert({
           id: crypto.randomUUID(),
@@ -193,7 +189,8 @@ export async function PATCH(req: NextRequest) {
         }, { onConflict: 'userId', ignoreDuplicates: false });
     }
 
-    const { data: updated } = await supabase
+    // Leer el usuario actualizado con admin client
+    const { data: updated } = await admin
       .from('User')
       .select('*, settings:ProfessionalSettings(*), business:Business(*)')
       .eq('id', session.userId)
@@ -212,7 +209,6 @@ export async function PATCH(req: NextRequest) {
     });
   } catch (error) {
     console.error("[settings PATCH]", error);
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Error interno" }, { status: 500 });
   }
 }
-

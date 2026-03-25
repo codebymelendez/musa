@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
-import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
 
 const createSchema = z.object({
   name: z.string().min(1, "El nombre es obligatorio"),
@@ -17,8 +17,8 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   try {
-    const supabase = await createClient(req);
-    const { data: services, error } = await supabase
+    const admin = createAdminClient();
+    const { data: services, error } = await admin
       .from('Service')
       .select('*')
       .eq('userId', session.userId)
@@ -52,10 +52,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = await createClient(req);
+    const admin = createAdminClient();
     
     // Obtener el businessId del usuario
-    const { data: userProfile } = await supabase
+    const { data: userProfile } = await admin
       .from('User')
       .select('businessId')
       .eq('id', session.userId)
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No tienes un negocio configurado" }, { status: 400 });
     }
 
-    const { data: service, error } = await supabase
+    const { data: service, error } = await admin
       .from('Service')
       .insert({ 
         ...parsed.data, 
