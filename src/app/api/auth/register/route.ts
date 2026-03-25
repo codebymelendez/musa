@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
       slug,
       serviceType: serviceType || null,
       onboardingDone: false,
+      updatedAt: new Date().toISOString(),
     });
 
     if (profileError) {

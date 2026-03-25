@@ -74,6 +74,7 @@ export async function POST(req: NextRequest) {
           name,
           slug,
           onboardingDone: false,
+          updatedAt: new Date().toISOString(),
         })
         .select()
         .single();
