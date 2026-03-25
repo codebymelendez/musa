@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
 
 const updateSchema = z.object({
   name: z.string().min(2).optional(),
@@ -114,9 +115,10 @@ export async function PATCH(req: NextRequest) {
         const slug = businessName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
         let { data: freePlan } = await supabase.from('Plan').select('id').eq('name', 'FREE').single();
         if (!freePlan) {
-          // Auto-inicializar plan FREE si no existe en la base de datos (por ejemplo, recién creada)
+          // Auto-inicializar plan FREE si no existe en la base de datos
+          const admin = createAdminClient();
           const limitsInfo = { appointments: 50, staff: 1, services: 10 };
-          const { data: newPlan, error: planError } = await supabase
+          const { data: newPlan, error: planError } = await admin
             .from('Plan')
             .insert({
               id: `plan-free-${Date.now()}`,

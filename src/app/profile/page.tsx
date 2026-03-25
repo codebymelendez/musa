@@ -109,7 +109,14 @@ export default function Profile() {
     );
   };
 
-  const bookingLink = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/p/${user?.slug ?? ""}`;
+  const [fullUrl, setFullUrl] = useState("");
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setFullUrl(window.location.origin);
+    }
+  }, []);
+
+  const bookingLink = `${fullUrl}/p/${user?.slug ?? ""}`;
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(bookingLink);
@@ -367,8 +374,8 @@ export default function Profile() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <div className="px-4 py-2 bg-white rounded-lg border border-outline-variant/30 text-sm font-mono text-on-surface-variant truncate max-w-[180px]">
-              /p/{user?.slug ?? "tu-nombre"}
+            <div className="px-4 py-2 bg-white rounded-lg border border-outline-variant/30 text-xs font-mono text-on-surface-variant truncate max-w-[220px]">
+              {bookingLink || `.../p/${user?.slug ?? "tu-nombre"}`}
             </div>
             <button
               onClick={handleCopy}
