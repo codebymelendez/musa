@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { z } from "zod";
 import { Resend } from "resend";
 import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { sendNotification, sendClientNotification } from "@/lib/notifications";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
@@ -34,16 +35,17 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const { serviceId, startTime, clientName, clientPhone, clientEmail, wantsNotifications } =
       parsed.data;
-    const supabase = await createClient();
+    const admin = createAdminClient();
 
     // Buscar profesional por slug
-    const { data: user, error: userError } = await supabase
+    const { data: user, error: userError } = await admin
       .from('User')
       .select('*, settings:ProfessionalSettings(*)')
       .eq('slug', slug)
       .single();
 
     if (userError || !user) {
+      console.error("[book POST] user not found:", slug, userError);
       return NextResponse.json({ error: "Profesional no encontrada" }, { status: 404 });
     }
 
@@ -56,7 +58,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     // Verificar servicio
-    const { data: service, error: serviceError } = await supabase
+    const { data: service, error: serviceError } = await admin
       .from('Service')
       .select('*')
       .eq('id', serviceId)
@@ -71,26 +73,12 @@ export async function POST(req: NextRequest, { params }: Params) {
     const start = new Date(startTime);
     const end = new Date(start.getTime() + service.durationMin * 60000);
 
-    // Conflicto de horario
-    // Nota: La lógica de OR en Supabase se hace con .or()
-    const { data: conflict, error: conflictError } = await supabase
+    // Lógica de solapamiento: (start < existingEnd AND end > existingStart)
+    const { data: realConflict, error: conflictErr } = await admin
       .from('Appointment')
       .select('id')
       .eq('userId', user.id)
-      .not('status', 'in', '("cancelled","no_show")')
-      .or(`startTime.gte.${start.toISOString()},startTime.lt.${end.toISOString()}`)
-      .limit(1);
-
-    // Ajuste: La lógica de solapamiento más completa es (start < existingEnd AND end > existingStart)
-    // Pero mantendremos la lógica original aproximada o la mejoraremos si es posible.
-    // Lógica original: OR [ { gte: start, lt: end }, { gt: start, lte: end }, { lte: start, gte: end } ]
-    
-    // Simplificado para Supabase:
-    const { data: realConflict } = await supabase
-      .from('Appointment')
-      .select('id')
-      .eq('userId', user.id)
-      .not('status', 'in', '("cancelled","no_show")')
+      .not('status', 'in', '(cancelled,no_show)')
       .filter('startTime', 'lt', end.toISOString())
       .filter('endTime', 'gt', start.toISOString())
       .limit(1);
@@ -103,11 +91,20 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     // Crear o actualizar clienta
-    // Upsert requiere un índice único o restricción. En Prisma era userId_phone.
-    const { data: client, error: clientError } = await supabase
+    // Primero buscamos si ya existe para evitar problemas de ID con upsert
+    const { data: existingClient } = await admin
+      .from('Client')
+      .select('id')
+      .eq('userId', user.id)
+      .eq('phone', clientPhone)
+      .maybeSingle();
+
+    const clientId = existingClient?.id || randomUUID();
+
+    const { data: client, error: clientError } = await admin
       .from('Client')
       .upsert({
-        id: randomUUID(),
+        id: clientId,
         userId: user.id,
         businessId: user.businessId,
         name: clientName,
@@ -125,7 +122,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     // Crear cita con token de reschedule
     const rescheduleToken = randomUUID();
-    const { data: appointment, error: appoError } = await supabase
+    const { data: appointment, error: appoError } = await admin
       .from('Appointment')
       .insert({
         id: randomUUID(),

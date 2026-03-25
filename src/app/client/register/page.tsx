@@ -163,8 +163,8 @@ export default function ClientRegisterPage() {
             disabled={!form.name || !form.phone}
             className="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white font-headline font-bold rounded-full shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            Buscar profesionales
-            <span className="material-symbols-outlined">search</span>
+            Confirmar y buscar profesionales
+            <span className="material-symbols-outlined">arrow_forward</span>
           </button>
 
           <p className="text-xs text-on-surface-variant text-center leading-relaxed">

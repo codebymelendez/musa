@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
       .from('Appointment')
       .select('id')
       .eq('userId', session.userId)
-      .not('status', 'in', '("cancelled","no_show")')
+      .not('status', 'in', '(cancelled,no_show)')
       .filter('startTime', 'lt', end.toISOString())
       .filter('endTime', 'gt', start.toISOString())
       .limit(1);

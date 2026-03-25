@@ -28,16 +28,21 @@ export async function GET(req: NextRequest, { params }: Params) {
     }
 
     const rawSettings = user.settings;
-    const settings = rawSettings
-      ? { ...rawSettings, workDays: typeof rawSettings.workDays === 'string' ? JSON.parse(rawSettings.workDays) : rawSettings.workDays }
-      : {
-          workDays: [1, 2, 3, 4, 5],
-          startHour: 9,
-          endHour: 18,
-          slotDuration: 30,
-          currency: "USD",
-          bookingEnabled: true,
-        };
+    let workDays = [1, 2, 3, 4, 5];
+    if (rawSettings && rawSettings.workDays) {
+      workDays = typeof rawSettings.workDays === 'string' 
+        ? JSON.parse(rawSettings.workDays) 
+        : rawSettings.workDays;
+    }
+
+    const settings = {
+      workDays,
+      startHour: rawSettings?.startHour ?? 9,
+      endHour: rawSettings?.endHour ?? 18,
+      slotDuration: rawSettings?.slotDuration ?? 30,
+      currency: rawSettings?.currency ?? "USD",
+      bookingEnabled: rawSettings?.bookingEnabled ?? true,
+    };
 
     if (settings.bookingEnabled === false) {
       return NextResponse.json(
@@ -63,7 +68,7 @@ export async function GET(req: NextRequest, { params }: Params) {
         .from('Appointment')
         .select('startTime, endTime, service:Service(durationMin)')
         .eq('userId', user.id)
-        .not('status', 'in', '("cancelled","no_show")')
+        .not('status', 'in', '(cancelled,no_show)')
         .gte('startTime', start.toISOString())
         .lte('startTime', end.toISOString());
 
