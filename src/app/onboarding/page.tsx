@@ -98,36 +98,42 @@ export default function Onboarding() {
         }),
       });
 
-      if (!settingsRes.ok) throw new Error("Error al guardar configuración");
+      if (!settingsRes.ok) {
+        const errData = await settingsRes.json().catch(() => ({}));
+        throw new Error(errData.error || "Error al guardar configuración");
+      }
 
       const settingsData = await settingsRes.json();
 
-      // 2. Refrescar sesión (opcional si el backend devuelve todo)
-      await fetch("/api/auth/me", { method: "GET" }); 
-
-      // 3. Crear servicios iniciales
-      const defaultSvcs = DEFAULT_SERVICES[serviceType] ?? DEFAULT_SERVICES.other;
-      for (const svc of defaultSvcs) {
-        await fetch("/api/services", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...svc,
-            category: serviceType,
-            currency: "USD",
-          }),
-        });
+      if (!settingsData?.businessId) {
+        throw new Error("No se pudo crear el negocio. Por favor intenta de nuevo.");
       }
 
-      // 4. Actualizar store
-      if (user) {
-        setUser({ 
-          ...user, 
-          onboardingDone: true, 
-          serviceType,
-          role: settingsData.role,
-          businessId: settingsData.businessId
-        });
+      // 2. Crear servicios iniciales (ya tenemos el businessId confirmado en settingsData)
+      const defaultSvcs = DEFAULT_SERVICES[serviceType] ?? DEFAULT_SERVICES.other;
+      const serviceResults = await Promise.allSettled(
+        defaultSvcs.map((svc) =>
+          fetch("/api/services", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...svc,
+              category: serviceType,
+              currency: "USD",
+            }),
+          })
+        )
+      );
+      // Log errores de servicios sin bloquear
+      serviceResults.forEach((r, i) => {
+        if (r.status === "rejected") console.error(`[onboarding svc ${i}]`, r.reason);
+      });
+
+      // 3. Refrescar el usuario desde el servidor para actualizar el store
+      const meRes = await fetch("/api/auth/me", { method: "GET" });
+      if (meRes.ok) {
+        const meData = await meRes.json();
+        if (meData?.id) setUser(meData);
       }
 
       setStep("done");

@@ -182,10 +182,15 @@ export async function PATCH(req: NextRequest) {
       await supabase
         .from('ProfessionalSettings')
         .upsert({
+          id: crypto.randomUUID(),
           userId: session.userId,
           workDays: settings.workDays ? JSON.stringify(settings.workDays) : "[1,2,3,4,5]",
-          ...settingsUpdate,
-        }, { onConflict: 'userId' });
+          ...(settings.startHour !== undefined && { startHour: settings.startHour }),
+          ...(settings.endHour !== undefined && { endHour: settings.endHour }),
+          ...(settings.slotDuration !== undefined && { slotDuration: settings.slotDuration }),
+          ...(settings.currency && { currency: settings.currency }),
+          ...(settings.bookingEnabled !== undefined && { bookingEnabled: settings.bookingEnabled }),
+        }, { onConflict: 'userId', ignoreDuplicates: false });
     }
 
     const { data: updated } = await supabase

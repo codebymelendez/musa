@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   try {
-    const supabase = await createClient();
+    const supabase = await createClient(req);
     const { data: user } = await supabase
       .from('User')
       .select('businessId')
