@@ -39,7 +39,7 @@ export async function GET(req: NextRequest, { params }: Params) {
           bookingEnabled: true,
         };
 
-    if (!settings.bookingEnabled) {
+    if (settings.bookingEnabled === false) {
       return NextResponse.json(
         { error: "Las reservas están temporalmente desactivadas" },
         { status: 503 }

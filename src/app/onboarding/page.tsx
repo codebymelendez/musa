@@ -94,6 +94,7 @@ export default function Onboarding() {
             startHour,
             endHour,
             slotDuration: 30,
+            bookingEnabled: true,
           },
         }),
       });
