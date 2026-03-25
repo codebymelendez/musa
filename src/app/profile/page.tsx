@@ -251,7 +251,9 @@ export default function Profile() {
             <div className="flex justify-between items-center py-2">
               <span className="text-sm font-medium text-on-surface-variant">Horario</span>
               <span className="text-sm font-bold text-on-surface">
-                {settings ? `${settings.startHour}:00 – ${settings.endHour}:00` : "9:00 – 18:00"}
+                {settings
+                  ? `${settings.startHour ?? 9}:00 – ${settings.endHour ?? 18}:00`
+                  : "9:00 – 18:00"}
               </span>
             </div>
           </div>

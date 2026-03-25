@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { generateTimeSlots, dayRange } from "@/lib/utils";
 import { ProfessionalSettings } from "@/types";
 
@@ -12,10 +12,10 @@ export async function GET(req: NextRequest, { params }: Params) {
   const serviceId = searchParams.get("serviceId");
 
   try {
-    const supabase = await createClient();
+    const admin = createAdminClient();
 
     // Buscar profesional por slug + servicios + settings
-    const { data: user, error: userError } = await supabase
+    const { data: user, error: userError } = await admin
       .from('User')
       .select('*, services:Service(*), settings:ProfessionalSettings(*)')
       .eq('slug', slug)
@@ -23,6 +23,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       .single();
 
     if (userError || !user) {
+      console.error("[public slug GET] user not found for slug:", slug, userError);
       return NextResponse.json({ error: "Profesional no encontrada" }, { status: 404 });
     }
 
@@ -58,7 +59,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       }
 
       // Citas existentes en el día
-      const { data: bookedAppointments, error: appointmentsError } = await supabase
+      const { data: bookedAppointments, error: appointmentsError } = await admin
         .from('Appointment')
         .select('startTime, endTime, service:Service(durationMin)')
         .eq('userId', user.id)

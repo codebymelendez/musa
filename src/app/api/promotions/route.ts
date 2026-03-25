@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
-import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
 
 const createSchema = z.object({
   title: z.string().min(3),
@@ -18,8 +18,8 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   try {
-    const supabase = await createClient(req);
-    const { data: user } = await supabase
+    const admin = createAdminClient();
+    const { data: user } = await admin
       .from('User')
       .select('businessId')
       .eq('id', session.userId)
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ promotions: [] });
     }
 
-    const { data: promotions, error } = await supabase
+    const { data: promotions, error } = await admin
       .from('Promotion')
       .select('*')
       .eq('businessId', user.businessId)
@@ -52,8 +52,8 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   try {
-    const supabase = await createClient();
-    const { data: user } = await supabase
+    const admin = createAdminClient();
+    const { data: user } = await admin
       .from('User')
       .select('role, businessId')
       .eq('id', session.userId)
@@ -76,10 +76,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { data: promotion, error: createError } = await supabase
+    const { data: promotion, error: createError } = await admin
       .from('Promotion')
       .insert({
         ...parsed.data,
+        id: crypto.randomUUID(),
         businessId: user.businessId,
         validFrom: new Date(parsed.data.validFrom).toISOString(),
         validUntil: new Date(parsed.data.validUntil).toISOString(),
