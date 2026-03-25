@@ -13,7 +13,11 @@
       "Bash(find /c/musa/src -type f -name *.test.* -o -name *.spec.*)",
       "Bash(find /c/musa/node_modules/next/dist/docs -type f -name *.md)",
       "Bash(find c:musasrcappp[slug] -type f)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(find /c/musa -type f -name *supabase*)",
+      "Bash(xargs grep:*)",
+      "Bash(find /c/musa -name schema.prisma -o -name .env* -o -name prisma -type d)",
+      "Bash(find /c/musa -maxdepth 3 -name schema* -type f)"
     ]
   }
 }
