@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
+import { sendEmail } from "@/lib/mailer";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { sendNotification, sendClientNotification } from "@/lib/notifications";
 
@@ -11,11 +11,17 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const { token } = await params;
   const supabase = createAdminClient();
 
-  const { data: appointment } = await supabase
+  // Buscamos por rescheduleToken o por ID
+  const { data: appointment, error: aError } = await supabase
     .from('Appointment')
-    .select('*, client:Client(*), service:Service(*), user:User(id, name, slug, whatsapp, email, settings)')
-    .eq('rescheduleToken', token)
-    .single();
+    .select('*, client:Client(*), service:Service(*), user:User(id, name, slug, whatsapp, email, settings:ProfessionalSettings(*))')
+    .or(`rescheduleToken.eq.${token},id.eq.${token}`)
+    .maybeSingle();
+
+  if (aError) {
+    console.error("[appointment portal] DB Error:", aError);
+    return NextResponse.json({ error: "Error en base de datos" }, { status: 500 });
+  }
 
   if (!appointment) {
     return NextResponse.json({ error: "Cita no encontrada" }, { status: 404 });
@@ -28,11 +34,17 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const { token } = await params;
   const supabase = createAdminClient();
 
-  const { data: appointment } = await supabase
+  // Buscamos por rescheduleToken o por ID
+  const { data: appointment, error: dError } = await supabase
     .from('Appointment')
     .select('*, client:Client(*), service:Service(*), user:User(id, name, email, slug)')
-    .eq('rescheduleToken', token)
-    .single();
+    .or(`rescheduleToken.eq.${token},id.eq.${token}`)
+    .maybeSingle();
+
+  if (dError) {
+    console.error("[appointment portal DELETE] DB Error:", dError);
+    return NextResponse.json({ error: "Error en base de datos" }, { status: 500 });
+  }
 
   if (!appointment) {
     return NextResponse.json({ error: "Cita no encontrada" }, { status: 404 });
@@ -81,9 +93,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
   // Email al profesional si tiene email
   if (appointment.user.email) {
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    resend.emails.send({
-      from: "Musa <noreply@musa.app>",
+    sendEmail({
       to: appointment.user.email,
       subject: `❌ Cita cancelada – ${appointment.client.name}`,
       html: `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"></head>
@@ -114,9 +124,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
   // Email a la clienta si tiene email
   if (appointment.client.email) {
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    resend.emails.send({
-      from: "Musa <noreply@musa.app>",
+    sendEmail({
       to: appointment.client.email,
       subject: "Cita cancelada – Musa",
       html: `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"></head>

@@ -24,10 +24,22 @@ const statusConfig: Record<
     badgeText: "Pendiente",
   },
   confirmed: {
-    dot: "bg-outline-variant",
-    border: "border-outline-variant",
-    badge: "bg-surface-container text-on-surface-variant",
-    badgeText: "Confirmado",
+    dot: "bg-primary",
+    border: "border-primary",
+    badge: "bg-primary/10 text-primary",
+    badgeText: "Confirmada",
+  },
+  reprogrammed: {
+    dot: "bg-primary",
+    border: "border-primary",
+    badge: "bg-primary/10 text-primary",
+    badgeText: "Reprogramada",
+  },
+  rescheduled: {
+    dot: "bg-primary",
+    border: "border-primary",
+    badge: "bg-primary/10 text-primary",
+    badgeText: "Reprogramada",
   },
   completed: {
     dot: "bg-tertiary",
@@ -173,7 +185,7 @@ export default function Home() {
 
             const cfg =
               statusConfig[apt.status] ?? statusConfig["confirmed"];
-            const isActive = apt.status === "confirmed" || apt.status === "pending";
+            const isActive = apt.status === "confirmed" || apt.status === "pending" || apt.status === "reprogrammed" || apt.status === "rescheduled";
 
             return (
               <div key={apt.id} className="relative flex gap-6">

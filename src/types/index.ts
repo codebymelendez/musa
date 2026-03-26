@@ -8,7 +8,9 @@ export type AppointmentStatus =
   | "confirmed"
   | "completed"
   | "no_show"
-  | "cancelled";
+  | "cancelled"
+  | "reprogrammed"
+  | "rescheduled";
 
 export interface Notification {
   id: string;

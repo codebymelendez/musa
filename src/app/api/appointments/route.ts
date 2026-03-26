@@ -150,6 +150,7 @@ export async function POST(req: NextRequest) {
         endTime: end.toISOString(),
         status: "confirmed",
         notes,
+        rescheduleToken: crypto.randomUUID(),
       })
       .select('*, client:Client(*), service:Service(*)')
       .single();

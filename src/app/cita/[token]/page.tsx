@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -14,6 +14,12 @@ interface Appointment {
   service: { name: string; durationMin: number; price: number; currency: string };
   client: { name: string; email?: string };
   user: { name: string; slug: string; whatsapp?: string };
+}
+
+interface Slot {
+  time: string;
+  isAvailable: boolean;
+  isCurrent: boolean;
 }
 
 type View = "loading" | "main" | "reschedule" | "cancelled" | "rescheduled" | "not-found" | "error";
@@ -35,16 +41,16 @@ function fmtTime(iso: string) {
   });
 }
 
-function groupByDay(slots: string[]): Record<string, string[]> {
-  const groups: Record<string, string[]> = {};
-  for (const iso of slots) {
-    const key = new Date(iso).toLocaleDateString("es-VE", {
+function groupByDay(slots: Slot[]): Record<string, Slot[]> {
+  const groups: Record<string, Slot[]> = {};
+  for (const slot of slots) {
+    const key = new Date(slot.time).toLocaleDateString("es-VE", {
       weekday: "long",
       day: "numeric",
       month: "long",
     });
     if (!groups[key]) groups[key] = [];
-    groups[key].push(iso);
+    groups[key].push(slot);
   }
   return groups;
 }
@@ -66,10 +72,11 @@ function statusLabel(status: string) {
 
 export default function CitaPortalPage() {
   const { token } = useParams<{ token: string }>();
+  const router = useRouter();
 
   const [view, setView] = useState<View>("loading");
   const [appointment, setAppointment] = useState<Appointment | null>(null);
-  const [slots, setSlots] = useState<string[]>([]);
+  const [slots, setSlots] = useState<Slot[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -140,8 +147,22 @@ export default function CitaPortalPage() {
       alert("Error de conexión. Intenta de nuevo.");
     } finally {
       setSubmitting(false);
+      // Opcional: Redirigir después de 2 segundos para que vean el éxito
+      if (view === "rescheduled") {
+        setTimeout(() => router.push("/client"), 2500);
+      }
     }
   };
+
+  // El setView se hace en el try, pero para estar seguros de la redirección automática:
+  useEffect(() => {
+    if (view === "rescheduled") {
+      const timer = setTimeout(() => {
+        router.push("/client");
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [view, router]);
 
   const handleCancel = async () => {
     setSubmitting(true);
@@ -167,9 +188,9 @@ export default function CitaPortalPage() {
 
   if (view === "loading") {
     return (
-      <div className="min-h-screen bg-violet-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#f9f4fc' }}>
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <div className="w-12 h-12 border-4 border-t-transparent rounded-full animate-spin mx-auto mb-4" style={{ borderColor: '#764797', borderTopColor: 'transparent' }} />
           <p className="text-gray-500 text-sm">Cargando tu cita...</p>
         </div>
       </div>
@@ -218,7 +239,8 @@ export default function CitaPortalPage() {
           {appointment && (
             <a
               href={`/p/${appointment.user.slug}`}
-              className="inline-block bg-violet-600 text-white px-6 py-3 rounded-full font-semibold text-sm hover:bg-violet-700 transition-colors"
+              className="inline-block text-white px-6 py-3 rounded-full font-semibold text-sm transition-colors"
+              style={{ backgroundColor: '#764797' }}
             >
               Reservar nueva cita
             </a>
@@ -237,8 +259,8 @@ export default function CitaPortalPage() {
           </div>
           <h2 className="text-xl font-bold text-gray-800 mb-2">¡Cita reprogramada!</h2>
           {newAppointmentDate && (
-            <div className="bg-violet-50 rounded-2xl p-4 my-4 text-left">
-              <p className="text-violet-700 text-xs font-semibold uppercase tracking-wide mb-1">Nueva fecha</p>
+            <div className="rounded-2xl p-4 my-4 text-left" style={{ backgroundColor: '#f4eaf9' }}>
+              <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#764797' }}>Nueva fecha</p>
               <p className="font-bold text-gray-800">{fmtDate(newAppointmentDate)}</p>
               <p className="text-gray-600 text-sm">a las {fmtTime(newAppointmentDate)}</p>
             </div>
@@ -249,7 +271,8 @@ export default function CitaPortalPage() {
           {newManageUrl && (
             <a
               href={newManageUrl}
-              className="inline-block bg-violet-600 text-white px-6 py-3 rounded-full font-semibold text-sm hover:bg-violet-700 transition-colors"
+              className="inline-block text-white px-6 py-3 rounded-full font-semibold text-sm transition-colors"
+              style={{ backgroundColor: '#764797' }}
             >
               Gestionar nueva cita →
             </a>
@@ -267,9 +290,9 @@ export default function CitaPortalPage() {
       <PortalShell>
         <div>
           {/* Appointment card */}
-          <div className="bg-gradient-to-br from-violet-600 to-purple-500 rounded-2xl p-5 text-white mb-4">
+          <div className="rounded-2xl p-5 text-white mb-4" style={{ background: 'linear-gradient(135deg, #764797 0%, #9060b2 100%)' }}>
             <div className="flex items-center justify-between mb-3">
-              <span className="text-violet-200 text-xs font-medium uppercase tracking-wide">
+              <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'rgba(255,255,255,0.7)' }}>
                 Tu cita
               </span>
               <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${badge.color}`}>
@@ -277,13 +300,13 @@ export default function CitaPortalPage() {
               </span>
             </div>
             <h2 className="text-xl font-bold mb-1">{appointment.service.name}</h2>
-            <p className="text-violet-200 text-sm mb-3">con {appointment.user.name}</p>
-            <div className="bg-white/10 rounded-xl px-4 py-3">
+            <p className="text-sm mb-3" style={{ color: 'rgba(255,255,255,0.7)' }}>con {appointment.user.name}</p>
+            <div className="rounded-xl px-4 py-3" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }}>
               <p className="text-white font-semibold">{fmtDate(appointment.startTime)}</p>
-              <p className="text-violet-200 text-sm">a las {fmtTime(appointment.startTime)}</p>
+              <p className="text-sm" style={{ color: 'rgba(255,255,255,0.7)' }}>a las {fmtTime(appointment.startTime)}</p>
             </div>
             {appointment.oldStartTime && (
-              <p className="text-violet-300 text-xs mt-2">
+              <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.5)' }}>
                 Fecha anterior: {fmtDate(appointment.oldStartTime)} {fmtTime(appointment.oldStartTime)}
               </p>
             )}
@@ -307,7 +330,8 @@ export default function CitaPortalPage() {
           <div className="space-y-3">
             <button
               onClick={handleOpenReschedule}
-              className="w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold py-3.5 rounded-2xl transition-colors"
+              className="w-full text-white font-semibold py-3.5 rounded-2xl transition-colors"
+              style={{ backgroundColor: '#764797' }}
             >
               📅 Cambiar fecha
             </button>
@@ -372,7 +396,8 @@ export default function CitaPortalPage() {
         <div>
           <button
             onClick={() => setView("main")}
-            className="flex items-center gap-1.5 text-violet-600 text-sm font-medium mb-4"
+            className="flex items-center gap-1.5 text-sm font-medium mb-4"
+            style={{ color: '#764797' }}
           >
             ← Volver
           </button>
@@ -384,7 +409,7 @@ export default function CitaPortalPage() {
 
           {loadingSlots && (
             <div className="text-center py-10">
-              <div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+              <div className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin mx-auto mb-3" style={{ borderColor: '#764797', borderTopColor: 'transparent' }} />
               <p className="text-gray-400 text-sm">Buscando huecos disponibles...</p>
             </div>
           )}
@@ -418,17 +443,45 @@ export default function CitaPortalPage() {
                     {day}
                   </p>
                   <div className="grid grid-cols-3 gap-2">
-                    {grouped[day].map((iso) => (
+                    {grouped[day].map((slot) => (
                       <button
-                        key={iso}
-                        onClick={() => setSelectedSlot(iso)}
-                        className={`py-2.5 rounded-xl text-sm font-semibold transition-all border ${
-                          selectedSlot === iso
-                            ? "bg-violet-600 text-white border-violet-600 shadow-md scale-105"
-                            : "bg-white text-gray-700 border-gray-200 hover:border-violet-300 hover:text-violet-600"
+                        key={slot.time}
+                        onClick={() => slot.isAvailable && !slot.isCurrent && setSelectedSlot(slot.time)}
+                        disabled={!slot.isAvailable || slot.isCurrent}
+                        style={slot.isCurrent
+                          ? { backgroundColor: '#f4eaf9', color: '#764797', borderColor: '#c89ee0' }
+                          : selectedSlot === slot.time
+                            ? { backgroundColor: '#764797', color: '#ffffff', borderColor: '#764797' }
+                            : !slot.isAvailable
+                              ? { backgroundColor: '#fff1f1', color: '#f8aaaa', borderColor: '#fecaca' }
+                              : {}}
+                        className={`relative py-3.5 rounded-2xl text-sm font-bold transition-all border flex flex-col items-center justify-center gap-1 group ${
+                          slot.isCurrent
+                            ? "cursor-not-allowed shadow-none"
+                            : !slot.isAvailable
+                              ? "cursor-not-allowed"
+                              : selectedSlot === slot.time
+                                ? "shadow-lg scale-105 z-10"
+                                : "bg-white text-gray-700 border-gray-100 hover:scale-[1.02]"
                         }`}
                       >
-                        🟢 {fmtTime(iso)}
+                        <span className="flex items-center gap-1.5">
+                          {slot.isCurrent ? (
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#764797' }} />
+                          ) : !slot.isAvailable ? (
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-300" />
+                          ) : (
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: selectedSlot === slot.time ? '#ffffff' : '#22c55e' }} />
+                          )}
+                          {fmtTime(slot.time)}
+                        </span>
+                        {slot.isCurrent ? (
+                          <span className="text-[9px] uppercase tracking-tighter font-black">Tu cita</span>
+                        ) : !slot.isAvailable ? (
+                          <span className="text-[9px] uppercase tracking-tighter opacity-50">Ocupado</span>
+                        ) : (
+                          <span className="text-[9px] uppercase tracking-tighter opacity-0 group-hover:opacity-60 transition-opacity" style={{ color: '#764797' }}>Libre</span>
+                        )}
                       </button>
                     ))}
                   </div>
@@ -439,7 +492,8 @@ export default function CitaPortalPage() {
 
           {/* Fixed confirm bar */}
           {selectedSlot && (
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 z-40">
+            <div className="fixed bottom-[70px] left-0 right-0 bg-white/95 backdrop-blur-md border-t border-violet-100 p-4 z-[60] shadow-[0_-8px_30px_rgb(0,0,0,0.04)]">
+
               <div className="max-w-sm mx-auto">
                 <p className="text-center text-sm text-gray-500 mb-3">
                   Nueva cita:{" "}
@@ -449,10 +503,15 @@ export default function CitaPortalPage() {
                 </p>
                 <button
                   onClick={handleConfirmReschedule}
-                  disabled={submitting}
-                  className="w-full bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-semibold py-3.5 rounded-2xl transition-colors"
+                  disabled={submitting || !appointment || selectedSlot === appointment.startTime}
+                  className="w-full disabled:opacity-50 text-white font-semibold py-3.5 rounded-2xl transition-colors"
+                  style={{ backgroundColor: '#764797' }}
                 >
-                  {submitting ? "Confirmando..." : "✅ Confirmar nueva fecha"}
+                  {submitting 
+                    ? "Confirmando..." 
+                    : selectedSlot === appointment?.startTime 
+                      ? "Selecciona otro horario" 
+                      : "✅ Confirmar nueva fecha"}
                 </button>
               </div>
             </div>
@@ -469,11 +528,11 @@ export default function CitaPortalPage() {
 
 function PortalShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-violet-50 pb-20">
+    <div className="min-h-screen pb-20" style={{ backgroundColor: '#f9f4fc' }}>
       {/* Header */}
-      <div className="bg-gradient-to-r from-violet-700 to-purple-600 px-4 py-5">
+      <div className="px-4 py-5" style={{ background: 'linear-gradient(135deg, #764797 0%, #9060b2 100%)' }}>
         <div className="max-w-sm mx-auto flex items-center justify-between">
-          <a href="/" className="flex items-center gap-1.5 text-violet-300 hover:text-white transition-colors text-sm">
+          <a href="/" className="flex items-center gap-1.5 hover:text-white transition-colors text-sm" style={{ color: 'rgba(255,255,255,0.65)' }}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
@@ -481,9 +540,9 @@ function PortalShell({ children }: { children: React.ReactNode }) {
           </a>
           <div className="text-center">
             <h1 className="text-white text-lg font-bold tracking-tight">Musa ✨</h1>
-            <p className="text-violet-300 text-xs">Gestiona tu cita</p>
+            <p className="text-xs" style={{ color: 'rgba(255,255,255,0.65)' }}>Gestiona tu cita</p>
           </div>
-          <a href="/client/login" className="text-violet-300 hover:text-white transition-colors text-xs font-medium">
+          <a href="/client/login" className="hover:text-white transition-colors text-xs font-medium" style={{ color: 'rgba(255,255,255,0.65)' }}>
             Mi cuenta
           </a>
         </div>
@@ -493,24 +552,34 @@ function PortalShell({ children }: { children: React.ReactNode }) {
       <div className="max-w-sm mx-auto px-4 py-6">{children}</div>
 
       {/* Footer nav */}
-      <div className="fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-xl border-t border-violet-100 px-4 py-3 flex justify-around z-50">
-        <a href="/" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-violet-600 transition-colors">
+      <div className="fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-xl border-t border-violet-100 px-4 py-3 flex justify-around z-[70]">
+        <a href="/" className="flex flex-col items-center gap-0.5 text-gray-400 transition-colors" style={{ '--hover-color': '#764797' } as React.CSSProperties}
+           onMouseEnter={e => (e.currentTarget.style.color='#764797')} onMouseLeave={e => (e.currentTarget.style.color='')}>
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
           </svg>
           <span className="text-[10px] font-bold uppercase tracking-wide">Inicio</span>
         </a>
-        <a href="/explore" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-violet-600 transition-colors">
+        <a href="/explore" className="flex flex-col items-center gap-0.5 text-gray-400 transition-colors"
+           onMouseEnter={e => (e.currentTarget.style.color='#764797')} onMouseLeave={e => (e.currentTarget.style.color='')}>
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <span className="text-[10px] font-bold uppercase tracking-wide">Explorar</span>
         </a>
-        <a href="/client" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-violet-600 transition-colors">
+        <a href="/client" className="flex flex-col items-center gap-0.5 text-gray-400 transition-colors"
+           onMouseEnter={e => (e.currentTarget.style.color='#764797')} onMouseLeave={e => (e.currentTarget.style.color='')}>
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
           <span className="text-[10px] font-bold uppercase tracking-wide">Mis Citas</span>
+        </a>
+        <a href="/" className="flex flex-col items-center gap-0.5 text-gray-400 transition-colors"
+           onMouseEnter={e => (e.currentTarget.style.color='#764797')} onMouseLeave={e => (e.currentTarget.style.color='')}>
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          <span className="text-[10px] font-bold uppercase tracking-wide">Salir</span>
         </a>
       </div>
     </div>

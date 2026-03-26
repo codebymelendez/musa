@@ -193,25 +193,56 @@ export default function Calendar() {
 
                   {/* Appointments */}
                   {colApts.map((apt) => {
-                    const gradient = STATUS_COLORS[apt.status] ?? STATUS_COLORS.confirmed;
-                    const isGradient = apt.status === "confirmed" || apt.status === "pending";
+                    const status = apt.status;
+                    let bgClass = "";
+                    let timeClass = "";
+                    let titleClass = "";
+                    let subtitleClass = "";
+
+                    switch (status) {
+                      case "confirmed":
+                      case "reprogrammed":
+                      case "rescheduled":
+                        bgClass = "bg-primary shadow-md border border-primary/20";
+                        timeClass = "text-white/90 font-bold";
+                        titleClass = "text-white font-black";
+                        subtitleClass = "text-white/80";
+                        break;
+                      case "completed":
+                        bgClass = "bg-tertiary shadow-md border border-tertiary/20";
+                        timeClass = "text-white/90 font-bold";
+                        titleClass = "text-white font-black";
+                        subtitleClass = "text-white/80";
+                        break;
+                      case "no_show":
+                      case "cancelled":
+                        bgClass = "bg-error shadow-md border border-error/20 opacity-90";
+                        timeClass = "text-white/90 font-bold";
+                        titleClass = "text-white font-black";
+                        subtitleClass = "text-white/80";
+                        break;
+                      case "pending":
+                      default:
+                        bgClass = "bg-surface-container-lowest border-l-4 border-outline-variant shadow-sm";
+                        timeClass = "text-on-surface-variant font-bold";
+                        titleClass = "text-on-surface font-black";
+                        subtitleClass = "text-on-surface-variant";
+                        break;
+                    }
+                    
                     return (
                       <div
                         key={apt.id}
                         style={positionStyle(apt)}
-                        className={`rounded-lg p-1.5 overflow-hidden ${
-                          isGradient
-                            ? `bg-gradient-to-br ${gradient} shadow-sm`
-                            : `bg-${gradient.split("-")[1]}/20 border-l-2 border-primary`
-                        } z-10`}
+                        className={`rounded-xl p-2 overflow-hidden z-10 transition-all ${bgClass}`}
                       >
-                        <p className={`text-[9px] font-bold leading-tight truncate ${isGradient ? "text-white" : "text-primary"}`}>
+                        <p className={`text-[10px] leading-tight mb-0.5 ${timeClass}`}>
                           {formatTimeES(apt.startTime)}
                         </p>
-                        <p className={`text-[10px] font-bold leading-tight truncate ${isGradient ? "text-white" : "text-on-surface"}`}>
+                        <p className={`text-[11px] leading-tight truncate ${titleClass}`}>
                           {apt.client?.name}
                         </p>
-                        <p className={`text-[9px] leading-tight truncate ${isGradient ? "text-white/80" : "text-on-surface-variant"}`}>
+                        <p className={`text-[10px] font-medium leading-tight truncate ${subtitleClass}`}>
                           {apt.service?.name}
                         </p>
                       </div>
@@ -225,7 +256,11 @@ export default function Calendar() {
       )}
 
       {/* Legend */}
-      <div className="mt-8 flex items-center gap-6 px-4">
+      <div className="mt-8 flex flex-wrap items-center gap-4 md:gap-6 px-4">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-outline-variant"></div>
+          <span className="text-xs font-medium text-on-surface-variant">Pendiente</span>
+        </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-primary"></div>
           <span className="text-xs font-medium text-on-surface-variant">Confirmada</span>
@@ -236,7 +271,7 @@ export default function Calendar() {
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-error"></div>
-          <span className="text-xs font-medium text-on-surface-variant">No-show</span>
+          <span className="text-xs font-medium text-on-surface-variant">Cancelada / No-show</span>
         </div>
       </div>
 

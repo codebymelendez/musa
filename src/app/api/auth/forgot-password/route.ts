@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { randomBytes } from "crypto";
-import { Resend } from "resend";
+import { sendEmail } from "@/lib/mailer";
 import { createClient } from "@/lib/supabase-server";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
@@ -47,9 +47,7 @@ export async function POST(req: NextRequest) {
 
     const resetUrl = `${APP_URL}/reset-password?token=${token}`;
 
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    await resend.emails.send({
-      from: "Musa <noreply@musa.app>",
+    sendEmail({
       to: email,
       subject: "Recupera tu contraseña – Musa",
       html: `
@@ -97,7 +95,7 @@ export async function POST(req: NextRequest) {
         </body>
         </html>
       `,
-    });
+    }).catch(() => {});
 
     return NextResponse.json({ success: true });
   } catch (error) {

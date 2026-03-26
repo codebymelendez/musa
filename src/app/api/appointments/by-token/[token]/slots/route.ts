@@ -10,29 +10,44 @@ export async function GET(req: NextRequest, { params }: Params) {
     60
   );
 
+  console.log(`[slots] Request received for token/id: "${token}"`);
   const supabase = createAdminClient();
-  const { data: appointment } = await supabase
+  
+  // Consulta ultra-simplificada para descartar errores de joins
+  const { data: appointment, error: appoError } = await supabase
     .from('Appointment')
-    .select('*, service:Service(*), user:User(*, settings:ProfessionalSettings(*))')
-    .eq('rescheduleToken', token)
-    .single();
+    .select('id, userId, status, serviceId, rescheduleToken, startTime, endTime')
+    .or(`rescheduleToken.eq.${token},id.eq.${token}`)
+    .maybeSingle();
+
+  if (appoError) {
+    console.error("[slots] Error crítico en DB query:", appoError);
+    return NextResponse.json({ error: "Error interno DB", details: appoError.message }, { status: 500 });
+  }
 
   if (!appointment) {
+    console.log(`[slots] Cita NO encontrada en DB para "${token}". Consultando tabla completa para depurar...`);
+    // Opcional: ver si la tabla tiene algo
+    const { count } = await supabase.from('Appointment').select('*', { count: 'exact', head: true });
+    console.log(`[slots] Total citas en tabla Appointment: ${count}`);
     return NextResponse.json({ error: "Cita no encontrada" }, { status: 404 });
   }
 
-  if (["cancelled", "completed", "no_show"].includes(appointment.status)) {
-    return NextResponse.json({ error: "Cita no modificable" }, { status: 409 });
+  console.log(`[slots] Cita encontrada OK: ID=${appointment.id}, User=${appointment.userId}.`);
+  
+  // Ahora buscamos el servicio y settings por separado
+  const { data: service } = await supabase.from('Service').select('*').eq('id', appointment.serviceId).single();
+  const { data: settings } = await supabase.from('ProfessionalSettings').select('*').eq('userId', appointment.userId).single();
+
+  if (!service || !settings) {
+    console.log(`[slots] Error: Falta servicio (${!!service}) o settings (${!!settings})`);
+    return NextResponse.json({ error: "Configuración incompleta", slots: [] });
   }
 
-  const settings = appointment.user?.settings;
-  if (!settings) {
-    return NextResponse.json({ slots: [] });
-  }
+  const serviceDurationMin = service.durationMin;
 
   const workDays: number[] = JSON.parse(settings.workDays);
   const { startHour, endHour, slotDuration } = settings;
-  const serviceDurationMin = appointment.service.durationMin;
 
   const now = new Date();
   const from = new Date(now);
@@ -43,16 +58,21 @@ export async function GET(req: NextRequest, { params }: Params) {
   until.setDate(until.getDate() + days);
   until.setHours(23, 59, 59, 999);
 
-  const { data: existingAppointments } = await supabase
+  const { data: existingAppointments, error: exError } = await supabase
     .from('Appointment')
     .select('startTime, endTime')
     .eq('userId', appointment.userId)
+    // EXCLUIMOS la cita actual para que el usuario pueda ver huecos libres si se moviera
     .neq('id', appointment.id)
     .not('status', 'in', '(cancelled,no_show)')
     .gte('startTime', from.toISOString())
     .lte('startTime', until.toISOString());
 
-  const availableSlots: string[] = [];
+  if (exError) {
+    console.error("[slots] Error fetch existing appointments:", exError);
+  }
+
+  const allSlots: { time: string, isAvailable: boolean, isCurrent: boolean }[] = [];
 
   for (let d = 0; d < days; d++) {
     const day = new Date(from);
@@ -69,6 +89,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
       const slotEnd = new Date(slotStart.getTime() + serviceDurationMin * 60000);
 
+      // Si el slot excede la hora de cierre, terminamos el día
       if (slotEnd.getHours() > endHour || (slotEnd.getHours() === endHour && slotEnd.getMinutes() > 0)) break;
       if (slotStart.getHours() >= endHour) break;
 
@@ -77,13 +98,20 @@ export async function GET(req: NextRequest, { params }: Params) {
           slotStart < new Date(existing.endTime) && slotEnd > new Date(existing.startTime)
       );
 
-      if (!hasConflict) {
-        availableSlots.push(slotStart.toISOString());
-      }
+      const sTime = new Date(slotStart).getTime();
+      const aStart = new Date(appointment.startTime).getTime();
+      const aEnd = new Date(appointment.endTime).getTime();
+      const isCurrent = sTime >= aStart && sTime < aEnd;
+
+      allSlots.push({
+        time: slotStart.toISOString(),
+        isAvailable: !hasConflict,
+        isCurrent: isCurrent
+      });
 
       minuteOffset += slotDuration;
     }
   }
 
-  return NextResponse.json({ slots: availableSlots });
+  return NextResponse.json({ slots: allSlots });
 }

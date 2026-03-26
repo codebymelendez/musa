@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { Resend } from "resend";
+import { sendEmail } from "@/lib/mailer";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { sendNotification, sendClientNotification } from "@/lib/notifications";
 
@@ -27,11 +27,17 @@ export async function POST(req: NextRequest) {
     const { token, newStartTime } = parsed.data;
     const supabase = createAdminClient();
 
-    const { data: appointment } = await supabase
+    // Buscamos por rescheduleToken o ID
+    const { data: appointment, error: aError } = await supabase
       .from('Appointment')
       .select('*, client:Client(*), service:Service(*), user:User(id, name, email, slug)')
-      .eq('rescheduleToken', token)
-      .single();
+      .or(`rescheduleToken.eq.${token},id.eq.${token}`)
+      .maybeSingle();
+
+    if (aError) {
+      console.error("[reschedule portal] DB Error:", aError);
+      return NextResponse.json({ error: "Error en base de datos" }, { status: 500 });
+    }
 
     if (!appointment) {
       return NextResponse.json({ error: "Cita no encontrada" }, { status: 404 });
@@ -49,16 +55,21 @@ export async function POST(req: NextRequest) {
       newStart.getTime() + appointment.service.durationMin * 60000
     );
 
-    // Verificar que el nuevo horario está libre para el staff
-    const { data: conflict } = await supabase
+    // Verificar que el nuevo horario está libre (excluyendo la cita actual)
+    const { data: conflict, error: cError } = await supabase
       .from('Appointment')
       .select('id')
       .eq('userId', appointment.userId)
       .neq('id', appointment.id)
-      .not('status', 'in', '("cancelled", "no_show")')
-      .or(`startTime.gte.${newStart.toISOString()},startTime.lt.${newEnd.toISOString()},endTime.gt.${newStart.toISOString()},endTime.lte.${newEnd.toISOString()},and(startTime.lte.${newStart.toISOString()},endTime.gte.${newEnd.toISOString()})`)
+      .not('status', 'in', '(cancelled,no_show,pending)') // Corregida sintaxis Supabase para 'in'
+      .filter('startTime', 'lt', newEnd.toISOString())
+      .filter('endTime', 'gt', newStart.toISOString())
       .limit(1)
       .maybeSingle();
+
+    if (cError) {
+      console.error("[reschedule] Conflict check error:", cError);
+    }
 
     if (conflict) {
       return NextResponse.json(
@@ -127,9 +138,7 @@ export async function POST(req: NextRequest) {
 
     // Email a la clienta
     if (appointment.client.email) {
-      const resend = new Resend(process.env.RESEND_API_KEY);
-      resend.emails.send({
-        from: "Musa <noreply@musa.app>",
+      sendEmail({
         to: appointment.client.email,
         subject: `✅ Cita reprogramada – ${appointment.service.name}`,
         html: buildClientRescheduleEmail({
@@ -145,9 +154,7 @@ export async function POST(req: NextRequest) {
 
     // Email al profesional
     if (appointment.user.email) {
-      const resend = new Resend(process.env.RESEND_API_KEY);
-      resend.emails.send({
-        from: "Musa <noreply@musa.app>",
+      sendEmail({
         to: appointment.user.email,
         subject: `📅 Cita reprogramada – ${appointment.client.name}`,
         html: buildStaffRescheduleEmail({
