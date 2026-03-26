@@ -56,7 +56,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Error al obtener citas" }, { status: 500 });
     }
 
-    return NextResponse.json(appointments);
+    // Format one-to-one relations which Supabase might return as an array
+    const formattedAppointments = (appointments || []).map(apt => ({
+      ...apt,
+      client: Array.isArray(apt.client) ? apt.client[0] : apt.client,
+      service: Array.isArray(apt.service) ? apt.service[0] : apt.service,
+      payment: Array.isArray(apt.payment) ? apt.payment[0] : apt.payment,
+    }));
+
+    return NextResponse.json(formattedAppointments);
   } catch (error) {
     console.error("[appointments GET]", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });

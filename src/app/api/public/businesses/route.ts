@@ -37,12 +37,23 @@ export async function GET(req: NextRequest) {
     if (category) {
       query = query.eq('category', category);
     }
-    if (q) {
-      // Búsqueda en nombre de negocio o nombre de dueño
-      query = query.or(`name.ilike.%${q}%,users.name.ilike.%${q}%`);
+
+    const { data: businesses, error } = await query;
+
+    if (error) {
+      console.error("[public businesses GET query error]", error);
+      return NextResponse.json({ businesses: [] });
     }
 
-    const { data: businesses } = await query;
+    // Client-side filtering for nested OR because Supabase .or() with foreign tables can be tricky
+    let filteredBusinesses = businesses || [];
+    if (q) {
+      const searchQ = q.toLowerCase();
+      filteredBusinesses = filteredBusinesses.filter((b: any) => {
+        const owner = Array.isArray(b.users) ? b.users[0] : b.users;
+        return b.name?.toLowerCase().includes(searchQ) || owner?.name?.toLowerCase().includes(searchQ);
+      });
+    }
 
     if (!businesses) {
       return NextResponse.json({ businesses: [] });
@@ -52,8 +63,8 @@ export async function GET(req: NextRequest) {
     // o haber incluido a todos los usuarios. Pero para el MVP, usaremos otra consulta
     // o una aproximación.
     
-    const result = await Promise.all(businesses.map(async (b) => {
-      const owner = b.users[0];
+    const result = await Promise.all(filteredBusinesses.map(async (b) => {
+      const owner = Array.isArray(b.users) ? b.users[0] : b.users;
       
       // Obtener conteo de staff (excluyendo al owner si se desea, o total)
       const { count: staffCount } = await supabase
@@ -70,12 +81,12 @@ export async function GET(req: NextRequest) {
         address: b.address,
         staffCount: staffCount || 1,
         owner: {
-          name: owner.name,
-          slug: owner.slug,
-          avatarUrl: owner.avatarUrl,
-          bio: owner.bio,
-          serviceType: owner.serviceType,
-          servicesCount: owner.services?.filter((s: any) => s.isActive).length || 0,
+          name: owner?.name || "Desconocido",
+          slug: owner?.slug,
+          avatarUrl: owner?.avatarUrl,
+          bio: owner?.bio,
+          serviceType: owner?.serviceType,
+          servicesCount: owner?.services?.filter((s: any) => s.isActive).length || 0,
         },
       };
     }));

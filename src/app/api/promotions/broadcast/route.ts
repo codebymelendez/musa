@@ -30,14 +30,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
     }
 
-    const { data: promotion } = await supabase
+    const { data: promotion, error: promoError } = await supabase
       .from('Promotion')
       .select('*')
       .eq('id', parsed.data.promotionId)
       .single();
 
-    if (!promotion || promotion.businessId !== user.businessId) {
+    if (promoError || !promotion) {
+      console.error("[promotions broadcast] Promotion not found:", parsed.data.promotionId, promoError);
       return NextResponse.json({ error: "Promoción no encontrada" }, { status: 404 });
+    }
+
+    if (promotion.businessId !== user.businessId) {
+      console.error("[promotions broadcast] Promotion businessId mismatch:", promotion.businessId, user.businessId);
+      return NextResponse.json({ error: "Promoción no pertenece al negocio" }, { status: 403 });
     }
 
     const slug = (user as any).business?.slug;

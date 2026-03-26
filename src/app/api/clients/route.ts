@@ -69,22 +69,52 @@ export async function POST(req: NextRequest) {
     const { name, phone, email, notes } = parsed.data;
     const supabase = await createClient();
 
-    // Upsert: si ya existe la clienta con ese teléfono, actualizar
-    const { data: client, error } = await supabase
+    // Buscar si ya existe la clienta con ese teléfono para el usuario
+    const { data: existingClient } = await supabase
       .from('Client')
-      .upsert({
-        userId: session.userId,
-        name,
-        phone,
-        email: email || null,
-        notes,
-      }, { onConflict: 'userId,phone' })
-      .select()
-      .single();
+      .select('id')
+      .eq('userId', session.userId)
+      .eq('phone', phone)
+      .maybeSingle();
 
-    if (error) {
-       console.error("[client upsert error]", error);
-       return NextResponse.json({ error: "Error al registrar cliente" }, { status: 500 });
+    let client;
+    if (existingClient) {
+      const { data: updatedClient, error: updateError } = await supabase
+        .from('Client')
+        .update({
+          name,
+          email: email || null,
+          notes,
+          updatedAt: new Date().toISOString(),
+        })
+        .eq('id', existingClient.id)
+        .select()
+        .single();
+
+      if (updateError) {
+         console.error("[client update error]", updateError);
+         return NextResponse.json({ error: "Error al actualizar cliente" }, { status: 500 });
+      }
+      client = updatedClient;
+    } else {
+      const { data: newClient, error: insertError } = await supabase
+        .from('Client')
+        .insert({
+          id: crypto.randomUUID(),
+          userId: session.userId,
+          name,
+          phone,
+          email: email || null,
+          notes,
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+         console.error("[client insert error]", insertError);
+         return NextResponse.json({ error: "Error al registrar cliente" }, { status: 500 });
+      }
+      client = newClient;
     }
 
     return NextResponse.json(client, { status: 201 });
