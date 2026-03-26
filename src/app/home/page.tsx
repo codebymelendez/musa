@@ -65,13 +65,13 @@ export default function Home() {
     if (!user) loadUser();
   }, [user, loadUser]);
 
-  // Cargar citas del día cuando el usuario esté disponible y el store hidratado
+  // Cargar citas de HOY al entrar a la home, ignorando la fecha guardada si es distinta
   useEffect(() => {
     if (isHydrated && user) {
-      const date = selectedDate || new Date().toISOString().split("T")[0];
-      fetchByDate(date);
+      const today = new Date().toISOString().split("T")[0];
+      fetchByDate(today);
     }
-  }, [isHydrated, user, selectedDate, fetchByDate]);
+  }, [isHydrated, user, fetchByDate]);
 
 
   const today = new Date();
@@ -164,12 +164,12 @@ export default function Home() {
         </div>
       )}
 
-      {/* Timeline de citas: Pendientes/Confirmadas */}
-      {!loading && appointments.filter(a => a.status === "confirmed" || a.status === "pending").length > 0 && (
+      {/* Timeline de citas: Próximas (todas menos completadas/canceladas) */}
+      {!loading && appointments.filter(a => a.status !== "completed" && a.status !== "cancelled").length > 0 && (
         <div className="space-y-6 relative mb-12">
           <div className="absolute left-4 top-0 bottom-0 w-px border-l-2 border-dotted border-outline-variant opacity-30 pointer-events-none"></div>
 
-          {appointments.filter(a => a.status === "confirmed" || a.status === "pending").map((apt) => {
+          {appointments.filter(a => a.status !== "completed" && a.status !== "cancelled").map((apt) => {
 
             const cfg =
               statusConfig[apt.status] ?? statusConfig["confirmed"];

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { getClientSession } from "@/lib/clientAuth";
 
 export async function GET(req: NextRequest) {
@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { data: appointments } = await supabase
       .from('Appointment')
       .select(`
@@ -53,7 +53,11 @@ export async function GET(req: NextRequest) {
     const { data: clientAppointments } = await supabase
       .from('Appointment')
       .select(`
-        *,
+        id,
+        startTime,
+        endTime,
+        status,
+        rescheduleToken,
         service:Service(name, durationMin, price, currency),
         user:User(
           name,

@@ -18,6 +18,7 @@ export default function TopAppBar() {
     pathname.startsWith("/staff/join") ||
     pathname.startsWith("/explore") ||
     pathname.startsWith("/client") ||
+    pathname.startsWith("/cita/") ||
     pathname === "/forgot-password" ||
     pathname === "/reset-password"
   ) {

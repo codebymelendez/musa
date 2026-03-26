@@ -170,12 +170,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     const dateStr = start.toLocaleDateString("es-VE", { weekday: "long", day: "numeric", month: "long" });
 
     // Email de confirmación
-    if (clientEmail && process.env.RESEND_API_KEY) {
+    if (clientEmail) {
       const manageUrl = `${APP_URL}/cita/${rescheduleToken}`;
       try {
-        const resend = new Resend(process.env.RESEND_API_KEY);
-        resend.emails.send({
-          from: "Musa <noreply@musa.app>",
+        const { sendEmail } = await import("@/lib/mailer");
+        await sendEmail({
           to: clientEmail,
           subject: `✅ Cita confirmada – ${service.name}`,
           html: buildConfirmationEmail({
@@ -186,12 +185,10 @@ export async function POST(req: NextRequest, { params }: Params) {
             startStr,
             manageUrl,
           }),
-        }).catch((e) => console.error("[Resend Error]", e));
+        });
       } catch (e) {
-        console.error("[Resend Init Error]", e);
+        console.error("[Mailer Error]", e);
       }
-    } else if (clientEmail) {
-      console.warn("No RESEND_API_KEY provided, skipping email sent to:", clientEmail);
     }
 
     // Notificaciones (Async)

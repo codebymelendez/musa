@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { Resend } from "resend";
-import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { sendNotification, sendClientNotification } from "@/lib/notifications";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { token, newStartTime } = parsed.data;
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const { data: appointment } = await supabase
       .from('Appointment')

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
 
 type Params = { params: Promise<{ token: string }> };
 
@@ -10,10 +10,10 @@ export async function GET(req: NextRequest, { params }: Params) {
     60
   );
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const { data: appointment } = await supabase
     .from('Appointment')
-    .select('*, service:Service(*), user:User(*, settings:Setting(*))')
+    .select('*, service:Service(*), user:User(*, settings:ProfessionalSettings(*))')
     .eq('rescheduleToken', token)
     .single();
 
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     .select('startTime, endTime')
     .eq('userId', appointment.userId)
     .neq('id', appointment.id)
-    .not('status', 'in', '("cancelled", "no_show")')
+    .not('status', 'in', '(cancelled,no_show)')
     .gte('startTime', from.toISOString())
     .lte('startTime', until.toISOString());
 

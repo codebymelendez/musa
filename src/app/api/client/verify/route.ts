@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { signClientToken } from "@/lib/clientAuth";
 
 const schema = z.object({
@@ -17,17 +17,34 @@ export async function POST(req: NextRequest) {
     }
 
     const { phone, name } = parsed.data;
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
-    // Buscar clienta por teléfono en cualquier negocio
-    const { data: client } = await supabase
+    // Normalizar teléfono (solo números)
+    const normalizedPhone = phone.replace(/\D/g, "");
+
+    // Búsqueda súper flexible: traemos todos y filtramos en JS
+    const { data: allClients, error: searchError } = await supabase
       .from('Client')
-      .select('id, name, phone')
-      .eq('phone', phone)
-      .limit(1)
-      .maybeSingle();
+      .select('id, name, phone');
+
+    if (searchError) {
+      console.error("[client verify] Error en consulta:", searchError);
+      return NextResponse.json({ error: "Error en base de datos" }, { status: 500 });
+    }
+
+    console.log(`[client verify] Buscando: ${phone} (${normalizedPhone}). Clientes en DB: ${allClients?.length || 0}`);
+
+    const client = allClients?.find(c => {
+       const cPhone = c.phone.replace(/\D/g, "");
+       const match = cPhone.includes(normalizedPhone) || 
+                     normalizedPhone.includes(cPhone) || 
+                     c.phone === phone;
+       if (match) console.log(`[client verify] Coincidencia encontrada: ${c.name} (${c.phone})`);
+       return match;
+    });
 
     if (!client) {
+      console.log(`[client verify] No se encontró cliente para: ${phone}`);
       return NextResponse.json(
         { error: "No encontramos citas con ese número. ¿Ya hiciste una reserva?" },
         { status: 404 }
@@ -40,11 +57,17 @@ export async function POST(req: NextRequest) {
         .toLowerCase()
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-s]/g, "") // Solo letras para mayor flexibilidad
         .trim();
 
+    const nClientName = normalize(client.name);
+    const nInputName = normalize(name);
+
     const nameMatch =
-      normalize(client.name).includes(normalize(name)) ||
-      normalize(name).includes(normalize(client.name));
+      nClientName.includes(nInputName) ||
+      nInputName.includes(nClientName) ||
+      // Probar si el primer nombre coincide
+      nClientName.split(" ")[0] === nInputName.split(" ")[0];
 
     if (!nameMatch) {
       return NextResponse.json(

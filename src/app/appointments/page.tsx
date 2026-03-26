@@ -122,7 +122,7 @@ export default function AppointmentsPage() {
 
                 <div className="flex gap-2 mt-4">
                   <Link
-                    href="/home"
+                    href={`/appointments/${apt.id}`}
                     className="flex-1 py-2 rounded-xl bg-surface-container-low text-on-surface-variant text-xs font-bold text-center hover:bg-surface-container-high transition-colors"
                   >
                     Ver detalles

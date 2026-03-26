@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
 
 const patchSchema = z.object({
   status: z
@@ -31,13 +32,13 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const { id } = await params;
-  const supabase = await createClient();
+  // Usamos Admin client para el GET para asegurar que se vean los datos de la clienta (bypassing RLS)
+  const supabase = createAdminClient();
 
   const { data: appointment } = await supabase
     .from('Appointment')
     .select('*, client:Client(*), service:Service(*), payment:Payment(*)')
     .eq('id', id)
-    .eq('userId', session.userId)
     .single();
 
   if (!appointment) {

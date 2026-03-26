@@ -16,6 +16,7 @@ export default function BottomNavBar() {
     pathname.startsWith("/staff/join") ||
     pathname.startsWith("/explore") ||
     pathname.startsWith("/client") ||
+    pathname.startsWith("/cita/") ||
     pathname === "/forgot-password" ||
     pathname === "/reset-password" ||
     pathname === "/onboarding"

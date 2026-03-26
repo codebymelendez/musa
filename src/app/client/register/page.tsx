@@ -66,11 +66,7 @@ export default function ClientRegisterPage() {
         localStorage.setItem("musa_client_preferences", JSON.stringify(form.preferences));
       if (data.token) localStorage.setItem("musa_client_token", data.token);
 
-      // Redirigir a explorar con ciudad pre-cargada
-      const params = new URLSearchParams();
-      if (form.city) params.set("city", form.city);
-      if (form.preferences.length === 1) params.set("category", form.preferences[0]);
-      router.push(`/explore?${params}`);
+      router.push("/client");
     } catch (err: any) {
       setError(err.message || "Error al registrarse");
     } finally {

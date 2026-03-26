@@ -469,15 +469,50 @@ export default function CitaPortalPage() {
 
 function PortalShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-violet-50">
+    <div className="min-h-screen bg-violet-50 pb-20">
       {/* Header */}
-      <div className="bg-gradient-to-r from-violet-700 to-purple-600 px-4 py-5 text-center">
-        <h1 className="text-white text-xl font-bold tracking-tight">Musa ✨</h1>
-        <p className="text-violet-300 text-xs mt-0.5">Gestiona tu cita</p>
+      <div className="bg-gradient-to-r from-violet-700 to-purple-600 px-4 py-5">
+        <div className="max-w-sm mx-auto flex items-center justify-between">
+          <a href="/" className="flex items-center gap-1.5 text-violet-300 hover:text-white transition-colors text-sm">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Inicio
+          </a>
+          <div className="text-center">
+            <h1 className="text-white text-lg font-bold tracking-tight">Musa ✨</h1>
+            <p className="text-violet-300 text-xs">Gestiona tu cita</p>
+          </div>
+          <a href="/client/login" className="text-violet-300 hover:text-white transition-colors text-xs font-medium">
+            Mi cuenta
+          </a>
+        </div>
       </div>
 
       {/* Content */}
       <div className="max-w-sm mx-auto px-4 py-6">{children}</div>
+
+      {/* Footer nav */}
+      <div className="fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-xl border-t border-violet-100 px-4 py-3 flex justify-around z-50">
+        <a href="/" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-violet-600 transition-colors">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+          </svg>
+          <span className="text-[10px] font-bold uppercase tracking-wide">Inicio</span>
+        </a>
+        <a href="/explore" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-violet-600 transition-colors">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <span className="text-[10px] font-bold uppercase tracking-wide">Explorar</span>
+        </a>
+        <a href="/client" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-violet-600 transition-colors">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <span className="text-[10px] font-bold uppercase tracking-wide">Mis Citas</span>
+        </a>
+      </div>
     </div>
   );
 }

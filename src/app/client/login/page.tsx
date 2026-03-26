@@ -99,7 +99,7 @@ export default function ClientLoginPage() {
               <input
                 className="w-full bg-surface-container-high border-none rounded-xl py-4 px-5 focus:ring-2 focus:ring-primary-container text-on-surface placeholder:text-on-surface-variant/50 text-sm"
                 type="text"
-                placeholder="Como te diste de alta en la reserva"
+                placeholder="Tu nombre completo"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
@@ -127,28 +127,9 @@ export default function ClientLoginPage() {
           </button>
         </form>
 
-        <div className="space-y-3 text-center">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-outline-variant/30" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-background px-3 text-xs text-on-surface-variant">¿Sin reservas aún?</span>
-            </div>
-          </div>
-          <Link
-            href="/explore"
-            className="inline-flex items-center gap-1.5 text-sm font-bold text-primary hover:underline"
-          >
-            <span className="material-symbols-outlined text-sm">search</span>
-            Encuentra tu primer profesional
-          </Link>
-        </div>
-
-        {/* Separador para registro */}
         <div className="bg-surface-container-lowest rounded-2xl p-4 text-center space-y-2 border border-outline-variant/20">
           <p className="text-xs text-on-surface-variant font-medium">
-            ¿Quieres guardar tus preferencias de antemano?
+            ¿Aún no tienes cuenta?
           </p>
           <Link
             href="/client/register"

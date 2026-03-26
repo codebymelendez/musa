@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
 
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const now = new Date().toISOString();
-
-    const { data: promotions } = await supabase
+    const supabase = createAdminClient();
+    const { data: promotions, error: pError } = await supabase
       .from('Promotion')
       .select(`
         *,
@@ -23,18 +21,39 @@ export async function GET() {
             role
           )
         )
-      `)
-      .eq('isActive', true)
-      .lte('validFrom', now)
-      .gte('validUntil', now)
-      .order('discount', { ascending: false })
-      .limit(12);
+      `);
 
-    if (!promotions) {
+    if (pError) {
+      console.error("[public promotions] Error:", pError);
       return NextResponse.json({ promotions: [] });
     }
 
-    const result = promotions.map((p: any) => {
+    console.log(`[public promotions] Total en DB: ${promotions?.length || 0}`);
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const filteredPromotions = (promotions || []).filter(p => {
+      // Si no tiene fechas, la mostramos (fallback) o si isActive es true
+      if (!p.isActive) return false;
+      if (!p.validFrom || !p.validUntil) return p.isActive;
+
+      const from = new Date(p.validFrom);
+      const until = new Date(p.validUntil);
+      const isMatch = from <= now && until >= startOfToday;
+      if (!isMatch) console.log(`[public promotions] Excluida por fecha: ${p.id} (desde ${p.validFrom} hasta ${p.validUntil})`);
+      return isMatch;
+    })
+    .sort((a, b) => (b.discount || 0) - (a.discount || 0))
+    .slice(0, 12);
+
+    console.log(`[public promotions] Retornando: ${filteredPromotions.length}`);
+    
+    if (filteredPromotions.length === 0) {
+      return NextResponse.json({ promotions: [] });
+    }
+
+    const result = filteredPromotions.map((p: any) => {
       const owner = p.business.users.find((u: any) => u.role === 'OWNER') ?? null;
       return {
         id: p.id,

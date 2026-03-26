@@ -119,6 +119,15 @@ export async function broadcastToBusinessClients(
 
     if (clients) {
       for (const client of clients) {
+        // Crear notificación en base de datos para la campana
+        await admin.from('Notification').insert({
+          clientId: client.id,
+          title: data.title,
+          body: data.body,
+          url: data.url,
+          type: "PROMOTION",
+        });
+
         const subs = (client as any).pushSubscriptions;
         if (subs && subs.length > 0) {
           await sendPushToSubscriptions(subs, data);

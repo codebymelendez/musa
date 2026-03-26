@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { checkAppointmentLimit, incrementAppointmentCount } from "@/lib/limits";
 
 const createSchema = z.object({
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { data: appointments, error } = await supabase
       .from('Appointment')
       .select('*, client:Client(*), service:Service(*), payment:Payment(*)')

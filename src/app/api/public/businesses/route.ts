@@ -1,21 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = req.nextUrl;
+export async function GET(request: NextRequest) {
+  const { searchParams } = request.nextUrl;
   const q = searchParams.get("q")?.trim();
   const city = searchParams.get("city")?.trim();
   const category = searchParams.get("category")?.trim();
 
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     
     // Construcción de la consulta con Supabase
     let query = supabase
       .from('Business')
       .select(`
         *,
-        users:User!inner(
+        users:User(
           name,
           slug,
           avatarUrl,
@@ -26,8 +26,6 @@ export async function GET(req: NextRequest) {
           services:Service(isActive)
         )
       `)
-      .eq('users.role', 'OWNER')
-      .eq('users.onboardingDone', true)
       .order('createdAt', { ascending: false })
       .limit(24);
 
@@ -40,9 +38,11 @@ export async function GET(req: NextRequest) {
 
     const { data: businesses, error } = await query;
 
+    console.log(`[public businesses] Encontrados en DB: ${businesses?.length || 0}`);
+
     if (error) {
       console.error("[public businesses GET query error]", error);
-      return NextResponse.json({ businesses: [] });
+      return NextResponse.json([]);
     }
 
     // Client-side filtering for nested OR because Supabase .or() with foreign tables can be tricky

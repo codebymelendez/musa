@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
-import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { sendNotification, sendClientNotification } from "@/lib/notifications";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
@@ -9,7 +9,7 @@ type Params = { params: Promise<{ token: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
   const { token } = await params;
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data: appointment } = await supabase
     .from('Appointment')
@@ -26,7 +26,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
   const { token } = await params;
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data: appointment } = await supabase
     .from('Appointment')
