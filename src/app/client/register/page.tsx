@@ -31,21 +31,51 @@ export default function ClientRegisterPage() {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Guardar perfil en localStorage (se actualiza en DB al hacer la primera reserva)
-    localStorage.setItem("musa_client_name", form.name);
-    localStorage.setItem("musa_client_phone", form.phone);
-    if (form.email) localStorage.setItem("musa_client_email", form.email);
-    if (form.city) localStorage.setItem("musa_client_city", form.city);
-    if (form.preferences.length > 0)
-      localStorage.setItem("musa_client_preferences", JSON.stringify(form.preferences));
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-    // Redirigir a explorar con ciudad pre-cargada
-    const params = new URLSearchParams();
-    if (form.city) params.set("city", form.city);
-    if (form.preferences.length === 1) params.set("category", form.preferences[0]);
-    router.push(`/explore?${params}`);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    try {
+      // Create user in DB to allow immediate login
+      const res = await fetch("/api/client/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          phone: form.phone,
+          email: form.email,
+          city: form.city,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Error al registrarse");
+      }
+
+      // Save to localStorage
+      localStorage.setItem("musa_client_name", form.name);
+      localStorage.setItem("musa_client_phone", form.phone);
+      if (form.email) localStorage.setItem("musa_client_email", form.email);
+      if (form.city) localStorage.setItem("musa_client_city", form.city);
+      if (form.preferences.length > 0)
+        localStorage.setItem("musa_client_preferences", JSON.stringify(form.preferences));
+      if (data.token) localStorage.setItem("musa_client_token", data.token);
+
+      // Redirigir a explorar con ciudad pre-cargada
+      const params = new URLSearchParams();
+      if (form.city) params.set("city", form.city);
+      if (form.preferences.length === 1) params.set("category", form.preferences[0]);
+      router.push(`/explore?${params}`);
+    } catch (err: any) {
+      setError(err.message || "Error al registrarse");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -158,17 +188,25 @@ export default function ClientRegisterPage() {
             </div>
           </div>
 
+          {error && (
+            <div className="bg-error-container text-on-error-container p-3 rounded-xl text-sm font-semibold">
+              {error}
+            </div>
+          )}
+
           <button
             type="submit"
-            disabled={!form.name || !form.phone}
+            disabled={!form.name || !form.phone || loading}
             className="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white font-headline font-bold rounded-full shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            Confirmar y buscar profesionales
-            <span className="material-symbols-outlined">arrow_forward</span>
+            {loading ? "Registrando..." : "Confirmar y buscar profesionales"}
+            <span className="material-symbols-outlined">
+              {loading ? "hourglass_empty" : "arrow_forward"}
+            </span>
           </button>
 
           <p className="text-xs text-on-surface-variant text-center leading-relaxed">
-            Tus datos se guardan localmente en este dispositivo. Al hacer tu primera reserva, se crearán en el sistema.
+            Tus datos se guardarán de forma segura para que puedas ver y gestionar tus reservas fácilmente.
           </p>
         </form>
       </div>

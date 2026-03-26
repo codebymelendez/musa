@@ -1,5 +1,5 @@
 import webpush from "web-push";
-import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
 
 const publicVapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
 const privateVapidKey = process.env.VAPID_PRIVATE_KEY || "";
@@ -22,7 +22,7 @@ async function sendPushToSubscriptions(
   subscriptions: { id: string; endpoint: string; keys: any }[],
   payload: PushPayload
 ) {
-  const supabase = await createClient();
+  const admin = createAdminClient();
   for (const sub of subscriptions) {
     try {
       const keys = typeof sub.keys === 'string' ? JSON.parse(sub.keys) : sub.keys;
@@ -32,7 +32,7 @@ async function sendPushToSubscriptions(
       );
     } catch (err: any) {
       if (err.statusCode === 410 || err.statusCode === 404) {
-        await supabase.from('PushSubscription').delete().eq('id', sub.id);
+        await admin.from('PushSubscription').delete().eq('id', sub.id);
       }
     }
   }
@@ -44,8 +44,8 @@ export async function sendNotification(
   data: PushPayload
 ) {
   try {
-    const supabase = await createClient();
-    const { data: localNotification } = await supabase
+    const admin = createAdminClient();
+    const { data: localNotification } = await admin
       .from('Notification')
       .insert({
         userId,
@@ -57,7 +57,7 @@ export async function sendNotification(
       .select()
       .single();
 
-    const { data: subscriptions } = await supabase
+    const { data: subscriptions } = await admin
       .from('PushSubscription')
       .select('id, endpoint, keys')
       .eq('userId', userId);
@@ -77,8 +77,8 @@ export async function sendClientNotification(
   data: PushPayload
 ) {
   try {
-    const supabase = await createClient();
-    const { data: localNotification } = await supabase
+    const admin = createAdminClient();
+    const { data: localNotification } = await admin
       .from('Notification')
       .insert({
         clientId,
@@ -90,7 +90,7 @@ export async function sendClientNotification(
       .select()
       .single();
 
-    const { data: subscriptions } = await supabase
+    const { data: subscriptions } = await admin
       .from('PushSubscription')
       .select('id, endpoint, keys')
       .eq('clientId', clientId);
@@ -110,8 +110,8 @@ export async function broadcastToBusinessClients(
   data: PushPayload
 ) {
   try {
-    const supabase = await createClient();
-    const { data: clients } = await supabase
+    const admin = createAdminClient();
+    const { data: clients } = await admin
       .from('Client')
       .select('id, pushSubscriptions:PushSubscription(id, endpoint, keys)')
       .eq('businessId', businessId)

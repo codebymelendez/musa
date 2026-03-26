@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { broadcastToBusinessClients } from "@/lib/notifications";
 import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
 
 const schema = z.object({
   promotionId: z.string(),
@@ -14,6 +15,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const supabase = await createClient();
+    const admin = createAdminClient();
+
     const { data: user } = await supabase
       .from('User')
       .select('role, businessId, business:Business(slug)')
@@ -30,7 +33,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
     }
 
-    const { data: promotion, error: promoError } = await supabase
+    const { data: promotion, error: promoError } = await admin
       .from('Promotion')
       .select('*')
       .eq('id', parsed.data.promotionId)
