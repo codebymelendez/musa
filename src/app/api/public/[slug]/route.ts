@@ -27,7 +27,12 @@ export async function GET(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Profesional no encontrada" }, { status: 404 });
     }
 
-    const rawSettings = user.settings;
+    // Supabase might return a single object or an array for settings depending on constraints
+    let rawSettings = user.settings;
+    if (Array.isArray(rawSettings)) {
+      rawSettings = rawSettings[0] || null;
+    }
+
     let workDays = [1, 2, 3, 4, 5];
     if (rawSettings && rawSettings.workDays) {
       workDays = typeof rawSettings.workDays === 'string' 

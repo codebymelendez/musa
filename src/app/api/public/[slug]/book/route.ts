@@ -49,8 +49,12 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Profesional no encontrada" }, { status: 404 });
     }
 
-    const settings = user.settings;
-    if (settings && !settings.bookingEnabled) {
+    let settings = user.settings;
+    if (Array.isArray(settings)) {
+      settings = settings[0] || null;
+    }
+
+    if (settings && settings.bookingEnabled === false) {
       return NextResponse.json(
         { error: "Las reservas están desactivadas" },
         { status: 503 }
@@ -99,25 +103,45 @@ export async function POST(req: NextRequest, { params }: Params) {
       .eq('phone', clientPhone)
       .maybeSingle();
 
-    const clientId = existingClient?.id || randomUUID();
+    let client;
+    if (existingClient) {
+      const { data: updatedClient, error: clientUpdateError } = await admin
+        .from('Client')
+        .update({
+          name: clientName,
+          email: clientEmail || null,
+          wantsNotifications: wantsNotifications ?? false,
+          updatedAt: new Date().toISOString(),
+        })
+        .eq('id', existingClient.id)
+        .select()
+        .single();
 
-    const { data: client, error: clientError } = await admin
-      .from('Client')
-      .upsert({
-        id: clientId,
-        userId: user.id,
-        businessId: user.businessId,
-        name: clientName,
-        phone: clientPhone,
-        email: clientEmail || null,
-        wantsNotifications: wantsNotifications ?? false,
-      }, { onConflict: 'userId,phone' })
-      .select()
-      .single();
+      if (clientUpdateError || !updatedClient) {
+        console.error("[update client]", clientUpdateError);
+        return NextResponse.json({ error: "Error al actualizar cliente" }, { status: 500 });
+      }
+      client = updatedClient;
+    } else {
+      const { data: newClient, error: clientInsertError } = await admin
+        .from('Client')
+        .insert({
+          id: randomUUID(),
+          userId: user.id,
+          businessId: user.businessId,
+          name: clientName,
+          phone: clientPhone,
+          email: clientEmail || null,
+          wantsNotifications: wantsNotifications ?? false,
+        })
+        .select()
+        .single();
 
-    if (clientError || !client) {
-      console.error("[upsert client]", clientError);
-      return NextResponse.json({ error: "Error al registrar cliente" }, { status: 500 });
+      if (clientInsertError || !newClient) {
+        console.error("[insert client]", clientInsertError);
+        return NextResponse.json({ error: "Error al registrar cliente" }, { status: 500 });
+      }
+      client = newClient;
     }
 
     // Crear cita con token de reschedule
