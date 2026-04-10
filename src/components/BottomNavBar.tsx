@@ -15,7 +15,7 @@ export default function BottomNavBar() {
     pathname.startsWith("/p/") ||
     pathname.startsWith("/staff/join") ||
     pathname.startsWith("/explore") ||
-    pathname.startsWith("/client") ||
+    pathname.startsWith("/client/") ||
     pathname.startsWith("/cita/") ||
     pathname === "/forgot-password" ||
     pathname === "/reset-password" ||
@@ -50,6 +50,12 @@ export default function BottomNavBar() {
       fill: pathname === "/stats" ? "1" : "0",
     },
     {
+      href: "/clients",
+      icon: "group",
+      label: "Clientas",
+      fill: pathname === "/clients" ? "1" : "0",
+    },
+    {
       href: "/profile",
       icon: "person",
       label: "Profile",
@@ -58,7 +64,7 @@ export default function BottomNavBar() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-3 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl shadow-[0_-4px_20px_rgba(0,0,0,0.04)] rounded-t-[2rem] z-50">
+    <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-3 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl shadow-[0_-4px_20px_rgba(0,0,0,0.04)] rounded-t-[2rem] z-[110]">
       {navItems.map((item) => {
         const isActive = pathname === item.href;
         return (

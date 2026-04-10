@@ -43,6 +43,7 @@ export interface Business {
   category: string | null;
   phone: string | null;
   city: string | null;
+  logoUrl: string | null;
   planId: string;
   plan?: PlanDef;
   currentMonthBookings: number;
@@ -82,6 +83,10 @@ export interface Client {
   phone: string;
   email: string | null;
   notes: string | null;
+  preferences: string | null;
+  birthday: string | null;
+  tags: string[];
+  isActive: boolean;
   createdAt: string;
   updatedAt: string;
   appointments?: Appointment[];
@@ -96,6 +101,7 @@ export interface Service {
   durationMin: number;
   price: number;
   currency: string;
+  imageUrl: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -165,6 +171,10 @@ export interface CreateClientPayload {
   phone: string;
   email?: string;
   notes?: string;
+  preferences?: string;
+  birthday?: string;
+  tags?: string[];
+  isActive?: boolean;
 }
 
 export interface CreateServicePayload {

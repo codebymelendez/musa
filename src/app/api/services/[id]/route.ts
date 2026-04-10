@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase-server";
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
+  imageUrl: z.string().url().optional().or(z.literal("")),
   category: z.enum(["nails", "hair", "brows", "makeup", "other"]).optional(),
   durationMin: z.number().int().positive().optional(),
   price: z.number().nonnegative().optional(),

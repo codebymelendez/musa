@@ -8,6 +8,10 @@ const createSchema = z.object({
   phone: z.string().min(7),
   email: z.string().email().optional().or(z.literal("")),
   notes: z.string().optional(),
+  preferences: z.string().optional(),
+  birthday: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  isActive: z.boolean().optional().default(true),
 });
 
 export async function GET(req: NextRequest) {
@@ -15,15 +19,30 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const { searchParams } = req.nextUrl;
-  const search = searchParams.get("search");
+  const search        = searchParams.get("search");
+  const showInactive  = searchParams.get("showInactive") === "true";
 
   try {
     const supabase = await createClient();
+
+    // Obtener businessId del usuario
+    const { data: userData } = await supabase.from('User').select('businessId').eq('id', session.userId).single();
+    const businessId = userData?.businessId;
+
+    if (!businessId) {
+      return NextResponse.json({ error: "El usuario no pertenece a un negocio" }, { status: 400 });
+    }
+
     let query = supabase
       .from('Client')
       .select('*, appointments:Appointment(*, service:Service(*))')
-      .eq('userId', session.userId)
+      .eq('businessId', businessId)
       .order('name', { ascending: true });
+
+    // Si NO se pide ver inactivas, filtrar solo activas
+    if (!showInactive) {
+      query = query.eq('isActive', true);
+    }
 
     if (search) {
       query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%`);
@@ -66,14 +85,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { name, phone, email, notes } = parsed.data;
+    const { name, phone, email, notes, preferences, birthday, tags, isActive } = parsed.data;
     const supabase = await createClient();
 
-    // Buscar si ya existe la clienta con ese teléfono para el usuario
+    // Obtener businessId del usuario
+    const { data: userData } = await supabase.from('User').select('businessId').eq('id', session.userId).single();
+    const businessId = userData?.businessId;
+
+    if (!businessId) {
+      return NextResponse.json({ error: "El usuario no pertenece a un negocio" }, { status: 400 });
+    }
+
+    // Buscar si ya existe la clienta con ese teléfono para este negocio
     const { data: existingClient } = await supabase
       .from('Client')
       .select('id')
-      .eq('userId', session.userId)
+      .eq('businessId', businessId)
       .eq('phone', phone)
       .maybeSingle();
 
@@ -85,6 +112,10 @@ export async function POST(req: NextRequest) {
           name,
           email: email || null,
           notes,
+          preferences,
+          birthday: birthday || null,
+          tags: tags || [],
+          isActive,
           updatedAt: new Date().toISOString(),
         })
         .eq('id', existingClient.id)
@@ -101,11 +132,16 @@ export async function POST(req: NextRequest) {
         .from('Client')
         .insert({
           id: crypto.randomUUID(),
-          userId: session.userId,
+          businessId: businessId,
+          userId: session.userId, // quien lo creó
           name,
           phone,
           email: email || null,
           notes,
+          preferences,
+          birthday: birthday || null,
+          tags: tags || [],
+          isActive
         })
         .select()
         .single();

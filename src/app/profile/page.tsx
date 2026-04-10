@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAppStore } from "@/store/useAppStore";
 import { User, ProfessionalSettings } from "@/types";
 import { formatCurrency } from "@/lib/utils";
+import ImageUploader from "@/components/ui/ImageUploader";
 
 const DAY_NAMES = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
@@ -24,6 +25,7 @@ export default function Profile() {
   const [formBio, setFormBio] = useState("");
   const [formWhatsapp, setFormWhatsapp] = useState("");
   const [formInstagram, setFormInstagram] = useState("");
+  const [formAvatarUrl, setFormAvatarUrl] = useState("");
   const [formStartHour, setFormStartHour] = useState(9);
   const [formEndHour, setFormEndHour] = useState(18);
   const [formWorkDays, setFormWorkDays] = useState<number[]>([1, 2, 3, 4, 5]);
@@ -47,6 +49,7 @@ export default function Profile() {
     setFormBio(u.bio ?? "");
     setFormWhatsapp(u.whatsapp ?? "");
     setFormInstagram(u.instagram ?? "");
+    setFormAvatarUrl(u.avatarUrl ?? "");
     setFormBusinessName(u.business?.name ?? "");
     setFormCity(u.business?.city ?? "");
     if (u.settings) {
@@ -64,6 +67,7 @@ export default function Profile() {
       if (editMode === "profile") {
         payload.name = formName;
         payload.bio = formBio;
+        payload.avatarUrl = formAvatarUrl;
       } else if (editMode === "hours") {
         payload.settings = {
           workDays: formWorkDays,
@@ -170,7 +174,22 @@ export default function Profile() {
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
-            <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="Tu nombre" className="w-full h-12 px-4 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface" />
+             <div className="space-y-4">
+              <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider ml-1">Foto de Perfil</label>
+              <ImageUploader
+                currentUrl={formAvatarUrl || null}
+                bucket="staff-avatars"
+                storagePath={`staff/${user?.id ?? 'new'}/avatar`}
+                onUploaded={(url) => setFormAvatarUrl(url)}
+                shape="circle"
+                fallbackInitials={formName ? formName.slice(0,2).toUpperCase() : undefined}
+                hint="Tu foto profesional · JPG, PNG o WebP"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider ml-1">Nombre</label>
+              <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="Tu nombre" className="w-full h-12 px-4 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface" />
+            </div>
             <textarea value={formBio} onChange={(e) => setFormBio(e.target.value)} placeholder="Descripción de tu negocio..." rows={3} className="w-full px-4 py-3 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface text-sm resize-none" />
             <button onClick={handleSave} disabled={saving} className="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white font-bold rounded-full">
               {saving ? "Guardando..." : "Guardar"}

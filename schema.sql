@@ -8,6 +8,7 @@ CREATE TABLE "Business" (
     "city" TEXT,
     "address" TEXT,
     "planId" TEXT NOT NULL,
+    "logoUrl" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -70,6 +71,10 @@ CREATE TABLE "Client" (
     "phone" TEXT NOT NULL,
     "email" TEXT,
     "notes" TEXT,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "preferences" TEXT,
+    "birthday" DATE,
+    "tags" JSONB DEFAULT '[]'::jsonb,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -87,6 +92,7 @@ CREATE TABLE "Service" (
     "durationMin" INTEGER NOT NULL,
     "price" DOUBLE PRECISION NOT NULL,
     "currency" TEXT NOT NULL DEFAULT 'USD',
+    "imageUrl" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -222,7 +228,7 @@ CREATE UNIQUE INDEX "Invitation_token_key" ON "Invitation"("token");
 CREATE UNIQUE INDEX "Invitation_code_key" ON "Invitation"("code");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Client_userId_phone_key" ON "Client"("userId", "phone");
+CREATE UNIQUE INDEX "Client_businessId_phone_key" ON "Client"("businessId", "phone");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Appointment_rescheduleToken_key" ON "Appointment"("rescheduleToken");

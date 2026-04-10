@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useServices } from "@/hooks/useServices";
 import { Service, ServiceCategory } from "@/types";
 import { formatCurrency } from "@/lib/utils";
+import Image from "next/image";
 import ServiceModal from "@/components/services/ServiceModal";
 
 const CATEGORY_LABELS: Record<ServiceCategory, string> = {
@@ -133,17 +134,31 @@ export default function Services() {
             return (
               <div
                 key={service.id}
-                className={`group relative bg-surface-container-lowest rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 border-l-4 border-${color} overflow-hidden`}
+                className={`group relative bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md transition-all duration-300 border-l-4 border-${color} overflow-hidden flex flex-col`}
               >
-                <div className="absolute top-0 right-0 p-4">
-                  <button
-                    onClick={() => handleEdit(service)}
-                    className="text-outline hover:text-primary transition-colors p-2 rounded-full hover:bg-primary/5"
-                  >
-                    <span className="material-symbols-outlined text-xl">edit</span>
-                  </button>
-                </div>
-                <div className="mb-4">
+                {/* Image header if available */}
+                {service.imageUrl && (
+                  <div className="relative w-full h-32 overflow-hidden">
+                    <Image
+                      src={service.imageUrl}
+                      alt={service.name}
+                      fill
+                      className="object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                  </div>
+                )}
+
+                <div className="p-6 pt-5 flex-1 flex flex-col">
+                  <div className="absolute top-0 right-0 p-4 z-10">
+                    <button
+                      onClick={() => handleEdit(service)}
+                      className={`transition-colors p-2 rounded-full hover:bg-primary/5 ${service.imageUrl ? 'bg-white/90 shadow-sm text-zinc-900' : 'text-outline hover:text-primary'}`}
+                    >
+                      <span className="material-symbols-outlined text-xl">edit</span>
+                    </button>
+                  </div>
+                  <div className="mb-4">
                   <span className={`text-xs font-bold text-${color} uppercase tracking-widest mb-1 block`}>
                     {CATEGORY_LABELS[service.category]}
                   </span>
@@ -166,6 +181,7 @@ export default function Services() {
                       {formatCurrency(service.price, service.currency)}
                     </span>
                   </div>
+                </div>
                 </div>
               </div>
             );

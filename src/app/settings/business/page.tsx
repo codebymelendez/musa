@@ -3,15 +3,17 @@
 import { useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { useRouter } from "next/navigation";
+import ImageUploader from "@/components/ui/ImageUploader";
 
 export default function BusinessSettingsPage() {
   const { user, setUser } = useAppStore();
   const router = useRouter();
   
-  const [name, setName] = useState(user?.business?.name || "");
-  const [city, setCity] = useState(user?.business?.city || "");
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [name,      setName]      = useState(user?.business?.name || "");
+  const [city,      setCity]      = useState(user?.business?.city || "");
+  const [logoUrl,   setLogoUrl]   = useState(user?.business?.logoUrl || "");
+  const [saving,    setSaving]    = useState(false);
+  const [message,   setMessage]   = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   if (user?.role !== "OWNER") {
     return <div className="p-8 text-center">No autorizado</div>;
@@ -26,7 +28,7 @@ export default function BusinessSettingsPage() {
       const res = await fetch("/api/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ businessName: name, city }),
+        body: JSON.stringify({ businessName: name, city, logoUrl: logoUrl || undefined }),
       });
 
       if (res.ok) {
@@ -54,6 +56,21 @@ export default function BusinessSettingsPage() {
         </header>
 
         <form onSubmit={handleSave} className="bg-surface-container-low p-6 rounded-3xl space-y-6">
+
+          {/* Logo del negocio */}
+          <div className="space-y-3">
+            <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest ml-1">Logo del Negocio</p>
+            <ImageUploader
+              currentUrl={logoUrl || null}
+              bucket="business-avatars"
+              storagePath={`business/${user?.business?.id ?? 'new'}/logo`}
+              onUploaded={(url) => setLogoUrl(url)}
+              shape="rounded"
+              fallbackInitials={name ? name.slice(0,2).toUpperCase() : undefined}
+              hint="Imagen de tu negocio · JPG, PNG o WebP · máx. 5 MB"
+            />
+          </div>
+
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-xs font-bold text-on-surface-variant uppercase ml-1">Nombre del Negocio</label>

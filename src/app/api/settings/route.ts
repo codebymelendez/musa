@@ -13,6 +13,7 @@ const updateSchema = z.object({
   serviceType: z.string().optional(),
   businessName: z.string().min(2).optional(),
   city: z.string().optional(),
+  logoUrl: z.string().url().optional().or(z.literal("")),
   settings: z
     .object({
       workDays: z.array(z.number().min(0).max(6)).optional(),
@@ -86,7 +87,7 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const { name, bio, whatsapp, instagram, avatarUrl, settings, serviceType, businessName, city } = parsed.data;
+    const { name, bio, whatsapp, instagram, avatarUrl, settings, serviceType, businessName, city, logoUrl } = parsed.data;
     // Usar admin client para todas las operaciones de escritura (bypasa RLS)
     const admin = createAdminClient();
 
@@ -106,7 +107,8 @@ export async function PATCH(req: NextRequest) {
           .from('Business')
           .update({
             name: businessName,
-            ...(city !== undefined && { city: city || null }),
+            ...(city    !== undefined && { city:    city    || null }),
+            ...(logoUrl !== undefined && { logoUrl: logoUrl || null }),
           })
           .eq('id', currentUser.businessId);
         businessId = currentUser.businessId;
