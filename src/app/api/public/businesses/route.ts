@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
 
+// Maps category keys to their Spanish labels for text search matching
+const CATEGORY_LABELS: Record<string, string> = {
+  nails: "uñas",
+  hair: "cabello",
+  brows: "cejas pestañas",
+  makeup: "maquillaje",
+  other: "belleza",
+};
+
+function normalize(str: string): string {
+  return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const q = searchParams.get("q")?.trim();
@@ -9,8 +22,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const supabase = createAdminClient();
-    
-    // Construcción de la consulta con Supabase
+
     let query = supabase
       .from('Business')
       .select(`
@@ -27,59 +39,83 @@ export async function GET(request: NextRequest) {
         )
       `)
       .order('createdAt', { ascending: false })
-      .limit(24);
+      .limit(50);
 
+    // City filter at DB level (case-insensitive)
     if (city) {
       query = query.ilike('city', `%${city}%`);
     }
+
+    // Category filter at DB level only when Business.category is likely set
+    // (for legacy records where Business.category is null, we fall back to client-side below)
     if (category) {
       query = query.eq('category', category);
     }
 
     const { data: businesses, error } = await query;
 
-    console.log(`[public businesses] Encontrados en DB: ${businesses?.length || 0}`);
-
     if (error) {
       console.error("[public businesses GET query error]", error);
-      return NextResponse.json([]);
-    }
-
-    // Client-side filtering for nested OR because Supabase .or() with foreign tables can be tricky
-    let filteredBusinesses = businesses || [];
-    if (q) {
-      const searchQ = q.toLowerCase();
-      filteredBusinesses = filteredBusinesses.filter((b: any) => {
-        const owner = Array.isArray(b.users) ? b.users[0] : b.users;
-        return b.name?.toLowerCase().includes(searchQ) || owner?.name?.toLowerCase().includes(searchQ);
-      });
-    }
-
-    if (!businesses) {
       return NextResponse.json({ businesses: [] });
     }
 
-    // Para obtener el staffCount de forma eficiente, podríamos necesitar otra query
-    // o haber incluido a todos los usuarios. Pero para el MVP, usaremos otra consulta
-    // o una aproximación.
-    
-    const result = await Promise.all(filteredBusinesses.map(async (b) => {
-      const owner = Array.isArray(b.users) ? b.users[0] : b.users;
-      
-      // Obtener conteo de staff (excluyendo al owner si se desea, o total)
-      const { count: staffCount } = await supabase
-        .from('User')
-        .select('*', { count: 'exact', head: true })
-        .eq('businessId', b.id);
+    let filteredBusinesses = businesses || [];
 
+    // If category filter returned no results (likely because Business.category is null),
+    // re-fetch without category filter and apply client-side using User.serviceType
+    if (category && filteredBusinesses.length === 0) {
+      const { data: allForCategory } = await supabase
+        .from('Business')
+        .select(`
+          *,
+          users:User(name, slug, avatarUrl, bio, serviceType, role, onboardingDone, services:Service(isActive))
+        `)
+        .order('createdAt', { ascending: false })
+        .limit(50);
+
+      filteredBusinesses = (allForCategory || []).filter((b: any) => {
+        const owner = Array.isArray(b.users) ? b.users[0] : b.users;
+        return b.category === category || owner?.serviceType === category;
+      });
+
+      // Re-apply city filter if needed
+      if (city) {
+        const normalizedCity = normalize(city);
+        filteredBusinesses = filteredBusinesses.filter((b: any) =>
+          normalize(b.city || "").includes(normalizedCity)
+        );
+      }
+    }
+
+    // Text search: name, owner name, bio, city, serviceType label — accent-insensitive
+    if (q) {
+      const searchQ = normalize(q);
+      filteredBusinesses = filteredBusinesses.filter((b: any) => {
+        const owner = Array.isArray(b.users) ? b.users[0] : b.users;
+        const serviceKey = owner?.serviceType?.toLowerCase() || "";
+        const serviceLabels = CATEGORY_LABELS[serviceKey] || "";
+        return (
+          normalize(b.name || "").includes(searchQ) ||
+          normalize(owner?.name || "").includes(searchQ) ||
+          normalize(b.city || "").includes(searchQ) ||
+          normalize(owner?.bio || "").includes(searchQ) ||
+          serviceKey.includes(searchQ) ||
+          normalize(serviceLabels).includes(searchQ)
+        );
+      });
+    }
+
+    const result = filteredBusinesses.map((b: any) => {
+      const owner = Array.isArray(b.users) ? b.users[0] : b.users;
+      const staffCount = Array.isArray(b.users) ? b.users.length : 1;
       return {
         id: b.id,
         name: b.name,
         slug: b.slug,
-        category: b.category,
+        category: b.category || owner?.serviceType || null,
         city: b.city,
         address: b.address,
-        staffCount: staffCount || 1,
+        staffCount,
         owner: {
           name: owner?.name || "Desconocido",
           slug: owner?.slug,
@@ -89,7 +125,7 @@ export async function GET(request: NextRequest) {
           servicesCount: owner?.services?.filter((s: any) => s.isActive).length || 0,
         },
       };
-    }));
+    });
 
     return NextResponse.json({ businesses: result });
   } catch (error) {

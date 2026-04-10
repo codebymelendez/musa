@@ -312,7 +312,15 @@ export default function HomePage() {
             Gestiona tu negocio →
           </Link>
           <p className="text-xs text-on-surface-variant pt-2">
-            © 2025 Musa · Todos los derechos reservados
+            © 2025 Musa · Desarrollado por{" "}
+            <a
+              href="https://codebymelendez.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-primary transition-colors"
+            >
+              codebymelendez.com
+            </a>
           </p>
         </footer>
       </main>

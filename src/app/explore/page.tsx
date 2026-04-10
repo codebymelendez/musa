@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useEffect, useRef, useState, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -61,6 +61,9 @@ function ExploreContent() {
   const [category, setCategory] = useState(searchParams.get("category") ?? "");
   const [businesses, setBusinesses] = useState<BusinessCard[]>([]);
   const [loading, setLoading] = useState(true);
+  const [detectingLocation, setDetectingLocation] = useState(false);
+
+  const isFirstRender = useRef(true);
 
   const fetchBusinesses = useCallback(async (q: string, c: string, cat: string) => {
     setLoading(true);
@@ -79,33 +82,74 @@ function ExploreContent() {
     }
   }, []);
 
+  // Debounced search: instant on mount, 350ms delay on subsequent changes
   useEffect(() => {
-    fetchBusinesses(query, city, category);
-  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+    const delay = isFirstRender.current ? 0 : 350;
+    isFirstRender.current = false;
+
+    const timer = setTimeout(() => {
+      fetchBusinesses(query, city, category);
+      const params = new URLSearchParams();
+      if (query) params.set("q", query);
+      if (city) params.set("city", city);
+      if (category) params.set("category", category);
+      router.replace(`/explore${params.size ? `?${params}` : ""}`, { scroll: false });
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [query, city, category]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-detect city from browser geolocation (only when no city param in URL)
+  useEffect(() => {
+    if (searchParams.get("city") || city) return;
+    if (!navigator.geolocation) return;
+
+    setDetectingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=es`,
+            { headers: { "User-Agent": "Musa/1.0" } }
+          );
+          const data = await res.json();
+          const detectedCity =
+            data.address?.city ||
+            data.address?.town ||
+            data.address?.municipality ||
+            data.address?.village;
+          if (detectedCity) {
+            setCity(detectedCity);
+          }
+        } catch {
+          // Geolocation available but reverse geocoding failed — proceed without city
+        } finally {
+          setDetectingLocation(false);
+        }
+      },
+      () => setDetectingLocation(false),
+      { timeout: 6000 }
+    );
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     fetchBusinesses(query, city, category);
-    // Update URL for shareability
-    const params = new URLSearchParams();
-    if (query) params.set("q", query);
-    if (city) params.set("city", city);
-    if (category) params.set("category", category);
-    router.replace(`/explore?${params}`, { scroll: false });
   };
 
   const handleCategorySelect = (cat: string) => {
     setCategory(cat);
-    fetchBusinesses(query, city, cat);
-    const params = new URLSearchParams();
-    if (query) params.set("q", query);
-    if (city) params.set("city", city);
-    if (cat) params.set("category", cat);
-    router.replace(`/explore?${params}`, { scroll: false });
+  };
+
+  const handleClearAll = () => {
+    setQuery("");
+    setCity("");
+    setCategory("");
   };
 
   return (
-    <div className="min-h-screen bg-background font-body text-on-surface antialiased">
+    <div className="min-h-screen bg-background font-body text-on-surface antialiased flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-lg shadow-sm shadow-purple-500/5">
         <div className="px-4 pt-4 pb-3 max-w-2xl mx-auto space-y-3">
@@ -119,6 +163,12 @@ function ExploreContent() {
             <h1 className="font-headline text-lg font-bold text-on-surface">
               Explorar profesionales
             </h1>
+            {detectingLocation && (
+              <span className="ml-auto flex items-center gap-1 text-xs text-on-surface-variant">
+                <span className="material-symbols-outlined text-sm animate-pulse">location_searching</span>
+                Detectando...
+              </span>
+            )}
           </div>
 
           {/* Search form */}
@@ -127,13 +177,13 @@ function ExploreContent() {
               <span className="material-symbols-outlined text-on-surface-variant text-lg">search</span>
               <input
                 className="flex-1 bg-transparent outline-none text-sm text-on-surface placeholder:text-on-surface-variant/60"
-                placeholder="Nombre o servicio..."
+                placeholder="Nombre, servicio o ciudad..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 autoComplete="off"
               />
               {query && (
-                <button type="button" onClick={() => { setQuery(""); fetchBusinesses("", city, category); }}>
+                <button type="button" onClick={() => setQuery("")}>
                   <span className="material-symbols-outlined text-on-surface-variant text-sm">close</span>
                 </button>
               )}
@@ -147,7 +197,19 @@ function ExploreContent() {
                 onChange={(e) => setCity(e.target.value)}
                 autoComplete="off"
               />
+              {city && (
+                <button type="button" onClick={() => setCity("")}>
+                  <span className="material-symbols-outlined text-on-surface-variant text-sm">close</span>
+                </button>
+              )}
             </div>
+            <button
+              type="submit"
+              className="w-11 h-11 bg-primary rounded-xl flex items-center justify-center text-white shadow-sm hover:opacity-90 transition-opacity flex-shrink-0"
+              aria-label="Buscar"
+            >
+              <span className="material-symbols-outlined text-sm">search</span>
+            </button>
           </form>
 
           {/* Category pills */}
@@ -170,7 +232,7 @@ function ExploreContent() {
         </div>
       </header>
 
-      <main className="px-4 py-4 max-w-2xl mx-auto">
+      <main className="px-4 py-4 max-w-2xl mx-auto flex-1 w-full">
         {/* Results count */}
         {!loading && (
           <p className="text-xs text-on-surface-variant mb-4 font-medium">
@@ -197,12 +259,7 @@ function ExploreContent() {
               </p>
             </div>
             <button
-              onClick={() => {
-                setQuery("");
-                setCity("");
-                setCategory("");
-                fetchBusinesses("", "", "");
-              }}
+              onClick={handleClearAll}
               className="text-sm font-bold text-primary hover:underline"
             >
               Ver todos los profesionales
@@ -211,8 +268,8 @@ function ExploreContent() {
         ) : (
           <div className="space-y-4">
             {businesses.map((biz) => {
-              const catMeta =
-                CATEGORY_META[biz.category ?? "other"] ?? CATEGORY_META.other;
+              const catKey = biz.category ?? biz.owner.serviceType ?? "other";
+              const catMeta = CATEGORY_META[catKey] ?? CATEGORY_META.other;
               return (
                 <Link
                   key={biz.id}
@@ -295,6 +352,21 @@ function ExploreContent() {
           </div>
         )}
       </main>
+
+      {/* Footer */}
+      <footer className="mt-auto py-6 text-center">
+        <p className="text-xs text-on-surface-variant/50">
+          Musa · Desarrollado por{" "}
+          <a
+            href="https://codebymelendez.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-primary transition-colors"
+          >
+            codebymelendez.com
+          </a>
+        </p>
+      </footer>
     </div>
   );
 }

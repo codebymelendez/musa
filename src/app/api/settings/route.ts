@@ -107,8 +107,9 @@ export async function PATCH(req: NextRequest) {
           .from('Business')
           .update({
             name: businessName,
-            ...(city    !== undefined && { city:    city    || null }),
-            ...(logoUrl !== undefined && { logoUrl: logoUrl || null }),
+            ...(city       !== undefined && { city:     city     || null }),
+            ...(logoUrl    !== undefined && { logoUrl:  logoUrl  || null }),
+            ...(serviceType !== undefined && { category: serviceType || null }),
           })
           .eq('id', currentUser.businessId);
         businessId = currentUser.businessId;
@@ -144,6 +145,7 @@ export async function PATCH(req: NextRequest) {
             name: businessName,
             slug: `${slug}-${Date.now().toString(36)}`,
             city: city || null,
+            category: serviceType || null,
             planId: freePlan.id,
           })
           .select()
