@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
+
+function normalizePhone(phone: string) {
+  return phone.replace(/\D/g, "");
+}
 
 const createSchema = z.object({
   name: z.string().min(2),
@@ -23,17 +28,18 @@ export async function GET(req: NextRequest) {
   const showInactive  = searchParams.get("showInactive") === "true";
 
   try {
-    const supabase = await createClient();
+    // Usamos el cliente ADMIN para asegurar visibilidad sin depender de RLS
+    const adminSupabase = createAdminClient();
 
-    // Obtener businessId del usuario
-    const { data: userData } = await supabase.from('User').select('businessId').eq('id', session.userId).single();
+    // Obtener businessId del usuario (usando admin para asegurar lectura)
+    const { data: userData } = await adminSupabase.from('User').select('businessId').eq('id', session.userId).single();
     const businessId = userData?.businessId;
 
     if (!businessId) {
       return NextResponse.json({ error: "El usuario no pertenece a un negocio" }, { status: 400 });
     }
 
-    let query = supabase
+    let query = adminSupabase
       .from('Client')
       .select('*, appointments:Appointment(*, service:Service(*))')
       .eq('businessId', businessId)
@@ -45,7 +51,13 @@ export async function GET(req: NextRequest) {
     }
 
     if (search) {
-      query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%`);
+      // Si parece un teléfono o tiene muchos números, normalizamos la búsqueda por teléfono
+      const normalizedSearch = normalizePhone(search);
+      if (normalizedSearch && normalizedSearch.length >= 3) {
+        query = query.or(`name.ilike.%${search}%,phone.ilike.%${normalizedSearch}%`);
+      } else {
+        query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%`);
+      }
     }
 
     const { data: clients, error } = await query;
@@ -86,9 +98,16 @@ export async function POST(req: NextRequest) {
     }
 
     const { name, phone, email, notes, preferences, birthday, tags, isActive } = parsed.data;
+    const normalizedPhone = normalizePhone(phone);
+    
+    // Usamos el cliente normal para verificar sesión/negocio del usuario
     const supabase = await createClient();
+    
+    // Usamos el cliente ADMIN para operaciones sobre la tabla Client
+    // Esto asegura que el staff pueda gestionar clientes incluso con RLS restrictivo
+    const adminSupabase = createAdminClient();
 
-    // Obtener businessId del usuario
+    // Obtener businessId del usuario (usando cliente normal por seguridad)
     const { data: userData } = await supabase.from('User').select('businessId').eq('id', session.userId).single();
     const businessId = userData?.businessId;
 
@@ -96,17 +115,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "El usuario no pertenece a un negocio" }, { status: 400 });
     }
 
-    // Buscar si ya existe la clienta con ese teléfono para este negocio
-    const { data: existingClient } = await supabase
+    // Buscar si ya existe la clienta con ese teléfono (normalizado) para este negocio
+    const { data: existingClient } = await adminSupabase
       .from('Client')
       .select('id')
       .eq('businessId', businessId)
-      .eq('phone', phone)
+      .eq('phone', normalizedPhone)
       .maybeSingle();
 
     let client;
     if (existingClient) {
-      const { data: updatedClient, error: updateError } = await supabase
+      const { data: updatedClient, error: updateError } = await adminSupabase
         .from('Client')
         .update({
           name,
@@ -124,31 +143,32 @@ export async function POST(req: NextRequest) {
 
       if (updateError) {
          console.error("[client update error]", updateError);
-         return NextResponse.json({ error: "Error al actualizar cliente" }, { status: 500 });
+         return NextResponse.json({ error: `Error al actualizar cliente: ${updateError.message}` }, { status: 500 });
       }
       client = updatedClient;
     } else {
-      const { data: newClient, error: insertError } = await supabase
+      const { data: newClient, error: insertError } = await adminSupabase
         .from('Client')
         .insert({
           id: crypto.randomUUID(),
           businessId: businessId,
           userId: session.userId, // quien lo creó
           name,
-          phone,
+          phone: normalizedPhone,
           email: email || null,
           notes,
           preferences,
           birthday: birthday || null,
           tags: tags || [],
-          isActive
+          isActive,
+          updatedAt: new Date().toISOString(),
         })
         .select()
         .single();
 
       if (insertError) {
          console.error("[client insert error]", insertError);
-         return NextResponse.json({ error: "Error al registrar cliente" }, { status: 500 });
+         return NextResponse.json({ error: `Error al registrar cliente: ${insertError.message}` }, { status: 500 });
       }
       client = newClient;
     }

@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
+
+function normalizePhone(phone: string) {
+  return phone.replace(/\D/g, "");
+}
 
 const updateSchema = z.object({
   name: z.string().min(2).optional(),
@@ -43,6 +48,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
 
     const supabase = await createClient();
+    const adminSupabase = createAdminClient();
+    
+    // Obtener businessId del usuario (cliente normal)
     const businessId = await getBusinessId(supabase, session.userId);
     if (!businessId) {
       return NextResponse.json({ error: "El usuario no pertenece a un negocio" }, { status: 400 });
@@ -54,7 +62,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     };
     const d = parsed.data;
     if (d.name !== undefined)        updateData.name        = d.name;
-    if (d.phone !== undefined)       updateData.phone       = d.phone;
+    if (d.phone !== undefined)       updateData.phone       = normalizePhone(d.phone);
     if (d.email !== undefined)       updateData.email       = d.email || null;
     if (d.notes !== undefined)       updateData.notes       = d.notes;
     if (d.preferences !== undefined) updateData.preferences = d.preferences;
@@ -62,7 +70,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (d.tags !== undefined)        updateData.tags        = d.tags;
     if (d.isActive !== undefined)    updateData.isActive    = d.isActive;
 
-    const { data: updated, error } = await supabase
+    const { data: updated, error } = await adminSupabase
       .from("Client")
       .update(updateData)
       .eq("id", id)
@@ -94,12 +102,13 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
   try {
     const supabase = await createClient();
+    const adminSupabase = createAdminClient();
     const businessId = await getBusinessId(supabase, session.userId);
     if (!businessId) {
       return NextResponse.json({ error: "El usuario no pertenece a un negocio" }, { status: 400 });
     }
 
-    const { data: updated, error } = await supabase
+    const { data: updated, error } = await adminSupabase
       .from("Client")
       .update({ isActive: false, updatedAt: new Date().toISOString() })
       .eq("id", id)

@@ -6,6 +6,10 @@ import { createClient } from "@/lib/supabase-server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { sendNotification, sendClientNotification } from "@/lib/notifications";
 
+function normalizePhone(phone: string) {
+  return phone.replace(/\D/g, "");
+}
+
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 const bookSchema = z.object({
@@ -96,11 +100,12 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     // Crear o actualizar clienta
     // Primero buscamos si ya existe para evitar problemas de ID con upsert
+    const normalizedPhone = normalizePhone(clientPhone);
     const { data: existingClient } = await admin
       .from('Client')
       .select('id')
       .eq('userId', user.id)
-      .eq('phone', clientPhone)
+      .eq('phone', normalizedPhone)
       .maybeSingle();
 
     let client;
@@ -130,9 +135,10 @@ export async function POST(req: NextRequest, { params }: Params) {
           userId: user.id,
           businessId: user.businessId,
           name: clientName,
-          phone: clientPhone,
+          phone: normalizedPhone,
           email: clientEmail || null,
           wantsNotifications: wantsNotifications ?? false,
+          updatedAt: new Date().toISOString(),
         })
         .select()
         .single();

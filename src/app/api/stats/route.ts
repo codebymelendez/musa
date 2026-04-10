@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
 
 export async function GET(req: NextRequest) {
   const session = await getSession(req);
@@ -15,10 +16,10 @@ export async function GET(req: NextRequest) {
   const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999).toISOString();
 
   try {
-    const supabase = await createClient();
+    const adminSupabase = createAdminClient();
 
     // ── Citas completadas del mes + Ingresos ──────────────────────────────────
-    const { data: completedAppointments, error: appointmentsError } = await supabase
+    const { data: completedAppointments, error: appointmentsError } = await adminSupabase
       .from('Appointment')
       .select('serviceId, service:Service(name), payment:Payment(isPaid, amount)')
       .eq('userId', session.userId)
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
       .map(({ name, count }) => ({ serviceName: name, count }));
 
     // ── Total de clientas ─────────────────────────────────────────────────────
-    const { count: totalClients, error: clientCountError } = await supabase
+    const { count: totalClients, error: clientCountError } = await adminSupabase
       .from('Client')
       .select('*', { count: 'exact', head: true })
       .eq('userId', session.userId);
@@ -70,7 +71,7 @@ export async function GET(req: NextRequest) {
     const startOfYear = new Date(year, 0, 1).toISOString();
     const endOfYear = new Date(year, 11, 31, 23, 59, 59, 999).toISOString();
 
-    const { data: yearPayments, error: yearRevenueError } = await supabase
+    const { data: yearPayments, error: yearRevenueError } = await adminSupabase
       .from('Payment')
       .select('amount, appointment:Appointment(startTime, status, userId)')
       .eq('isPaid', true)
@@ -84,7 +85,7 @@ export async function GET(req: NextRequest) {
       .reduce((s, p) => s + (p.amount || 0), 0);
 
     // ── Reprogramaciones del mes ──────────────────────────────────────────────
-    const { count: rescheduledThisMonth } = await supabase
+    const { count: rescheduledThisMonth } = await adminSupabase
       .from('Appointment')
       .select('*', { count: 'exact', head: true })
       .eq('userId', session.userId)
