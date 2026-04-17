@@ -41,7 +41,8 @@ export async function GET(req: NextRequest) {
     // Para cuentas donde programId está null (datos legados), hacer lookup por businessId
     const normalizedAccounts = await Promise.all(
       (accounts ?? []).map(async (a) => {
-        let program = Array.isArray(a.program) ? a.program[0] : a.program;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let program: any = Array.isArray(a.program) ? a.program[0] : a.program;
         if (!program && a.businessId) {
           const { data: fallbackProgram } = await supabase
             .from("LoyaltyProgram")
