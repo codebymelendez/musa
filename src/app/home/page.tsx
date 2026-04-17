@@ -125,6 +125,23 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Loyalty shortcut */}
+      <section className="mb-6">
+        <Link
+          href="/loyalty"
+          className="flex items-center gap-4 bg-surface-container-low rounded-2xl px-5 py-4 border border-outline-variant/10 hover:bg-surface-container transition-colors"
+        >
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center flex-shrink-0">
+            <span className="material-symbols-outlined text-white text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>stars</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-on-surface text-sm">Programa de fidelización</p>
+            <p className="text-xs text-on-surface-variant">Gestiona puntos y recompensas de tus clientas</p>
+          </div>
+          <span className="material-symbols-outlined text-on-surface-variant text-lg">chevron_right</span>
+        </Link>
+      </section>
+
       {/* Stats Overview */}
       <div className="grid grid-cols-2 gap-4 mb-10">
         <div className="bg-surface-container-low p-5 rounded-3xl border border-outline-variant/10 shadow-sm">
@@ -305,7 +322,7 @@ export default function Home() {
                   <div className="text-right">
                     <p className="text-sm font-bold text-tertiary">{formatCurrency(apt.payment?.amount ?? 0)}</p>
                     <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-tighter opacity-60">
-                      {apt.payment?.method.replace(/_/g, " ")}
+                      {apt.payment?.method?.replace(/_/g, " ")}
                     </p>
                   </div>
                 </div>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { generateTimeSlots, dayRange } from "@/lib/utils";
 import { ProfessionalSettings } from "@/types";
+import { getBlocksInRange } from "@/lib/availability";
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -81,7 +82,7 @@ export async function GET(req: NextRequest, { params }: Params) {
         console.error("[fetch appointments error]", appointmentsError);
       }
 
-      slots = generateTimeSlots(
+      const rawSlots = generateTimeSlots(
         selectedDate,
         settings as ProfessionalSettings,
         (bookedAppointments || []).map((a: any) => ({
@@ -91,6 +92,22 @@ export async function GET(req: NextRequest, { params }: Params) {
         })),
         selectedService.durationMin
       );
+
+      // Excluir slots bloqueados por la profesional
+      const activeBlocks = await getBlocksInRange(user.id, start, end);
+      if (activeBlocks.length > 0) {
+        slots = rawSlots.map((slot) => {
+          if (!slot.available) return slot;
+          const slotStart = new Date(slot.datetime);
+          const slotEnd = new Date(slotStart.getTime() + selectedService.durationMin * 60000);
+          const isBlocked = activeBlocks.some(
+            (b) => slotStart < new Date(b.endTime) && slotEnd > new Date(b.startTime)
+          );
+          return isBlocked ? { ...slot, available: false, blocked: true } : slot;
+        });
+      } else {
+        slots = rawSlots;
+      }
     }
 
     return NextResponse.json({

@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useAppointments } from "@/hooks/useAppointments";
-import { Appointment } from "@/types";
+import { useAvailabilityBlocks } from "@/hooks/useAvailabilityBlocks";
+import { Appointment, AvailabilityBlock } from "@/types";
 import { weekRange, formatTimeES, statusLabel } from "@/lib/utils";
+import BlockTimeModal from "@/components/calendar/BlockTimeModal";
+import NewAppointmentModal from "@/components/appointments/NewAppointmentModal";
 
 const DAY_ABBR = ["DOM", "LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB"];
 const HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
@@ -34,17 +37,31 @@ function positionStyle(apt: Appointment): React.CSSProperties {
   };
 }
 
+function blockPositionStyle(block: AvailabilityBlock): React.CSSProperties {
+  const start = new Date(block.startTime);
+  const end = new Date(block.endTime);
+  const startHour = Math.max(start.getHours() + start.getMinutes() / 60, HOURS[0]);
+  const endHour = Math.min(end.getHours() + end.getMinutes() / 60, HOURS[HOURS.length - 1] + 1);
+  const top = (startHour - HOURS[0]) * HOUR_HEIGHT;
+  const height = Math.max((endHour - startHour) * HOUR_HEIGHT, 16);
+  return { top: `${top}px`, height: `${height}px`, position: "absolute", left: "0px", right: "0px" };
+}
+
 export default function Calendar() {
   const [viewMode, setViewMode] = useState<"weekly" | "monthly">("weekly");
   const [baseDate, setBaseDate] = useState(new Date());
+  const [showBlockModal, setShowBlockModal] = useState(false);
+  const [showNewAppointmentModal, setShowNewAppointmentModal] = useState(false);
   const weekDays = getWeekDays(baseDate);
   const { appointments, loading, fetchByRange } = useAppointments();
+  const { blocks, fetchBlocks } = useAvailabilityBlocks();
 
   const { start, end } = weekRange(baseDate);
 
   useEffect(() => {
     fetchByRange(start.toISOString(), end.toISOString());
-  }, [baseDate, fetchByRange]);
+    fetchBlocks(start.toISOString(), end.toISOString());
+  }, [baseDate, fetchByRange, fetchBlocks]);
 
   const todayStr = new Date().toDateString();
 
@@ -72,6 +89,24 @@ export default function Calendar() {
     const colIdx = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
     if (!aptsByDay[colIdx]) aptsByDay[colIdx] = [];
     aptsByDay[colIdx].push(apt);
+  }
+
+  // Mapear bloques a columnas de días
+  const blocksByDay: Record<number, AvailabilityBlock[]> = {};
+  for (const block of blocks) {
+    const bStart = new Date(block.startTime);
+    const bEnd = new Date(block.endTime);
+    // Un bloque puede abarcar varios días
+    weekDays.forEach((day, colIdx) => {
+      const dayStart = new Date(day);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(day);
+      dayEnd.setHours(23, 59, 59, 999);
+      if (bStart <= dayEnd && bEnd >= dayStart) {
+        if (!blocksByDay[colIdx]) blocksByDay[colIdx] = [];
+        blocksByDay[colIdx].push(block);
+      }
+    });
   }
 
   const STATUS_COLORS: Record<string, string> = {
@@ -191,6 +226,32 @@ export default function Calendar() {
                     />
                   ))}
 
+                  {/* Bloques de agenda */}
+                  {(blocksByDay[colIdx] ?? []).map((block) => {
+                    const blockLabel: Record<string, string> = {
+                      vacation: "Vacaciones",
+                      break: "Descanso",
+                      manual: "Bloqueado",
+                    };
+                    const label = blockLabel[block.blockType] ?? "Bloqueado";
+                    return (
+                      <div
+                        key={block.id}
+                        style={blockPositionStyle(block)}
+                        className="z-[5] overflow-hidden"
+                      >
+                        <div className="w-full h-full bg-zinc-100 border-l-[3px] border-zinc-400 rounded-r-md flex flex-col justify-start gap-0.5 pt-1 px-1.5">
+                          <span className="material-symbols-outlined text-[11px] text-zinc-500 leading-none">
+                            do_not_disturb_on
+                          </span>
+                          <span className="text-[9px] text-zinc-500 font-bold leading-tight uppercase tracking-tight hidden sm:block">
+                            {label}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+
                   {/* Appointments */}
                   {colApts.map((apt) => {
                     const status = apt.status;
@@ -256,7 +317,7 @@ export default function Calendar() {
       )}
 
       {/* Legend */}
-      <div className="mt-8 flex flex-wrap items-center gap-4 md:gap-6 px-4">
+      <div className="mt-8 flex flex-wrap items-center gap-4 md:gap-6 px-4" suppressHydrationWarning>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-outline-variant"></div>
           <span className="text-xs font-medium text-on-surface-variant">Pendiente</span>
@@ -273,12 +334,48 @@ export default function Calendar() {
           <div className="w-3 h-3 rounded-full bg-error"></div>
           <span className="text-xs font-medium text-on-surface-variant">Cancelada / No-show</span>
         </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-sm bg-surface-container-high border-l-2 border-on-surface-variant/40"></div>
+          <span className="text-xs font-medium text-on-surface-variant">Bloqueado</span>
+        </div>
       </div>
 
-      {/* FAB */}
-      <button className="fixed bottom-28 right-6 w-14 h-14 rounded-full bg-gradient-to-br from-primary to-primary-container text-white shadow-xl shadow-purple-500/30 flex items-center justify-center transition-transform active:scale-90 z-40">
+      {/* FAB — bloquear tiempo */}
+      <button
+        onClick={() => setShowBlockModal(true)}
+        className="fixed bottom-44 right-6 w-12 h-12 rounded-full bg-surface-container-lowest border border-outline-variant/20 text-on-surface-variant shadow-lg flex items-center justify-center transition-transform active:scale-90 z-40"
+        title="Bloquear tiempo"
+      >
+        <span className="material-symbols-outlined text-xl">do_not_disturb_on</span>
+      </button>
+
+      {/* FAB — nueva cita */}
+      <button
+        onClick={() => setShowNewAppointmentModal(true)}
+        className="fixed bottom-28 right-6 w-14 h-14 rounded-full bg-gradient-to-br from-primary to-primary-container text-white shadow-xl shadow-purple-500/30 flex items-center justify-center transition-transform active:scale-90 z-40"
+      >
         <span className="material-symbols-outlined text-3xl">add</span>
       </button>
+
+      {/* Modal bloqueo */}
+      {showBlockModal && (
+        <BlockTimeModal
+          defaultDate={baseDate}
+          onClose={() => setShowBlockModal(false)}
+          onCreated={() => fetchBlocks(start.toISOString(), end.toISOString())}
+        />
+      )}
+
+      {/* Modal nueva cita */}
+      {showNewAppointmentModal && (
+        <NewAppointmentModal
+          onClose={() => setShowNewAppointmentModal(false)}
+          onCreated={() => {
+            setShowNewAppointmentModal(false);
+            fetchByRange(start.toISOString(), end.toISOString());
+          }}
+        />
+      )}
     </main>
   );
 }

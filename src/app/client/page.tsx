@@ -1,9 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { formatTimeES } from "@/lib/utils";
+
+const QRDisplay = lazy(() => import("@/components/loyalty/QRDisplay"));
+
+interface LoyaltyAccountSummary {
+  id: string;
+  totalPoints: number;
+  lifetimePoints: number;
+  qrToken: string;
+  program: { name: string; rewardThreshold: number; rewardDescription: string; isActive: boolean } | null;
+  business: { name: string; logoUrl: string | null } | null;
+}
 
 interface BookingAppointment {
   id: string;
@@ -45,9 +56,13 @@ export default function ClientPortalPage() {
   const [clientName, setClientName] = useState<string | null>(null);
   const [upcoming, setUpcoming] = useState<BookingAppointment[]>([]);
   const [past, setPast] = useState<BookingAppointment[]>([]);
+  const [loyaltyAccounts, setLoyaltyAccounts] = useState<LoyaltyAccountSummary[]>([]);
+  const [eligibleBusinesses, setEligibleBusinesses] = useState<{ businessId: string; businessName: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
+  const [tab, setTab] = useState<"upcoming" | "past" | "loyalty">("upcoming");
+  const [showQRFor, setShowQRFor] = useState<string | null>(null);
+  const [enrolling, setEnrolling] = useState<string | null>(null);
 
   useEffect(() => {
     const t = localStorage.getItem("musa_client_token");
@@ -72,10 +87,45 @@ export default function ClientPortalPage() {
           setPast(d.past ?? []);
           if (d.clientName) setClientName(d.clientName);
         })
+        .then(() => {
+          // Cargar loyalty accounts en paralelo
+          return fetch("/api/client/loyalty", {
+            headers: { Authorization: `Bearer ${t}` },
+          })
+            .then((r) => r.json())
+            .then((d) => {
+              setLoyaltyAccounts(d.accounts ?? []);
+              setEligibleBusinesses(d.eligible ?? []);
+            })
+            .catch(() => {}); // No bloquear si loyalty falla
+        })
         .catch(() => setError("Error al cargar tus citas"))
         .finally(() => setLoading(false));
     }
   }, []);
+
+  const handleEnroll = async (businessId: string) => {
+    if (!token) return;
+    setEnrolling(businessId);
+    try {
+      const res = await fetch("/api/client/loyalty/enroll", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ businessId }),
+      });
+      if (res.ok) {
+        // Recargar cuentas de loyalty
+        const r = await fetch("/api/client/loyalty", { headers: { Authorization: `Bearer ${token}` } });
+        const d = await r.json();
+        setLoyaltyAccounts(d.accounts ?? []);
+        setEligibleBusinesses(d.eligible ?? []);
+      }
+    } catch {
+      // silent
+    } finally {
+      setEnrolling(null);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem("musa_client_token");
@@ -147,7 +197,7 @@ export default function ClientPortalPage() {
   }
 
   // ── Autenticado ────────────────────────────────────────────────────────────
-  const displayAppointments = tab === "upcoming" ? upcoming : past;
+  const displayAppointments = tab === "upcoming" ? upcoming : (tab === "past" ? past : []);
 
   return (
     <div className="min-h-screen bg-background font-body antialiased pb-28">
@@ -189,17 +239,21 @@ export default function ClientPortalPage() {
 
         {/* Tabs */}
         <div className="flex gap-1 bg-surface-container-high rounded-2xl p-1 mb-5">
-          {(["upcoming", "past"] as const).map((t) => (
+          {(["upcoming", "past", "loyalty"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-colors ${
+              className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-colors ${
                 tab === t
                   ? "bg-white text-on-surface shadow-sm"
                   : "text-on-surface-variant hover:text-on-surface"
               }`}
             >
-              {t === "upcoming" ? `Próximas (${upcoming.length})` : `Historial (${past.length})`}
+              {t === "upcoming"
+                ? `Próximas (${upcoming.length})`
+                : t === "past"
+                ? `Historial`
+                : `Mis puntos${loyaltyAccounts.length > 0 ? ` (${loyaltyAccounts.length})` : ""}`}
             </button>
           ))}
         </div>
@@ -211,8 +265,133 @@ export default function ClientPortalPage() {
           </div>
         )}
 
-        {/* Loading */}
-        {loading ? (
+        {/* ── Loyalty tab ── */}
+        {tab === "loyalty" && (
+          <div className="space-y-4">
+            {loyaltyAccounts.length === 0 && eligibleBusinesses.length === 0 ? (
+              <div className="text-center py-16 space-y-3">
+                <span className="text-4xl">⭐</span>
+                <p className="text-sm text-on-surface-variant">
+                  Aún no tienes puntos de fidelización.
+                </p>
+                <p className="text-xs text-on-surface-variant">
+                  Completa citas en negocios que tengan programa de fidelización activo.
+                </p>
+              </div>
+            ) : (
+              loyaltyAccounts.map((acc) => {
+                const prog = acc.program;
+                const threshold = prog?.rewardThreshold ?? 10;
+                const progress = Math.min((acc.totalPoints / threshold) * 100, 100);
+                const canRedeem = acc.totalPoints >= threshold && prog?.isActive;
+                return (
+                  <div
+                    key={acc.id}
+                    className="bg-surface-container-lowest rounded-2xl p-5 shadow-sm border border-outline-variant/10 space-y-4"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-bold text-on-surface text-sm">
+                          {acc.business?.name ?? "Negocio"}
+                        </p>
+                        <p className="text-xs text-on-surface-variant">
+                          {prog?.name ?? "Programa de fidelización"}
+                        </p>
+                      </div>
+                      {canRedeem && (
+                        <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-1 rounded-full flex-shrink-0">
+                          ¡Lista!
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Points progress */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-end">
+                        <span className="font-headline font-extrabold text-2xl text-on-surface">
+                          {acc.totalPoints}
+                        </span>
+                        <span className="text-xs text-on-surface-variant mb-0.5">
+                          / {threshold}
+                        </span>
+                      </div>
+                      <div className="h-2 bg-surface-container-high rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${canRedeem ? "bg-green-500" : "bg-gradient-to-r from-primary to-primary-container"}`}
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-on-surface-variant">
+                        {canRedeem
+                          ? prog?.rewardDescription
+                          : `Faltan ${threshold - acc.totalPoints} para tu recompensa`}
+                      </p>
+                    </div>
+
+                    {/* QR */}
+                    <button
+                      onClick={() => setShowQRFor(showQRFor === acc.id ? null : acc.id)}
+                      className="w-full h-10 flex items-center justify-center gap-2 bg-surface-container text-on-surface-variant text-xs font-bold rounded-xl hover:bg-surface-container-high transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-sm">qr_code</span>
+                      {showQRFor === acc.id ? "Ocultar QR" : "Mostrar mi QR"}
+                    </button>
+
+                    {showQRFor === acc.id && (
+                      <Suspense fallback={<div className="h-48 animate-pulse bg-surface-container-high rounded-2xl" />}>
+                        <div className="flex justify-center pt-2">
+                          <QRDisplay token={acc.qrToken} size={180} />
+                        </div>
+                      </Suspense>
+                    )}
+                  </div>
+                );
+              })
+            )}
+
+            {/* Negocios donde puede inscribirse */}
+            {eligibleBusinesses.length > 0 && (
+              <div className="space-y-3">
+                {loyaltyAccounts.length > 0 && (
+                  <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider px-1">
+                    También disponible
+                  </p>
+                )}
+                {eligibleBusinesses.map((biz) => (
+                  <div
+                    key={biz.businessId}
+                    className="bg-surface-container-lowest rounded-2xl p-5 shadow-sm border border-outline-variant/10 flex items-center gap-4"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center flex-shrink-0">
+                      <span className="material-symbols-outlined text-white text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>stars</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-on-surface text-sm truncate">{biz.businessName}</p>
+                      <p className="text-xs text-on-surface-variant">Tienes puntos pendientes — obtén tu QR</p>
+                    </div>
+                    <button
+                      onClick={() => handleEnroll(biz.businessId)}
+                      disabled={enrolling === biz.businessId}
+                      className="flex-shrink-0 h-9 px-4 bg-primary text-white text-xs font-bold rounded-full disabled:opacity-50 flex items-center gap-1 hover:bg-primary/90 transition-colors"
+                    >
+                      {enrolling === biz.businessId ? (
+                        <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-sm">qr_code</span>
+                          Mi QR
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Appointments (solo tabs de citas) */}
+        {tab !== "loyalty" && (loading ? (
           <div className="space-y-4">
             {[1, 2].map((i) => (
               <div key={i} className="h-28 bg-surface-container-high rounded-2xl animate-pulse" />
@@ -316,7 +495,7 @@ export default function ClientPortalPage() {
               );
             })}
           </div>
-        )}
+        ))}
       </main>
 
       {/* Client bottom nav */}

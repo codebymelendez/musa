@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
+import { getBlocksInRange, isSlotBlocked } from "@/lib/availability";
 
 type Params = { params: Promise<{ token: string }> };
 
@@ -72,6 +73,9 @@ export async function GET(req: NextRequest, { params }: Params) {
     console.error("[slots] Error fetch existing appointments:", exError);
   }
 
+  // Cargar bloqueos de agenda del profesional en el mismo rango
+  const activeBlocks = await getBlocksInRange(appointment.userId, from, until);
+
   const allSlots: { time: string, isAvailable: boolean, isCurrent: boolean }[] = [];
 
   for (let d = 0; d < days; d++) {
@@ -98,6 +102,8 @@ export async function GET(req: NextRequest, { params }: Params) {
           slotStart < new Date(existing.endTime) && slotEnd > new Date(existing.startTime)
       );
 
+      const isBlocked = isSlotBlocked(slotStart, slotEnd, activeBlocks);
+
       const sTime = new Date(slotStart).getTime();
       const aStart = new Date(appointment.startTime).getTime();
       const aEnd = new Date(appointment.endTime).getTime();
@@ -105,7 +111,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
       allSlots.push({
         time: slotStart.toISOString(),
-        isAvailable: !hasConflict,
+        isAvailable: !hasConflict && !isBlocked,
         isCurrent: isCurrent
       });
 

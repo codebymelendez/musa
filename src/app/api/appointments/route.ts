@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase-server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { checkAppointmentLimit, incrementAppointmentCount } from "@/lib/limits";
+import { getBlocksInRange, isSlotBlocked } from "@/lib/availability";
 
 const createSchema = z.object({
   clientId: z.string(),
@@ -135,6 +136,15 @@ export async function POST(req: NextRequest) {
     if (conflict && conflict.length > 0) {
       return NextResponse.json(
         { error: "Ya tienes una cita en ese horario" },
+        { status: 409 }
+      );
+    }
+
+    // Verificar bloqueos de agenda
+    const blocks = await getBlocksInRange(session.userId, start, end);
+    if (isSlotBlocked(start, end, blocks)) {
+      return NextResponse.json(
+        { error: "Ese horario está bloqueado en tu agenda" },
         { status: 409 }
       );
     }

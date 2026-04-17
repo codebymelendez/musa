@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { Resend } from "resend";
-import { createClient } from "@/lib/supabase-server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { sendNotification, sendClientNotification } from "@/lib/notifications";
+import { getBlocksInRange, isSlotBlocked } from "@/lib/availability";
 
 function normalizePhone(phone: string) {
   return phone.replace(/\D/g, "");
@@ -94,6 +93,15 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (realConflict && realConflict.length > 0) {
       return NextResponse.json(
         { error: "Ese horario ya no está disponible. Por favor elige otro." },
+        { status: 409 }
+      );
+    }
+
+    // Verificar bloqueos de agenda de la profesional
+    const blocks = await getBlocksInRange(user.id, start, end);
+    if (isSlotBlocked(start, end, blocks)) {
+      return NextResponse.json(
+        { error: "Ese horario no está disponible. Por favor elige otro." },
         { status: 409 }
       );
     }

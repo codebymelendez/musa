@@ -392,23 +392,32 @@ export default function PublicBookingPage() {
               </p>
             ) : (
               <div className="grid grid-cols-3 gap-3">
-                {slots.map((slot) => (
-                  <button
-                    key={slot.time}
-                    type="button"
-                    disabled={!slot.available}
-                    onClick={() => setSelectedSlot(slot)}
-                    className={`py-3 rounded-xl font-medium text-sm text-center transition-colors ${
-                      !slot.available
-                        ? "bg-surface-container-lowest text-on-surface-variant opacity-40 cursor-not-allowed"
-                        : selectedSlot?.time === slot.time
-                        ? "bg-primary text-on-primary font-bold"
-                        : "bg-surface-container-lowest text-on-surface hover:bg-primary-fixed-dim hover:text-primary"
-                    }`}
-                  >
-                    {slot.time}
-                  </button>
-                ))}
+                {slots.map((slot) => {
+                  // Derivar la hora mostrada del datetime real (no del string UTC del servidor)
+                  // Esto asegura que la hora del botón coincida con la de la confirmación
+                  const displayTime = new Date(slot.datetime).toLocaleTimeString("es-VE", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: true,
+                  });
+                  return (
+                    <button
+                      key={slot.datetime}
+                      type="button"
+                      disabled={!slot.available}
+                      onClick={() => setSelectedSlot(slot)}
+                      className={`py-3 rounded-xl font-medium text-sm text-center transition-colors ${
+                        !slot.available
+                          ? "bg-surface-container-lowest text-on-surface-variant opacity-40 cursor-not-allowed"
+                          : selectedSlot?.datetime === slot.datetime
+                          ? "bg-primary text-on-primary font-bold"
+                          : "bg-surface-container-lowest text-on-surface hover:bg-primary-fixed-dim hover:text-primary"
+                      }`}
+                    >
+                      {displayTime}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </section>
@@ -433,7 +442,7 @@ export default function PublicBookingPage() {
                   day: "numeric",
                   month: "long",
                 })}{" "}
-                · {selectedSlot?.time} ·{" "}
+                · {selectedSlot ? formatTimeES(selectedSlot.datetime) : ""} ·{" "}
                 {formatCurrency(selectedService?.price ?? 0, selectedService?.currency)}
               </p>
             </div>

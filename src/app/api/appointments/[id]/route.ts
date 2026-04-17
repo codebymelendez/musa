@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase-server";
 import { createAdminClient } from "@/lib/supabase-admin";
+import { awardLoyaltyPoints } from "@/lib/loyalty";
 
 const patchSchema = z.object({
   status: z
@@ -91,10 +92,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (updateError) throw updateError;
 
     // Registrar/actualizar pago si se envía
+    // Usamos adminClient para Payment porque la tabla no tiene RLS de escritura para staff
     if (payment) {
       const { amount, method, isPaid = true, notes: payNotes } = payment;
+      const adminForPayment = createAdminClient();
 
-      const { error: paymentError } = await supabase
+      const { error: paymentError } = await adminForPayment
         .from('Payment')
         .upsert({
           appointmentId: id,
@@ -105,15 +108,51 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           notes: payNotes,
           paidAt: isPaid ? new Date().toISOString() : null,
         }, { onConflict: 'appointmentId' });
-      
+
       if (paymentError) throw paymentError;
     }
 
-    const { data: result } = await supabase
+    // Usamos adminClient para el SELECT final porque incluye Payment (cross-table)
+    const adminForRead = createAdminClient();
+    const { data: result } = await adminForRead
       .from('Appointment')
       .select('*, client:Client(*), service:Service(*), payment:Payment(*)')
       .eq('id', id)
       .single();
+
+    // Auto-sumar puntos de fidelización cuando la cita se marca como completada
+    if (status === "completed" && result) {
+      try {
+        const adminDb = createAdminClient();
+        const { data: userRow } = await adminDb
+          .from("User")
+          .select("businessId")
+          .eq("id", session.userId)
+          .single();
+
+        if (!userRow?.businessId) {
+          console.warn("[loyalty award] businessId not found for userId:", session.userId);
+        } else {
+          const clientId = Array.isArray(result.client) ? result.client[0]?.id : result.client?.id;
+          if (!clientId) {
+            console.warn("[loyalty award] clientId could not be extracted from result");
+          } else {
+            const awarded = await awardLoyaltyPoints({
+              businessId: userRow.businessId,
+              clientId,
+              appointmentId: id,
+              createdBy: session.userId,
+            });
+            if (!awarded) {
+              console.info("[loyalty award] skipped — no active program or already processed for appointment:", id);
+            }
+          }
+        }
+      } catch (loyaltyErr) {
+        // No bloquear la respuesta por un fallo de fidelización
+        console.error("[loyalty award] unexpected error:", loyaltyErr);
+      }
+    }
 
     return NextResponse.json(result);
   } catch (error) {

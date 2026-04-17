@@ -226,6 +226,90 @@ export interface SettingsUpdatePayload {
   };
 }
 
+// ─── Bloqueo de Agenda ────────────────────────────────────────────────────────
+
+export type BlockType = "manual" | "vacation" | "break";
+
+export interface AvailabilityBlock {
+  id: string;
+  userId: string;
+  businessId: string;
+  startTime: string;
+  endTime: string;
+  isAllDay: boolean;
+  reason: string | null;
+  blockType: BlockType;
+  recurrenceRule: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateBlockPayload {
+  startTime: string;   // ISO
+  endTime: string;     // ISO
+  isAllDay?: boolean;
+  reason?: string;
+  blockType?: BlockType;
+}
+
+// ─── Sistema de Fidelización ──────────────────────────────────────────────────
+
+export type LoyaltyAccumulationType = "visits" | "points";
+export type LoyaltyTransactionType = "earn" | "redeem" | "adjustment" | "expiry";
+
+export interface LoyaltyProgram {
+  id: string;
+  businessId: string;
+  name: string;
+  isActive: boolean;
+  accumulationType: LoyaltyAccumulationType;
+  pointsPerVisit: number;
+  rewardThreshold: number;
+  rewardDescription: string;
+  validUntil: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ClientLoyaltyAccount {
+  id: string;
+  businessId: string;
+  clientId: string;
+  programId: string;
+  totalPoints: number;
+  lifetimePoints: number;
+  qrToken: string;
+  createdAt: string;
+  updatedAt: string;
+  client?: Client;
+  program?: LoyaltyProgram;
+}
+
+export interface LoyaltyTransaction {
+  id: string;
+  accountId: string;
+  businessId: string;
+  clientId: string;
+  appointmentId: string | null;
+  pointsDelta: number;
+  transactionType: LoyaltyTransactionType;
+  notes: string | null;
+  createdBy: string | null;
+  createdAt: string;
+}
+
+export interface LoyaltyRedemption {
+  id: string;
+  accountId: string;
+  transactionId: string;
+  businessId: string;
+  clientId: string;
+  pointsUsed: number;
+  rewardDescription: string;
+  redeemedBy: string | null;
+  redeemedAt: string;
+}
+
 // ─── API Response ─────────────────────────────────────────────────────────────
 
 export interface ApiError {
