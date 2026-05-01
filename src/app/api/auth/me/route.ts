@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
     }
 
+    const s = Array.isArray(user.settings) ? user.settings[0] : user.settings;
     const userToReturn = {
       id: user.id,
       name: user.name,
@@ -38,8 +39,8 @@ export async function GET(req: NextRequest) {
       onboardingDone: user.onboardingDone,
       businessId: user.businessId,
       business: user.business,
-      settings: user.settings
-        ? { ...user.settings, workDays: JSON.parse(user.settings.workDays || "[1,2,3,4,5]") }
+      settings: s
+        ? { ...s, workDays: JSON.parse(s.workDays || "[1,2,3,4,5]") }
         : null,
     };
 

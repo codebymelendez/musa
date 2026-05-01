@@ -275,9 +275,11 @@ export default function Profile() {
               <span className="text-sm font-bold text-on-surface">
                 {settings
                   ? (() => {
-                      const format = (v: number) => {
-                        const h = Math.floor(v > 24 ? v / 100 : v);
-                        const m = v > 24 ? v % 100 : 0;
+                      const format = (v: any) => {
+                        const val = Number(v);
+                        if (isNaN(val)) return "00:00";
+                        const h = Math.floor(val > 24 ? val / 100 : val);
+                        const m = val > 24 ? val % 100 : 0;
                         return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
                       };
                       return `${format(settings.startHour)} – ${format(settings.endHour)}`;
@@ -287,7 +289,7 @@ export default function Profile() {
             </div>
           </div>
           <button
-            onClick={() => { setEditMode("hours"); }}
+            onClick={() => { fillForm(user!); setEditMode("hours"); }}
             className="w-full py-2.5 text-sm font-semibold text-primary bg-primary/5 rounded-full hover:bg-primary/10 transition-colors"
           >
             Editar Horarios

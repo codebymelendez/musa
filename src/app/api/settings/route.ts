@@ -41,6 +41,7 @@ export async function GET(req: NextRequest) {
 
     if (error || !user) return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
 
+    const s = Array.isArray(user.settings) ? user.settings[0] : user.settings;
     const userToReturn = {
       id: user.id,
       name: user.name,
@@ -56,8 +57,8 @@ export async function GET(req: NextRequest) {
       onboardingDone: user.onboardingDone,
       businessId: user.businessId,
       business: user.business,
-      settings: user.settings
-        ? { ...user.settings, workDays: JSON.parse(user.settings.workDays || "[1,2,3,4,5]") }
+      settings: s
+        ? { ...s, workDays: JSON.parse(s.workDays || "[1,2,3,4,5]") }
         : null,
     };
 
@@ -200,10 +201,11 @@ export async function PATCH(req: NextRequest) {
       .eq('id', session.userId)
       .single();
 
+    const s = Array.isArray(updated?.settings) ? updated.settings[0] : updated?.settings;
     const result = {
       ...updated,
-      settings: updated?.settings
-        ? { ...updated.settings, workDays: JSON.parse(updated.settings.workDays || "[1,2,3,4,5]") }
+      settings: s
+        ? { ...s, workDays: JSON.parse(s.workDays || "[1,2,3,4,5]") }
         : null,
     };
 
