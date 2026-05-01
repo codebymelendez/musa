@@ -85,17 +85,33 @@ export function generateTimeSlots(
   const dayOfWeek = date.getDay();
   if (!workDays.includes(dayOfWeek)) return [];
 
+  // Convertir HHmm o Hour simple a minutos totales
+  const getMinutes = (val: number) => {
+    if (val > 24) {
+      // Formato HHmm (ej: 930 -> 9:30)
+      const h = Math.floor(val / 100);
+      const m = val % 100;
+      return h * 60 + m;
+    }
+    // Formato Hour simple (ej: 9 -> 9:00)
+    return val * 60;
+  };
+
+  const startTotalMinutes = getMinutes(startHour);
+  const endTotalMinutes = getMinutes(endHour);
+
   let current = new Date(date);
-  current.setHours(startHour, 0, 0, 0);
+  current.setHours(0, 0, 0, 0);
+  current.setMinutes(startTotalMinutes);
 
   const endLimit = new Date(date);
-  endLimit.setHours(endHour, 0, 0, 0);
+  endLimit.setHours(0, 0, 0, 0);
+  endLimit.setMinutes(endTotalMinutes);
 
-  while (current < endLimit) {
+  const now = new Date();
+
+  while (current.getTime() + serviceDuration * 60000 <= endLimit.getTime()) {
     const slotEnd = new Date(current.getTime() + serviceDuration * 60000);
-
-    // No mostrar slots que terminarían después del cierre
-    if (slotEnd > endLimit) break;
 
     // Verificar si el slot colisiona con una cita existente
     const isBooked = bookedTimes.some(({ startTime, endTime }) => {
@@ -104,8 +120,8 @@ export function generateTimeSlots(
       return current < apptEnd && slotEnd > apptStart;
     });
 
-    // No mostrar slots en el pasado
-    const isPast = current < new Date();
+    // No mostrar slots en el pasado (con un margen de 5 min)
+    const isPast = current.getTime() < now.getTime() - 5 * 60000;
 
     const hh = current.getHours().toString().padStart(2, "0");
     const mm = current.getMinutes().toString().padStart(2, "0");

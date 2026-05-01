@@ -53,8 +53,10 @@ export default function Profile() {
     setFormBusinessName(u.business?.name ?? "");
     setFormCity(u.business?.city ?? "");
     if (u.settings) {
-      setFormStartHour(u.settings.startHour);
-      setFormEndHour(u.settings.endHour);
+      // Convertir HHmm o Hour simple a HHmm consistente
+      const toHHmm = (v: number) => (v <= 24 ? v * 100 : v);
+      setFormStartHour(toHHmm(u.settings.startHour));
+      setFormEndHour(toHHmm(u.settings.endHour));
       setFormWorkDays(u.settings.workDays);
     }
   };
@@ -64,11 +66,12 @@ export default function Profile() {
     try {
       const payload: Record<string, unknown> = {};
 
-      if (editMode === "profile") {
-        payload.name = formName;
-        payload.bio = formBio;
-        payload.avatarUrl = formAvatarUrl;
-      } else if (editMode === "hours") {
+      if (editMode === "hours") {
+        if (formStartHour >= formEndHour) {
+          alert("La hora de inicio debe ser anterior a la de cierre");
+          setSaving(false);
+          return;
+        }
         payload.settings = {
           workDays: formWorkDays,
           startHour: formStartHour,
@@ -271,8 +274,15 @@ export default function Profile() {
               <span className="text-sm font-medium text-on-surface-variant">Horario</span>
               <span className="text-sm font-bold text-on-surface">
                 {settings
-                  ? `${settings.startHour ?? 9}:00 – ${settings.endHour ?? 18}:00`
-                  : "9:00 – 18:00"}
+                  ? (() => {
+                      const format = (v: number) => {
+                        const h = Math.floor(v > 24 ? v / 100 : v);
+                        const m = v > 24 ? v % 100 : 0;
+                        return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+                      };
+                      return `${format(settings.startHour)} – ${format(settings.endHour)}`;
+                    })()
+                  : "09:00 – 18:00"}
               </span>
             </div>
           </div>
@@ -346,11 +356,49 @@ export default function Profile() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-on-surface-variant uppercase tracking-wider">Hora inicio</label>
-                <input type="number" value={formStartHour} onChange={(e) => setFormStartHour(parseInt(e.target.value))} min={0} max={23} className="w-full h-12 px-4 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface" />
+                <div className="flex gap-1">
+                  <select 
+                    value={Math.floor(formStartHour / 100)} 
+                    onChange={(e) => setFormStartHour(parseInt(e.target.value) * 100 + (formStartHour % 100))}
+                    className="flex-1 h-12 px-3 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface text-sm"
+                  >
+                    {Array.from({ length: 24 }, (_, i) => (
+                      <option key={i} value={i}>{i.toString().padStart(2, "0")}</option>
+                    ))}
+                  </select>
+                  <select 
+                    value={formStartHour % 100} 
+                    onChange={(e) => setFormStartHour(Math.floor(formStartHour / 100) * 100 + parseInt(e.target.value))}
+                    className="flex-1 h-12 px-3 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface text-sm"
+                  >
+                    {[0, 15, 30, 45].map((m) => (
+                      <option key={m} value={m}>{m.toString().padStart(2, "0")}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-on-surface-variant uppercase tracking-wider">Hora cierre</label>
-                <input type="number" value={formEndHour} onChange={(e) => setFormEndHour(parseInt(e.target.value))} min={1} max={24} className="w-full h-12 px-4 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface" />
+                <div className="flex gap-1">
+                  <select 
+                    value={Math.floor(formEndHour / 100)} 
+                    onChange={(e) => setFormEndHour(parseInt(e.target.value) * 100 + (formEndHour % 100))}
+                    className="flex-1 h-12 px-3 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface text-sm"
+                  >
+                    {Array.from({ length: 25 }, (_, i) => (
+                      <option key={i} value={i}>{i.toString().padStart(2, "0")}</option>
+                    ))}
+                  </select>
+                  <select 
+                    value={formEndHour % 100} 
+                    onChange={(e) => setFormEndHour(Math.floor(formEndHour / 100) * 100 + parseInt(e.target.value))}
+                    className="flex-1 h-12 px-3 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface text-sm"
+                  >
+                    {[0, 15, 30, 45].map((m) => (
+                      <option key={m} value={m}>{m.toString().padStart(2, "0")}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
             <button onClick={handleSave} disabled={saving} className="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white font-bold rounded-full">

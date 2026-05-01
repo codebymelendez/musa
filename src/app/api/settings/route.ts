@@ -17,8 +17,8 @@ const updateSchema = z.object({
   settings: z
     .object({
       workDays: z.array(z.number().min(0).max(6)).optional(),
-      startHour: z.number().min(0).max(23).optional(),
-      endHour: z.number().min(1).max(24).optional(),
+      startHour: z.number().min(0).max(2359).optional(),
+      endHour: z.number().min(0).max(2400).optional(),
       slotDuration: z.number().min(15).max(120).optional(),
       currency: z.string().optional(),
       bookingEnabled: z.boolean().optional(),

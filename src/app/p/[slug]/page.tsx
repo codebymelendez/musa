@@ -246,7 +246,7 @@ export default function PublicBookingPage() {
         </button>
       </header>
 
-      <main className="pt-24 pb-32 px-6 max-w-2xl mx-auto space-y-8">
+      <main className="pt-24 pb-40 px-6 max-w-2xl mx-auto space-y-8 min-h-[calc(100dvh-80px)]">
         {/* Bienvenida a clientas que regresan */}
         {isReturningClient && step === "service" && (
           <div className="bg-primary-fixed/30 rounded-2xl px-5 py-3 flex items-center gap-3">
@@ -602,8 +602,8 @@ export default function PublicBookingPage() {
 
       {/* Bottom Action Bar */}
       {step !== "confirmed" && (
-        <div className="fixed bottom-0 left-0 w-full p-6 bg-white/80 backdrop-blur-xl z-50 rounded-t-[2.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
-          <div className="max-w-2xl mx-auto flex items-center justify-between gap-6">
+        <div className="fixed bottom-0 left-0 w-full p-4 sm:p-6 bg-white/90 backdrop-blur-xl z-50 rounded-t-[2rem] sm:rounded-t-[2.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.08)] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+          <div className="max-w-2xl mx-auto flex items-center justify-between gap-4 sm:gap-6">
             <div>
               {step !== "service" && (
                 <button
@@ -636,7 +636,7 @@ export default function PublicBookingPage() {
                 else if (step === "datetime" && selectedSlot) setStep("contact");
                 else if (step === "contact") handleBook();
               }}
-              className="flex-1 h-14 bg-gradient-to-r from-primary to-primary-container text-white font-headline font-bold rounded-full shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              className="flex-1 h-12 sm:h-14 bg-gradient-to-r from-primary to-primary-container text-white font-headline font-bold rounded-full shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {booking ? (
                 <span className="material-symbols-outlined animate-spin">progress_activity</span>
