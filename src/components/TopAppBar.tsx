@@ -11,6 +11,8 @@ const HIDDEN_PATHS = [
   "/onboarding",
   "/forgot-password",
   "/reset-password",
+  "/promotions",
+  "/appointments",
 ];
 
 export default function TopAppBar() {

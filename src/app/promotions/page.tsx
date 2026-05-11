@@ -139,6 +139,18 @@ export default function PromotionsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.title.trim() || form.title.trim().length < 3) {
+      setError("El título debe tener al menos 3 caracteres");
+      return;
+    }
+    if (!form.discount || form.discount < 1 || form.discount > 100) {
+      setError("El descuento debe ser entre 1% y 100%");
+      return;
+    }
+    if (!form.validFrom || !form.validUntil) {
+      setError("Las fechas de vigencia son obligatorias");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -465,14 +477,13 @@ export default function PromotionsPage() {
 
               {/* Descripción */}
               <div>
-                <span className="musa-sublabel block mb-2">Descripción *</span>
+                <span className="musa-sublabel block mb-2">Descripción</span>
                 <textarea
                   className="w-full px-4 py-3 bg-surface-raised border border-border rounded-xl font-ui text-[14px] text-on-surface placeholder:text-on-surface-subtle outline-none focus:border-border-focus focus:shadow-[0_0_0_3px_rgba(181,89,62,0.12)] transition-all duration-150 resize-none"
                   placeholder="Detalles de la oferta…"
                   rows={3}
                   value={form.description}
                   onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  required
                 />
               </div>
 

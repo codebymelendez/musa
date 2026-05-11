@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase-admin";
 
 const createSchema = z.object({
   title: z.string().min(3),
-  description: z.string().min(5),
+  description: z.string().optional().default(""),
   discount: z.number().min(1).max(100),
   validFrom: z.string().datetime(),
   validUntil: z.string().datetime(),
