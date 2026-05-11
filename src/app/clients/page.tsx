@@ -5,7 +5,6 @@ import {
   MagnifyingGlassIcon,
   EyeIcon,
   EyeSlashIcon,
-  UsersIcon,
   PhoneIcon,
   CalendarDaysIcon,
   ClockIcon,
@@ -27,12 +26,12 @@ function formatBirthday(dateStr: string | null) {
   return new Date(dateStr + "T12:00:00").toLocaleDateString("es-VE", { day: "numeric", month: "short" });
 }
 
-const TAG_COLORS: Record<string, string> = {
-  VIP:             "bg-yellow-100 text-yellow-800",
-  Frecuente:       "bg-green-100 text-green-800",
-  Referida:        "bg-sky-100 text-sky-800",
-  Estudiante:      "bg-rose-100 text-rose-800",
-  "Nuevo cliente": "bg-teal-100 text-teal-800",
+const TAG_CLASSES: Record<string, string> = {
+  VIP:             "musa-tag musa-tag--gold",
+  Frecuente:       "musa-tag musa-tag--success",
+  Referida:        "musa-tag musa-tag--primary",
+  Estudiante:      "musa-tag musa-tag--rose",
+  "Nuevo cliente": "musa-tag musa-tag--neutral",
 };
 
 export default function ClientsPage() {
@@ -68,8 +67,8 @@ export default function ClientsPage() {
 
   useEffect(() => { fetchClients(); }, [fetchClients]);
 
-  const handleEdit    = (c: Client) => { setEditTarget(c); setModalOpen(true); };
-  const handleNew     = () => { setEditTarget(null); setModalOpen(true); };
+  const handleEdit       = (c: Client) => { setEditTarget(c); setModalOpen(true); };
+  const handleNew        = () => { setEditTarget(null); setModalOpen(true); };
   const handleModalSaved = () => { setModalOpen(false); setEditTarget(null); fetchClients(); };
 
   const handleArchive = async (client: Client) => {
@@ -95,23 +94,25 @@ export default function ClientsPage() {
 
   return (
     <main className="pt-24 px-4 max-w-5xl mx-auto pb-32 animate-page">
+
       {/* ── Header ──────────────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8 px-1">
         <div>
-          <span className="font-ui text-[11px] font-semibold tracking-widest text-primary uppercase mb-1 block">
-            Gestión
-          </span>
-          <h1 className="font-display text-[32px] font-semibold text-on-surface tracking-[-0.02em] italic">
-            Clientas
+          <span className="musa-sublabel mb-1.5 block">Clientas</span>
+          <h1 className="font-display font-normal text-[28px] text-on-surface leading-tight">
+            {active.length > 0
+              ? `${active.length} clienta${active.length !== 1 ? "s" : ""}`
+              : "Gestión"}
           </h1>
-          <p className="font-ui text-[14px] text-on-surface-muted mt-1">
-            {active.length} activa{active.length !== 1 ? "s" : ""}
-            {inactive.length > 0 && ` · ${inactive.length} archivada${inactive.length !== 1 ? "s" : ""}`}
-          </p>
+          {inactive.length > 0 && (
+            <p className="font-ui text-[13px] text-on-surface-subtle mt-1">
+              {inactive.length} archivada{inactive.length !== 1 ? "s" : ""}
+            </p>
+          )}
         </div>
         <button
           onClick={handleNew}
-          className="hidden md:flex items-center gap-2 bg-primary text-on-primary px-6 py-2.5 rounded-full font-ui font-semibold text-[14px] shadow-primary-sm hover:bg-primary-hover transition-colors"
+          className="hidden md:flex items-center gap-2 bg-primary text-on-primary px-6 py-2.5 rounded-full font-ui font-medium text-[14px] shadow-primary-sm hover:bg-primary-hover transition-colors"
         >
           <UserPlusIcon className="w-4 h-4" />
           Añadir clienta
@@ -121,51 +122,71 @@ export default function ClientsPage() {
       {/* ── Search + filter ─────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6 px-1">
         <div className="relative flex-1">
-          <MagnifyingGlassIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-subtle" />
+          <MagnifyingGlassIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-subtle pointer-events-none" />
           <input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nombre, teléfono o email..."
-            className="w-full h-11 pl-10 pr-4 bg-surface-raised border border-border rounded-lg font-ui text-[14px] text-on-surface placeholder:text-on-surface-subtle outline-none focus:border-border-focus transition-colors"
+            placeholder="Nombre, teléfono o email…"
+            className="musa-input pl-10"
           />
         </div>
         <button
           onClick={() => setShowInactive((v) => !v)}
-          className={`flex items-center gap-2 px-5 h-11 rounded-lg font-ui text-[13px] font-semibold transition-colors whitespace-nowrap border ${
+          className={`flex items-center gap-2 px-5 h-[46px] rounded-xl font-ui text-[13px] font-medium transition-colors whitespace-nowrap border ${
             showInactive
-              ? "bg-primary/10 text-primary border-primary/20"
+              ? "bg-primary-surface text-primary border-primary-border"
               : "bg-surface-raised text-on-surface-muted border-border hover:border-border-focus"
           }`}
         >
           {showInactive ? <EyeIcon className="w-4 h-4" /> : <EyeSlashIcon className="w-4 h-4" />}
-          {showInactive ? "Ver todas" : "Ver archivadas"}
+          {showInactive ? "Ver todas" : "Archivadas"}
         </button>
       </div>
 
-      {/* ── Loading ─────────────────────────────────────────────────── */}
+      {/* ── Loading skeletons ────────────────────────────────────────── */}
       {loading && (
-        <div className="flex justify-center py-16">
-          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-1">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-surface-raised border border-border-subtle rounded-xl p-5 shadow-xs">
+              <div className="flex items-start gap-4">
+                <div className="w-11 h-11 rounded-full bg-surface-sunken animate-pulse shrink-0" />
+                <div className="flex-1 space-y-2.5 pt-1">
+                  <div
+                    className="h-[14px] rounded bg-surface-sunken animate-pulse"
+                    style={{ width: `${48 + (i * 19) % 32}%` }}
+                  />
+                  <div
+                    className="h-[11px] rounded bg-surface-sunken animate-pulse"
+                    style={{ width: `${30 + (i * 13) % 28}%` }}
+                  />
+                  <div className="h-[11px] rounded bg-surface-sunken animate-pulse w-[40%]" />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
       {/* ── Empty state ─────────────────────────────────────────────── */}
       {!loading && clients.length === 0 && (
-        <div className="text-center py-20 text-on-surface-muted">
-          <UsersIcon className="w-12 h-12 mx-auto mb-4 opacity-30" />
-          <p className="font-ui font-semibold text-[16px] text-on-surface mb-1">
-            {search ? "Sin resultados" : "Aún no hay clientas"}
+        <div className="flex flex-col items-center py-20 text-center">
+          <div className="musa-rule w-[80px] mb-8" />
+          <p
+            className="font-display font-light italic text-on-surface mb-2"
+            style={{ fontSize: "26px" }}
+          >
+            {search ? "Sin resultados." : "Aún no hay clientas."}
           </p>
-          <p className="font-ui text-[13px] max-w-xs mx-auto mb-6">
+          <p className="font-ui text-[13px] text-on-surface-muted max-w-[240px] mb-8">
             {search
               ? `No encontramos "${search}". Prueba con otro nombre o número.`
-              : "Añade tu primera clienta manualmente o espera a que reserven."}
+              : "Añade tu primera clienta manualmente o espera a que reserven en tu página."}
           </p>
           {!search && (
             <button
               onClick={handleNew}
-              className="inline-flex items-center gap-2 bg-primary text-on-primary px-6 py-2.5 rounded-full font-ui font-semibold text-[14px] shadow-primary-sm hover:bg-primary-hover transition-colors"
+              className="inline-flex items-center gap-2 border border-primary text-primary px-6 py-2.5 rounded-full font-ui font-medium text-[13px] hover:bg-primary-surface transition-colors"
             >
               <UserPlusIcon className="w-4 h-4" />
               Añadir primera clienta
@@ -185,25 +206,26 @@ export default function ClientsPage() {
             return (
               <div
                 key={client.id}
-                className={`relative bg-surface-raised border border-border-subtle rounded-xl p-5 shadow-xs hover:shadow-md transition-all duration-200 ${
-                  !client.isActive ? "opacity-60" : ""
-                }`}
+                className={`relative musa-card p-5 ${!client.isActive ? "opacity-60" : ""}`}
               >
                 {!client.isActive && (
-                  <span className="absolute top-3 right-3 font-ui text-[10px] font-semibold uppercase tracking-widest bg-surface-sunken text-on-surface-muted px-2 py-0.5 rounded-full">
+                  <span className="absolute top-3 right-3 musa-sublabel bg-surface-sunken px-2.5 py-1 rounded-full">
                     Archivada
                   </span>
                 )}
 
                 <div className="flex items-start gap-4">
                   {/* Avatar */}
-                  <div className="w-11 h-11 rounded-full bg-rose-100 flex items-center justify-center font-ui font-semibold text-[15px] text-sienna-700 shrink-0">
+                  <div
+                    className="w-11 h-11 rounded-full flex items-center justify-center font-ui font-medium text-[15px] shrink-0"
+                    style={{ background: "var(--color-rose-100)", color: "var(--color-sienna-700)" }}
+                  >
                     {getInitials(client.name)}
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-ui font-semibold text-[15px] text-on-surface truncate">
+                      <h3 className="font-ui font-medium text-[15px] text-on-surface truncate">
                         {client.name}
                       </h3>
                       {client.birthday && (
@@ -226,11 +248,11 @@ export default function ClientsPage() {
                     </div>
 
                     {client.tags?.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
+                      <div className="flex flex-wrap gap-1.5 mt-2">
                         {client.tags.map((tag) => (
                           <span
                             key={tag}
-                            className={`px-2 py-0.5 rounded-full font-ui text-[10px] font-semibold ${TAG_COLORS[tag] ?? "bg-surface-sunken text-on-surface-muted"}`}
+                            className={TAG_CLASSES[tag] ?? "musa-tag musa-tag--neutral"}
                           >
                             {tag}
                           </span>
@@ -257,12 +279,12 @@ export default function ClientsPage() {
                   <div className="mt-3 pt-3 border-t border-border-subtle">
                     {client.preferences && (
                       <p className="font-ui text-[12px] text-on-surface-muted line-clamp-1">
-                        <span className="font-semibold">Pref:</span> {client.preferences}
+                        <span className="font-medium">Pref:</span> {client.preferences}
                       </p>
                     )}
                     {client.notes && (
                       <p className="font-ui text-[12px] text-on-surface-subtle line-clamp-1 mt-0.5">
-                        <span className="font-semibold">Nota:</span> {client.notes}
+                        <span className="font-medium">Nota:</span> {client.notes}
                       </p>
                     )}
                   </div>
@@ -271,7 +293,7 @@ export default function ClientsPage() {
                 <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border-subtle">
                   <button
                     onClick={() => handleEdit(client)}
-                    className="flex-1 flex items-center justify-center gap-1.5 h-9 bg-surface-sunken text-on-surface-muted font-ui text-[12px] font-semibold rounded-lg hover:bg-primary/5 hover:text-primary transition-colors"
+                    className="flex-1 flex items-center justify-center gap-1.5 h-9 bg-surface-sunken text-on-surface-muted font-ui text-[12px] font-medium rounded-lg hover:bg-primary-surface hover:text-primary transition-colors"
                   >
                     <PencilIcon className="w-3.5 h-3.5" />
                     Editar
@@ -279,14 +301,14 @@ export default function ClientsPage() {
                   <button
                     onClick={() => handleArchive(client)}
                     disabled={isArchiving}
-                    className={`flex-1 flex items-center justify-center gap-1.5 h-9 font-ui text-[12px] font-semibold rounded-lg transition-colors disabled:opacity-40 ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 h-9 font-ui text-[12px] font-medium rounded-lg transition-colors disabled:opacity-40 ${
                       client.isActive
                         ? "bg-surface-sunken text-on-surface-muted hover:bg-error-surface hover:text-error"
                         : "bg-surface-sunken text-on-surface-muted hover:bg-success-surface hover:text-success"
                     }`}
                   >
                     {isArchiving ? (
-                      <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      <div className="w-3.5 h-3.5 border border-current border-t-transparent rounded-full animate-spin" />
                     ) : client.isActive ? (
                       <><UserMinusIcon className="w-3.5 h-3.5" /> Archivar</>
                     ) : (

@@ -112,7 +112,7 @@ export default function Calendar() {
       {/* ── Header ───────────────────────────────────────────────────── */}
       <section className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="flex flex-col gap-2">
-          <span className="font-ui text-[11px] font-semibold tracking-widest text-primary uppercase">
+          <span className="font-ui text-[11px] font-medium tracking-widest text-primary uppercase">
             Agenda
           </span>
           <div className="flex items-center gap-3">
@@ -123,7 +123,7 @@ export default function Calendar() {
             >
               <ChevronLeftIcon className="w-4 h-4 text-on-surface-muted" />
             </button>
-            <h2 className="font-display text-[32px] font-semibold text-on-surface tracking-[-0.02em] italic">
+            <h2 className="font-cormorant font-normal text-[36px] text-on-surface tracking-tight italic">
               Semana {weekNum}
             </h2>
             <button
@@ -139,7 +139,7 @@ export default function Calendar() {
         <div className="flex bg-surface-sunken border border-border-subtle p-1 rounded-xl w-fit">
           <button
             onClick={() => setViewMode("weekly")}
-            className={`px-5 py-2 rounded-lg font-ui text-[13px] font-semibold transition-colors ${
+            className={`px-5 py-2 rounded-lg font-ui text-[13px] font-medium transition-colors ${
               viewMode === "weekly"
                 ? "bg-surface-raised text-primary shadow-sm"
                 : "text-on-surface-muted hover:text-on-surface"
@@ -149,7 +149,7 @@ export default function Calendar() {
           </button>
           <button
             onClick={() => setViewMode("monthly")}
-            className={`px-5 py-2 rounded-lg font-ui text-[13px] font-semibold transition-colors ${
+            className={`px-5 py-2 rounded-lg font-ui text-[13px] font-medium transition-colors ${
               viewMode === "monthly"
                 ? "bg-surface-raised text-primary shadow-sm"
                 : "text-on-surface-muted hover:text-on-surface"
@@ -162,8 +162,33 @@ export default function Calendar() {
 
       {/* ── Loading ──────────────────────────────────────────────────── */}
       {loading && (
-        <div className="flex justify-center py-16">
-          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <div className="bg-surface border border-outline-variant/30 rounded-2xl shadow-sm overflow-hidden animate-pulse">
+          <div className="grid grid-cols-8 border-b border-outline-variant/10 py-5 bg-surface-sunken/20">
+            <div className="flex items-center justify-center">
+               <div className="h-3 w-8 bg-outline-variant/10 rounded"></div>
+            </div>
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div key={i} className="flex flex-col items-center gap-1">
+                <div className="h-3 w-6 bg-outline-variant/10 rounded mb-1"></div>
+                <div className="h-6 w-6 bg-outline-variant/10 rounded-full"></div>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-8">
+            <div className="flex flex-col">
+               {Array.from({ length: 5 }).map((_, i) => (
+                 <div key={i} className="h-20 border-r border-outline-variant/10 flex items-start justify-center pt-2">
+                   <div className="h-3 w-8 bg-outline-variant/10 rounded"></div>
+                 </div>
+               ))}
+            </div>
+            {Array.from({ length: 7 }).map((_, i) => (
+               <div key={i} className="h-[400px] border-r border-outline-variant/10 last:border-r-0 relative">
+                 <div className="absolute top-10 left-1 right-1 h-16 bg-outline-variant/10 rounded-lg"></div>
+                 {i % 2 === 0 && <div className="absolute top-32 left-1 right-1 h-24 bg-outline-variant/10 rounded-lg"></div>}
+               </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -172,20 +197,20 @@ export default function Calendar() {
         <div className="bg-surface-raised border border-border-subtle rounded-2xl shadow-sm overflow-hidden">
           {/* Day headers */}
           <div className="grid grid-cols-8 border-b border-border-subtle py-5 bg-surface-sunken/40">
-            <div className="flex items-center justify-center font-ui text-[10px] font-bold text-on-surface-subtle uppercase tracking-widest">
+            <div className="flex items-center justify-center font-ui text-[10px] font-medium text-on-surface-subtle uppercase tracking-widest">
               Hora
             </div>
             {weekDays.map((day, i) => {
               const isToday = day.toDateString() === todayStr;
               return (
                 <div key={i} className="flex flex-col items-center gap-1">
-                  <span className={`font-ui text-[11px] font-semibold ${isToday ? "text-primary" : "text-on-surface-muted"}`}>
+                  <span className={`font-ui text-[11px] font-medium ${isToday ? "text-primary" : "text-on-surface-muted"}`}>
                     {DAY_ABBR[day.getDay()]}
                   </span>
                   <span
-                    className={`font-ui text-[17px] font-semibold ${
+                    className={`font-ui text-[17px] font-medium ${
                       isToday
-                        ? "w-8 h-8 flex items-center justify-center rounded-full bg-primary text-on-primary"
+                        ? "w-8 h-8 flex items-center justify-center rounded-full bg-primary text-on-primary shadow-primary-sm"
                         : "text-on-surface"
                     }`}
                   >
@@ -204,7 +229,7 @@ export default function Calendar() {
                 <div
                   key={h}
                   style={{ height: `${HOUR_HEIGHT}px` }}
-                  className="flex items-start justify-center pt-2 font-ui text-[11px] font-medium text-on-surface-subtle border-r border-border-subtle"
+                  className="flex items-start justify-center pt-2 font-mono-num text-[11px] font-medium text-on-surface-subtle border-r border-border-subtle"
                 >
                   {h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`}
                 </div>
@@ -240,7 +265,7 @@ export default function Calendar() {
                     >
                       <div className="w-full h-full bg-stone-100 border-l-[3px] border-stone-400 rounded-r flex flex-col justify-start gap-0.5 pt-1 px-1">
                         <NoSymbolIcon className="w-2.5 h-2.5 text-stone-400" />
-                        <span className="font-ui text-[9px] text-stone-500 font-semibold leading-tight uppercase tracking-tight hidden sm:block">
+                        <span className="font-ui text-[9px] text-stone-500 font-medium leading-tight uppercase tracking-tight hidden sm:block">
                           {BLOCK_LABELS[block.blockType] ?? "Bloqueado"}
                         </span>
                       </div>
@@ -260,28 +285,28 @@ export default function Calendar() {
                       case "reprogrammed":
                       case "rescheduled":
                         bgClass     = "bg-primary shadow-sm border border-primary/20";
-                        timeClass   = "text-white/90 font-bold";
-                        titleClass  = "text-white font-semibold";
+                        timeClass   = "text-white/90 font-medium font-mono-num";
+                        titleClass  = "text-white font-medium";
                         subtitleClass = "text-white/75";
                         break;
                       case "completed":
                         bgClass     = "bg-success shadow-sm border border-success/20";
-                        timeClass   = "text-white/90 font-bold";
-                        titleClass  = "text-white font-semibold";
+                        timeClass   = "text-white/90 font-medium font-mono-num";
+                        titleClass  = "text-white font-medium";
                         subtitleClass = "text-white/75";
                         break;
                       case "no_show":
                       case "cancelled":
                         bgClass     = "bg-error shadow-sm border border-error/20 opacity-80";
-                        timeClass   = "text-white/90 font-bold";
-                        titleClass  = "text-white font-semibold";
+                        timeClass   = "text-white/90 font-medium font-mono-num";
+                        titleClass  = "text-white font-medium";
                         subtitleClass = "text-white/75";
                         break;
                       case "pending":
                       default:
-                        bgClass     = "bg-surface-raised border-l-[3px] border-border shadow-xs";
-                        timeClass   = "text-on-surface-muted font-semibold";
-                        titleClass  = "text-on-surface font-semibold";
+                        bgClass     = "bg-surface border-l-[3px] border-border shadow-sm";
+                        timeClass   = "text-on-surface-muted font-medium font-mono-num";
+                        titleClass  = "text-on-surface font-medium";
                         subtitleClass = "text-on-surface-muted";
                         break;
                     }
@@ -339,7 +364,7 @@ export default function Calendar() {
       {/* ── FAB — new appointment ────────────────────────────────────── */}
       <button
         onClick={() => setShowNewAppointmentModal(true)}
-        className="fixed bottom-28 right-6 w-14 h-14 rounded-full bg-primary text-on-primary shadow-primary-md flex items-center justify-center transition-transform active:scale-90 z-40 hover:bg-primary-hover musa-fab"
+        className="fixed bottom-28 right-6 w-14 h-14 rounded-full bg-primary text-on-primary shadow-primary-sm flex items-center justify-center transition-transform active:scale-90 z-40 hover:bg-primary-hover musa-fab"
         aria-label="Nueva cita"
       >
         <PlusIcon className="w-6 h-6" />

@@ -359,3 +359,153 @@
   background-color: #C4996A;
   opacity: 0.40;
 }
+
+/* ─── Chip / Tag — designed pill component ─── */
+.musa-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 14px;
+  background-color: var(--color-surface-sunken);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--color-on-surface-muted);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  text-decoration: none;
+  transition:
+    background-color 140ms ease-out,
+    border-color 140ms ease-out,
+    color 140ms ease-out,
+    transform 100ms ease-out;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.musa-chip:hover {
+  background-color: var(--color-primary-surface);
+  border-color: var(--color-primary-border);
+  color: var(--color-primary);
+}
+
+.musa-chip:active {
+  transform: scale(0.97);
+}
+
+.musa-chip-active {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+/* ─── Section label — DM Sans structural variant ─── */
+.musa-sublabel {
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-on-surface-subtle);
+  line-height: 1.4;
+}
+
+/* ─── Corner frame — editorial spatial marker ─── */
+.musa-corner-frame-tr {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  width: 3rem;
+  height: 3rem;
+  pointer-events: none;
+  border-top: 1.5px solid rgba(181, 89, 62, 0.22);
+  border-right: 1.5px solid rgba(181, 89, 62, 0.22);
+}
+
+.musa-corner-frame-tr-gold {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  width: 3rem;
+  height: 3rem;
+  pointer-events: none;
+  border-top: 1.5px solid rgba(196, 153, 106, 0.22);
+  border-right: 1.5px solid rgba(196, 153, 106, 0.22);
+}
+
+/* ─── Animation delays for staggered reveals ─── */
+.delay-75  { animation-delay:  75ms; }
+.delay-150 { animation-delay: 150ms; }
+.delay-225 { animation-delay: 225ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-375 { animation-delay: 375ms; }
+
+/* ─── Input — brand proportions ─── */
+.musa-input {
+  width: 100%;
+  height: 46px;
+  padding: 0 1rem;
+  background-color: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--color-on-surface);
+  transition: border-color 140ms ease-out, box-shadow 140ms ease-out;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.musa-input::placeholder {
+  color: var(--color-on-surface-subtle);
+}
+
+.musa-input:focus {
+  border-color: var(--color-border-focus);
+  box-shadow: 0 0 0 3px rgba(181, 89, 62, 0.12);
+}
+
+/* ─── Tag — brand-aligned client label pill ─── */
+.musa-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--radius-full);
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.musa-tag--gold {
+  background-color: var(--color-rose-100);
+  color: var(--color-sienna-700);
+}
+
+.musa-tag--success {
+  background-color: var(--color-success-surface);
+  color: var(--color-success);
+}
+
+.musa-tag--primary {
+  background-color: var(--color-primary-surface);
+  color: var(--color-primary);
+}
+
+.musa-tag--rose {
+  background-color: var(--color-rose-50);
+  color: var(--color-rose-400);
+}
+
+.musa-tag--neutral {
+  background-color: var(--color-surface-sunken);
+  color: var(--color-on-surface-muted);
+  border: 1px solid var(--color-border-subtle);
+}

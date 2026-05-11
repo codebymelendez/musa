@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { XMarkIcon, ArrowRightIcon, ClockIcon } from "@heroicons/react/24/outline";
 
 interface Promotion {
-  id: string;
-  title: string;
+  id:          string;
+  title:       string;
   description: string;
-  discount: number;
-  validUntil: string;
+  discount:    number;
+  validUntil:  string;
 }
 
 interface Props {
@@ -29,115 +30,126 @@ export default function PromotionBanner({ promotions, onBook }: Props) {
 
   return (
     <>
-      {/* Banner compacto */}
-      <div
-        className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary via-primary-container to-purple-400 p-5 cursor-pointer shadow-lg shadow-primary/20 active:scale-[0.98] transition-transform"
+      {/* ── Compact banner ───────────────────────────────────────── */}
+      <button
+        type="button"
         onClick={() => setModalOpen(true)}
+        className="w-full text-left bg-primary-surface border border-primary-border rounded-xl p-4 hover:shadow-sm active:scale-[0.99] transition-all duration-150"
       >
-        {/* Decorative circles */}
-        <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-white/10" />
-        <div className="absolute -bottom-4 -left-4 w-16 h-16 rounded-full bg-white/10" />
-
-        <div className="relative flex items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-white/70 uppercase tracking-widest">
-                Promo especial
-              </span>
-              {promotions.length > 1 && (
-                <span className="text-[10px] bg-white/20 text-white rounded-full px-2 py-0.5 font-bold">
-                  {promotions.length} ofertas
-                </span>
-              )}
-            </div>
-            <h3 className="font-headline text-white font-extrabold text-xl leading-tight">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <span className="font-ui font-medium text-primary block mb-1" style={{ fontSize: "10.5px", letterSpacing: "0.12em", textTransform: "uppercase" }}>
+              {promotions.length > 1 ? `${promotions.length} ofertas disponibles` : "Oferta especial"}
+            </span>
+            <p className="font-ui font-medium text-[14px] text-on-surface leading-snug truncate">
               {promo.title}
-            </h3>
-            <p className="text-white/80 text-xs">
-              Válida por {daysLeft <= 1 ? "¡solo hoy!" : `${daysLeft} días más`}
+            </p>
+            <p className="font-ui text-[12px] text-on-surface-muted mt-1">
+              {daysLeft <= 1 ? "¡Solo hoy!" : `Válida por ${daysLeft} días más`}
             </p>
           </div>
 
-          <div className="flex-shrink-0 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-white/20 flex flex-col items-center justify-center">
-              <span className="text-white font-extrabold text-xl leading-none">
-                {promo.discount}%
-              </span>
-              <span className="text-white/70 text-[10px] font-bold">OFF</span>
-            </div>
+          <div className="flex flex-col items-end flex-shrink-0 leading-none">
+            <span
+              className="font-display font-normal text-primary leading-none"
+              style={{ fontSize: "28px" }}
+            >
+              {promo.discount}
+            </span>
+            <span className="font-ui font-medium text-primary mt-0.5" style={{ fontSize: "10.5px", letterSpacing: "0.08em" }}>
+              % dto.
+            </span>
           </div>
         </div>
 
         {/* Dot indicators for multiple promos */}
         {promotions.length > 1 && (
-          <div className="flex gap-1.5 mt-3 justify-center">
+          <div className="flex gap-1.5 mt-3">
             {promotions.map((_, i) => (
               <button
                 key={i}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setActiveIdx(i);
-                }}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setActiveIdx(i); }}
                 className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                  i === activeIdx ? "bg-white" : "bg-white/40"
+                  i === activeIdx ? "bg-primary" : "bg-primary-border"
                 }`}
               />
             ))}
           </div>
         )}
-      </div>
+      </button>
 
-      {/* Modal de detalle */}
+      {/* ── Detail modal ─────────────────────────────────────────── */}
       {modalOpen && (
-        <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
-          <div className="bg-surface-container-lowest rounded-[2.5rem] p-8 max-w-sm w-full shadow-2xl space-y-6 animate-in slide-in-from-bottom-4 duration-300">
-            {/* Discount badge */}
-            <div className="flex items-center justify-between">
-              <div className="bg-gradient-to-r from-primary to-primary-container px-5 py-2 rounded-full">
-                <span className="text-white font-extrabold text-2xl">{promo.discount}% OFF</span>
+        <div
+          className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-espresso-900/55"
+          onClick={(e) => { if (e.target === e.currentTarget) setModalOpen(false); }}
+        >
+          <div className="bg-background w-full max-w-sm rounded-t-2xl sm:rounded-2xl shadow-xl">
+
+            {/* Modal header */}
+            <div className="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-border-subtle">
+              <div className="flex-1 min-w-0">
+                <p className="musa-sublabel mb-0.5">Oferta especial</p>
+                <h2 className="font-display font-normal text-[20px] text-on-surface leading-tight truncate">
+                  {promo.title}
+                </h2>
               </div>
               <button
                 onClick={() => setModalOpen(false)}
-                className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center"
+                className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-muted hover:bg-surface-sunken transition-colors flex-shrink-0"
+                aria-label="Cerrar"
               >
-                <span className="material-symbols-outlined text-on-surface-variant">close</span>
+                <XMarkIcon className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-2">
-              <h2 className="font-headline text-2xl font-extrabold tracking-tighter text-on-surface">
-                {promo.title}
-              </h2>
-              <p className="text-on-surface-variant leading-relaxed">{promo.description}</p>
-            </div>
+            {/* Modal body */}
+            <div className="px-6 pt-5 pb-8 space-y-5">
 
-            <div className="flex items-center gap-2 bg-surface-container px-4 py-3 rounded-xl">
-              <span className="material-symbols-outlined text-primary text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>
-                timer
-              </span>
-              <p className="text-sm text-on-surface-variant">
-                Válida hasta{" "}
-                <strong className="text-on-surface">
-                  {new Date(promo.validUntil).toLocaleDateString("es-VE", {
-                    day: "numeric",
-                    month: "long",
-                  })}
-                </strong>
-              </p>
-            </div>
+              {/* Discount — editorial number */}
+              <div className="flex items-baseline gap-2">
+                <span
+                  className="font-display font-normal text-primary leading-none"
+                  style={{ fontSize: "48px", letterSpacing: "-0.02em" }}
+                >
+                  {promo.discount}
+                </span>
+                <span className="font-ui font-medium text-primary text-[16px]">
+                  % de descuento
+                </span>
+              </div>
 
-            <button
-              onClick={() => {
-                setModalOpen(false);
-                onBook?.();
-              }}
-              className="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white font-headline font-bold rounded-full shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
-            >
-              <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
-                calendar_add_on
-              </span>
-              Reservar ahora con descuento
-            </button>
+              {/* Description */}
+              {promo.description && (
+                <p className="font-ui text-[14px] text-on-surface-muted leading-relaxed">
+                  {promo.description}
+                </p>
+              )}
+
+              {/* Expiry */}
+              <div className="flex items-center gap-2 bg-surface-sunken rounded-xl px-4 py-3">
+                <ClockIcon className="w-4 h-4 text-on-surface-muted flex-shrink-0" />
+                <p className="font-ui text-[13px] text-on-surface-muted">
+                  Válida hasta{" "}
+                  <span className="font-medium text-on-surface">
+                    {new Date(promo.validUntil).toLocaleDateString("es-VE", {
+                      day:   "numeric",
+                      month: "long",
+                    })}
+                  </span>
+                </p>
+              </div>
+
+              {/* CTA */}
+              <button
+                onClick={() => { setModalOpen(false); onBook?.(); }}
+                className="w-full h-[50px] bg-primary text-on-primary rounded-full font-ui font-medium text-[15px] shadow-primary-sm hover:bg-primary-hover transition-colors flex items-center justify-center gap-2"
+              >
+                Reservar ahora
+                <ArrowRightIcon className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       )}

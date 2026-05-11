@@ -5,6 +5,7 @@ import { useServices } from "@/hooks/useServices";
 import { useClients } from "@/hooks/useClients";
 import { useAppointments } from "@/hooks/useAppointments";
 import { formatCurrency } from "@/lib/utils";
+import { XMarkIcon, ExclamationCircleIcon, UserIcon, ClockIcon, CheckIcon } from "@heroicons/react/24/outline";
 
 interface Props {
   onClose: () => void;
@@ -78,12 +79,12 @@ export default function NewAppointmentModal({ onClose, onCreated }: Props) {
       <div className="bg-surface-container-lowest w-full max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl p-8 space-y-6 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h2 className="font-headline text-2xl font-bold">Nueva Cita</h2>
+          <h2 className="font-headline text-2xl font-medium">Nueva Cita</h2>
           <button
             onClick={onClose}
             className="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center"
           >
-            <span className="material-symbols-outlined">close</span>
+            <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
 
@@ -95,7 +96,7 @@ export default function NewAppointmentModal({ onClose, onCreated }: Props) {
 
         {/* Paso 1: Seleccionar servicio */}
         <div className="space-y-3">
-          <h3 className="font-semibold text-on-surface-variant text-sm uppercase tracking-wider">
+          <h3 className="font-medium text-on-surface-variant text-sm uppercase tracking-wider">
             Servicio
           </h3>
           <div className="space-y-2">
@@ -110,7 +111,7 @@ export default function NewAppointmentModal({ onClose, onCreated }: Props) {
                   className="accent-primary"
                 />
                 <div className="flex-1">
-                  <p className="font-semibold text-on-surface">{s.name}</p>
+                  <p className="font-medium text-on-surface">{s.name}</p>
                   <p className="text-xs text-on-surface-variant">
                     {s.durationMin} min · {formatCurrency(s.price, s.currency)}
                   </p>
@@ -122,7 +123,7 @@ export default function NewAppointmentModal({ onClose, onCreated }: Props) {
 
         {/* Paso 2: Fecha y hora */}
         <div className="space-y-3">
-          <h3 className="font-semibold text-on-surface-variant text-sm uppercase tracking-wider">
+          <h3 className="font-medium text-on-surface-variant text-sm uppercase tracking-wider">
             Fecha y Hora
           </h3>
           <input
@@ -142,7 +143,7 @@ export default function NewAppointmentModal({ onClose, onCreated }: Props) {
 
         {/* Paso 3: Clienta */}
         <div className="space-y-3">
-          <h3 className="font-semibold text-on-surface-variant text-sm uppercase tracking-wider">
+          <h3 className="font-medium text-on-surface-variant text-sm uppercase tracking-wider">
             Clienta
           </h3>
 
@@ -151,14 +152,14 @@ export default function NewAppointmentModal({ onClose, onCreated }: Props) {
             <button
               type="button"
               onClick={() => setClientMode("existing")}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${clientMode === "existing" ? "bg-surface-container-lowest text-primary shadow-sm" : "text-on-surface-variant"}`}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${clientMode === "existing" ? "bg-surface-container-lowest text-primary shadow-sm" : "text-on-surface-variant"}`}
             >
               Clienta existente
             </button>
             <button
               type="button"
               onClick={() => setClientMode("new")}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${clientMode === "new" ? "bg-surface-container-lowest text-primary shadow-sm" : "text-on-surface-variant"}`}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${clientMode === "new" ? "bg-surface-container-lowest text-primary shadow-sm" : "text-on-surface-variant"}`}
             >
               Nueva clienta
             </button>
@@ -200,10 +201,10 @@ export default function NewAppointmentModal({ onClose, onCreated }: Props) {
         {/* Resumen */}
         {selectedService && selectedDate && selectedTime && (
           <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 space-y-1">
-            <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+            <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wider">
               Resumen
             </p>
-            <p className="font-semibold text-on-surface">{selectedService.name}</p>
+            <p className="font-medium text-on-surface">{selectedService.name}</p>
             <p className="text-sm text-on-surface-variant">
               {selectedDate} a las {selectedTime} ·{" "}
               {formatCurrency(selectedService.price, selectedService.currency)}
@@ -215,7 +216,7 @@ export default function NewAppointmentModal({ onClose, onCreated }: Props) {
         <button
           onClick={handleSubmit}
           disabled={loading}
-          className="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white font-headline font-bold rounded-full shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+          className="w-full h-14 bg-primary text-on-primary shadow-primary-sm font-headline font-medium rounded-full shadow-primary-sm hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
         >
           {loading ? (
             <span className="material-symbols-outlined animate-spin">
@@ -224,7 +225,7 @@ export default function NewAppointmentModal({ onClose, onCreated }: Props) {
           ) : (
             <>
               Confirmar Cita
-              <span className="material-symbols-outlined">check</span>
+              <CheckIcon className="w-5 h-5" />
             </>
           )}
         </button>

@@ -27,7 +27,7 @@ export default function QRDisplay({ token, size = 200, label }: Props) {
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <div className="p-3 bg-white rounded-2xl shadow-md">
+      <div className="p-3 bg-white rounded-2xl shadow-primary-sm">
         <canvas ref={canvasRef} />
       </div>
       {label && (

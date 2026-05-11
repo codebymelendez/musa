@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ClientLoyaltyAccount } from "@/types";
+import { GiftIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
 interface Props {
   account: ClientLoyaltyAccount;
@@ -49,23 +50,21 @@ export default function RedeemModal({ account, onClose, onRedeemed }: Props) {
       <div className="relative w-full sm:max-w-sm bg-white rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl p-6 space-y-5">
         {confirmed ? (
           <div className="text-center space-y-4 py-4">
-            <span className="material-symbols-outlined text-5xl text-green-500" style={{ fontVariationSettings: "'FILL' 1" }}>
-              check_circle
-            </span>
-            <h3 className="font-headline font-bold text-on-surface">¡Canje registrado!</h3>
+            <GiftIcon className="w-12 h-12 text-green-500" />
+            <h3 className="font-headline font-medium text-on-surface">¡Canje registrado!</h3>
             <p className="text-sm text-on-surface-variant">{program?.rewardDescription}</p>
           </div>
         ) : (
           <>
             <div className="flex items-center justify-between">
-              <h2 className="font-headline font-bold text-on-surface text-lg">Canjear recompensa</h2>
+              <h2 className="font-headline font-medium text-on-surface text-lg">Canjear recompensa</h2>
               <button onClick={onClose} className="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant">
-                <span className="material-symbols-outlined text-sm">close</span>
+                <XMarkIcon className="w-5 h-5" />
               </button>
             </div>
 
             <div className="bg-green-50 rounded-2xl p-4 space-y-2">
-              <p className="text-sm font-bold text-green-800">
+              <p className="text-sm font-medium text-green-800">
                 {account.client?.name}
               </p>
               <p className="text-sm text-green-700">{program?.rewardDescription ?? "Recompensa"}</p>
@@ -81,17 +80,17 @@ export default function RedeemModal({ account, onClose, onRedeemed }: Props) {
             <div className="flex gap-3">
               <button
                 onClick={onClose}
-                className="flex-1 h-12 bg-surface-container-high text-on-surface-variant font-bold rounded-full"
+                className="flex-1 h-12 bg-surface-container-high text-on-surface-variant font-medium rounded-full"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleRedeem}
                 disabled={loading}
-                className="flex-1 h-12 bg-green-500 text-white font-bold rounded-full flex items-center justify-center gap-2 disabled:opacity-60"
+                className="flex-1 h-12 bg-green-500 text-white font-medium rounded-full flex items-center justify-center gap-2 disabled:opacity-60"
               >
                 {loading ? (
-                  <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                  <div className="w-5 h-5 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
                 ) : (
                   "Confirmar canje"
                 )}

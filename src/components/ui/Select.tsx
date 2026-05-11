@@ -33,7 +33,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="font-ui text-[12px] font-semibold text-on-surface-muted tracking-[0.01em]"
+            className="musa-sublabel"
           >
             {label}
           </label>

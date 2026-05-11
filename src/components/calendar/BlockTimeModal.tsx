@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { BlockType, CreateBlockPayload } from "@/types";
+import { XMarkIcon, ExclamationCircleIcon, UserIcon, NoSymbolIcon } from "@heroicons/react/24/outline";
 
 interface ConflictInfo {
   message: string;
@@ -91,18 +92,18 @@ export default function BlockTimeModal({ defaultDate, onClose, onCreated }: Prop
       <div className="relative w-full sm:max-w-md bg-white rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h2 className="font-headline font-bold text-on-surface text-lg">Bloquear tiempo</h2>
+          <h2 className="font-headline font-medium text-on-surface text-lg">Bloquear tiempo</h2>
           <button
             onClick={onClose}
             className="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant"
           >
-            <span className="material-symbols-outlined text-sm">close</span>
+            <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tipo de bloqueo */}
         <div className="space-y-2">
-          <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+          <label className="musa-sublabel">
             Tipo
           </label>
           <div className="grid grid-cols-3 gap-2">
@@ -112,13 +113,13 @@ export default function BlockTimeModal({ defaultDate, onClose, onCreated }: Prop
                   key={type}
                   type="button"
                   onClick={() => setBlockType(type)}
-                  className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-2xl text-xs font-bold transition-colors ${
+                  className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-2xl text-xs font-medium transition-colors ${
                     blockType === type
                       ? "bg-primary text-white"
                       : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container"
                   }`}
                 >
-                  <span className="material-symbols-outlined text-lg">{icon}</span>
+                  <div className="w-5 h-5 rounded bg-surface-container-highest" />
                   <span className="text-center leading-tight">{label}</span>
                 </button>
               )
@@ -143,7 +144,7 @@ export default function BlockTimeModal({ defaultDate, onClose, onCreated }: Prop
           {isAllDay ? (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                <label className="musa-sublabel">
                   Desde
                 </label>
                 <input
@@ -158,7 +159,7 @@ export default function BlockTimeModal({ defaultDate, onClose, onCreated }: Prop
                 />
               </div>
               <div>
-                <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                <label className="musa-sublabel">
                   Hasta
                 </label>
                 <input
@@ -174,7 +175,7 @@ export default function BlockTimeModal({ defaultDate, onClose, onCreated }: Prop
           ) : (
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                <label className="musa-sublabel">
                   Fecha
                 </label>
                 <input
@@ -187,7 +188,7 @@ export default function BlockTimeModal({ defaultDate, onClose, onCreated }: Prop
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                  <label className="musa-sublabel">
                     Desde
                   </label>
                   <input
@@ -199,7 +200,7 @@ export default function BlockTimeModal({ defaultDate, onClose, onCreated }: Prop
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                  <label className="musa-sublabel">
                     Hasta
                   </label>
                   <input
@@ -216,7 +217,7 @@ export default function BlockTimeModal({ defaultDate, onClose, onCreated }: Prop
 
           {/* Motivo interno */}
           <div>
-            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+            <label className="musa-sublabel">
               Motivo interno (opcional)
             </label>
             <input
@@ -237,14 +238,14 @@ export default function BlockTimeModal({ defaultDate, onClose, onCreated }: Prop
           {/* Conflictos detectados */}
           {conflict && (
             <div className="bg-amber-50 rounded-2xl p-4 space-y-3">
-              <p className="text-sm font-bold text-amber-800">
-                <span className="material-symbols-outlined text-sm align-middle mr-1">warning</span>
+              <p className="text-sm font-medium text-amber-800">
+                <ExclamationCircleIcon className="w-5 h-5 inline mr-1" />
                 {conflict.message}
               </p>
               <ul className="space-y-1">
                 {conflict.conflicts.map((c) => (
                   <li key={c.id} className="text-xs text-amber-700 flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-xs">person</span>
+                    <UserIcon className="w-4 h-4" />
                     {c.client?.name ?? "Clienta"} ·{" "}
                     {new Date(c.startTime).toLocaleTimeString("es-VE", {
                       hour: "2-digit",
@@ -260,7 +261,7 @@ export default function BlockTimeModal({ defaultDate, onClose, onCreated }: Prop
                 type="button"
                 onClick={(e) => handleSubmit(e, true)}
                 disabled={saving}
-                className="w-full h-10 bg-amber-500 text-white text-sm font-bold rounded-xl"
+                className="w-full h-10 bg-amber-500 text-white text-sm font-medium rounded-xl"
               >
                 Guardar de todas formas
               </button>
@@ -271,13 +272,13 @@ export default function BlockTimeModal({ defaultDate, onClose, onCreated }: Prop
             <button
               type="submit"
               disabled={saving}
-              className="w-full h-12 bg-gradient-to-r from-primary to-primary-container text-white font-bold rounded-full flex items-center justify-center gap-2 disabled:opacity-60"
+              className="w-full h-12 bg-primary text-on-primary shadow-primary-sm font-medium rounded-full flex items-center justify-center gap-2 disabled:opacity-60"
             >
               {saving ? (
-                <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
               ) : (
                 <>
-                  <span className="material-symbols-outlined text-sm">block</span>
+                  <NoSymbolIcon className="w-5 h-5" />
                   Bloquear tiempo
                 </>
               )}

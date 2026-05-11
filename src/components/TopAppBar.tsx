@@ -41,7 +41,7 @@ export default function TopAppBar() {
           className="ring-1 ring-border"
         />
         <div>
-          <h1 className="font-ui font-semibold text-[15px] text-on-surface leading-tight truncate max-w-[180px]">
+          <h1 className="font-ui font-medium text-[15px] text-on-surface leading-tight truncate max-w-[180px]">
             {displayName}
           </h1>
         </div>

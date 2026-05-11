@@ -145,13 +145,13 @@ export default function ClientPortalPage() {
           <Link href="/" className="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
           </Link>
-          <h1 className="font-headline text-lg font-bold text-on-surface">Área de clientas</h1>
+          <h1 className="font-headline text-lg font-medium text-on-surface">Área de clientas</h1>
         </header>
 
         <main className="px-6 pt-12 pb-16 max-w-sm mx-auto space-y-8 text-center">
           <div className="space-y-3">
             <div className="text-5xl">💅</div>
-            <h2 className="font-headline text-2xl font-extrabold tracking-tighter text-on-surface" suppressHydrationWarning>
+            <h2 className="font-headline font-cormorant font-normal text-3xl text-on-surface" suppressHydrationWarning>
               {clientName ? `¡Hola, ${clientName}!` : "Tu espacio de belleza"}
             </h2>
             <p className="text-sm text-on-surface-variant leading-relaxed">
@@ -162,14 +162,14 @@ export default function ClientPortalPage() {
           <div className="space-y-3">
             <Link
               href="/client/login"
-              className="flex items-center justify-center gap-2 w-full h-14 bg-primary text-white font-headline font-bold rounded-full shadow-lg shadow-primary-sm hover:scale-[1.02] transition-transform"
+              className="flex items-center justify-center gap-2 w-full h-14 bg-primary text-on-primary font-medium rounded-full shadow-primary-sm hover:scale-[1.02] transition-transform"
             >
               <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>calendar_today</span>
               Ver mis citas
             </Link>
             <Link
               href="/client/register"
-              className="flex items-center justify-center gap-2 w-full h-14 bg-surface-container-high text-on-surface font-headline font-bold rounded-full hover:bg-surface-container transition-colors"
+              className="flex items-center justify-center gap-2 w-full h-14 bg-surface border border-outline-variant/30 text-on-surface font-headline font-medium rounded-full hover:bg-surface-container transition-colors"
             >
               Crear perfil de clienta
             </Link>
@@ -186,7 +186,7 @@ export default function ClientPortalPage() {
 
           <Link
             href="/explore"
-            className="flex items-center justify-center gap-2 text-sm font-bold text-primary hover:underline"
+            className="flex items-center justify-center gap-2 text-sm font-medium text-primary hover:underline"
           >
             <span className="material-symbols-outlined text-sm">search</span>
             Explorar profesionales cerca
@@ -203,11 +203,11 @@ export default function ClientPortalPage() {
     <div className="min-h-screen bg-background font-body antialiased pb-28">
       {/* Header */}
       <header className="sticky top-0 z-40 glass-nav border-b border-border-subtle px-5 py-3 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+        <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-medium text-sm flex-shrink-0">
           {clientName?.charAt(0).toUpperCase() ?? "C"}
         </div>
         <div className="flex-1 min-w-0">
-          <h1 className="font-headline text-base font-bold text-on-surface truncate">
+          <h1 className="font-headline text-base font-medium text-on-surface truncate">
             Hola, {clientName} 👋
           </h1>
           <p className="text-xs text-on-surface-variant">
@@ -223,14 +223,14 @@ export default function ClientPortalPage() {
         <div className="py-5 flex gap-3">
           <Link
             href="/explore"
-            className="flex-1 flex items-center justify-center gap-2 bg-primary/10 text-primary text-sm font-bold rounded-2xl py-3 hover:bg-primary/20 transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 bg-primary/10 text-primary text-sm font-medium rounded-2xl py-3 hover:bg-primary/20 transition-colors"
           >
             <span className="material-symbols-outlined text-sm">search</span>
             Nueva reserva
           </Link>
           <Link
             href="/"
-            className="flex-1 flex items-center justify-center gap-2 bg-surface-container-high text-on-surface-variant text-sm font-bold rounded-2xl py-3 hover:bg-surface-container transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 bg-surface border border-outline-variant/30 text-on-surface-variant text-sm font-medium rounded-2xl py-3 hover:bg-surface-container transition-colors"
           >
             <span className="material-symbols-outlined text-sm">local_offer</span>
             Ofertas
@@ -238,12 +238,12 @@ export default function ClientPortalPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-surface-container-high rounded-2xl p-1 mb-5">
+        <div className="flex gap-1 bg-surface border border-outline-variant/30 rounded-2xl p-1 mb-5">
           {(["upcoming", "past", "loyalty"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-colors ${
+              className={`flex-1 py-2.5 rounded-xl text-xs font-medium transition-colors ${
                 tab === t
                   ? "bg-white text-on-surface shadow-sm"
                   : "text-on-surface-variant hover:text-on-surface"
@@ -291,7 +291,7 @@ export default function ClientPortalPage() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <p className="font-bold text-on-surface text-sm">
+                        <p className="font-medium text-on-surface text-sm">
                           {acc.business?.name ?? "Negocio"}
                         </p>
                         <p className="text-xs text-on-surface-variant">
@@ -299,7 +299,7 @@ export default function ClientPortalPage() {
                         </p>
                       </div>
                       {canRedeem && (
-                        <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-1 rounded-full flex-shrink-0">
+                        <span className="text-[10px] font-medium bg-green-100 text-green-700 px-2 py-1 rounded-full flex-shrink-0">
                           ¡Lista!
                         </span>
                       )}
@@ -308,14 +308,14 @@ export default function ClientPortalPage() {
                     {/* Points progress */}
                     <div className="space-y-1.5">
                       <div className="flex justify-between items-end">
-                        <span className="font-headline font-extrabold text-2xl text-on-surface">
+                        <span className="font-cormorant font-normal text-[32px] text-on-surface">
                           {acc.totalPoints}
                         </span>
                         <span className="text-xs text-on-surface-variant mb-0.5">
                           / {threshold}
                         </span>
                       </div>
-                      <div className="h-2 bg-surface-container-high rounded-full overflow-hidden">
+                      <div className="h-2 bg-surface border border-outline-variant/30 rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full ${canRedeem ? "bg-green-500" : "bg-primary"}`}
                           style={{ width: `${progress}%` }}
@@ -331,14 +331,14 @@ export default function ClientPortalPage() {
                     {/* QR */}
                     <button
                       onClick={() => setShowQRFor(showQRFor === acc.id ? null : acc.id)}
-                      className="w-full h-10 flex items-center justify-center gap-2 bg-surface-container text-on-surface-variant text-xs font-bold rounded-xl hover:bg-surface-container-high transition-colors"
+                      className="w-full h-10 flex items-center justify-center gap-2 bg-surface-container text-on-surface-variant text-xs font-medium rounded-xl hover:bg-surface border border-outline-variant/30 transition-colors"
                     >
                       <span className="material-symbols-outlined text-sm">qr_code</span>
                       {showQRFor === acc.id ? "Ocultar QR" : "Mostrar mi QR"}
                     </button>
 
                     {showQRFor === acc.id && (
-                      <Suspense fallback={<div className="h-48 animate-pulse bg-surface-container-high rounded-2xl" />}>
+                      <Suspense fallback={<div className="h-48 animate-pulse bg-surface border border-outline-variant/30 rounded-2xl" />}>
                         <div className="flex justify-center pt-2">
                           <QRDisplay token={acc.qrToken} size={180} />
                         </div>
@@ -353,7 +353,7 @@ export default function ClientPortalPage() {
             {eligibleBusinesses.length > 0 && (
               <div className="space-y-3">
                 {loyaltyAccounts.length > 0 && (
-                  <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider px-1">
+                  <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wider px-1">
                     También disponible
                   </p>
                 )}
@@ -366,13 +366,13 @@ export default function ClientPortalPage() {
                       <span className="material-symbols-outlined text-white text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>stars</span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-on-surface text-sm truncate">{biz.businessName}</p>
+                      <p className="font-medium text-on-surface text-sm truncate">{biz.businessName}</p>
                       <p className="text-xs text-on-surface-variant">Tienes puntos pendientes — obtén tu QR</p>
                     </div>
                     <button
                       onClick={() => handleEnroll(biz.businessId)}
                       disabled={enrolling === biz.businessId}
-                      className="flex-shrink-0 h-9 px-4 bg-primary text-white text-xs font-bold rounded-full disabled:opacity-50 flex items-center gap-1 hover:bg-primary/90 transition-colors"
+                      className="flex-shrink-0 h-9 px-4 bg-primary text-white text-xs font-medium rounded-full disabled:opacity-50 flex items-center gap-1 hover:bg-primary/90 transition-colors"
                     >
                       {enrolling === biz.businessId ? (
                         <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
@@ -394,7 +394,7 @@ export default function ClientPortalPage() {
         {tab !== "loyalty" && (loading ? (
           <div className="space-y-4">
             {[1, 2].map((i) => (
-              <div key={i} className="h-28 bg-surface-container-high rounded-2xl animate-pulse" />
+              <div key={i} className="h-28 bg-surface border border-outline-variant/30 rounded-2xl animate-pulse" />
             ))}
           </div>
         ) : displayAppointments.length === 0 ? (
@@ -406,7 +406,7 @@ export default function ClientPortalPage() {
                 : "No hay citas en tu historial"}
             </p>
             {tab === "upcoming" && (
-              <Link href="/explore" className="text-sm font-bold text-primary hover:underline">
+              <Link href="/explore" className="text-sm font-medium text-primary hover:underline">
                 Reservar ahora →
               </Link>
             )}
@@ -425,7 +425,7 @@ export default function ClientPortalPage() {
                 >
                   {/* Professional info */}
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-surface-container-high overflow-hidden relative flex-shrink-0">
+                    <div className="w-12 h-12 rounded-2xl bg-surface border border-outline-variant/30 overflow-hidden relative flex-shrink-0">
                       {appt.user.avatarUrl ? (
                         <Image
                           src={appt.user.avatarUrl}
@@ -440,19 +440,19 @@ export default function ClientPortalPage() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-on-surface text-sm truncate">{bizName}</p>
+                      <p className="font-medium text-on-surface text-sm truncate">{bizName}</p>
                       <p className="text-xs text-on-surface-variant">
                         {appt.user.name}{city ? ` · ${city}` : ""}
                       </p>
                     </div>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${statusMeta.color}`}>
+                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${statusMeta.color}`}>
                       {statusMeta.label}
                     </span>
                   </div>
 
                   {/* Appointment details */}
                   <div className="bg-surface-container rounded-xl px-4 py-3 space-y-1">
-                    <p className="font-bold text-on-surface text-sm">{appt.service.name}</p>
+                    <p className="font-medium text-on-surface text-sm">{appt.service.name}</p>
                     <p className="text-xs text-on-surface-variant">
                       {formatDateShort(appt.startTime)} · {formatTimeES(appt.startTime)} ·{" "}
                       {appt.service.durationMin} min
@@ -464,7 +464,7 @@ export default function ClientPortalPage() {
                     {appt.rescheduleToken && !["cancelled", "completed", "no_show"].includes(appt.status) ? (
                       <Link
                         href={`/cita/${appt.rescheduleToken}`}
-                        className="flex-1 h-10 bg-primary text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1 hover:bg-primary/90 transition-colors"
+                        className="flex-1 h-10 bg-primary text-white text-xs font-medium rounded-xl flex items-center justify-center gap-1 hover:bg-primary/90 transition-colors"
                       >
                         <span className="material-symbols-outlined text-sm">edit_calendar</span>
                         Gestionar cita
@@ -472,7 +472,7 @@ export default function ClientPortalPage() {
                     ) : (
                       <Link
                         href={`/p/${appt.user.slug}`}
-                        className="flex-1 h-10 bg-primary/10 text-primary text-xs font-bold rounded-xl flex items-center justify-center gap-1 hover:bg-primary/20 transition-colors"
+                        className="flex-1 h-10 bg-primary/10 text-primary text-xs font-medium rounded-xl flex items-center justify-center gap-1 hover:bg-primary/20 transition-colors"
                       >
                         <span className="material-symbols-outlined text-sm">calendar_add_on</span>
                         Reservar de nuevo
@@ -505,28 +505,28 @@ export default function ClientPortalPage() {
           className="flex flex-col items-center justify-center px-4 py-2 text-zinc-400 hover:text-primary transition-colors"
         >
           <span className="material-symbols-outlined mb-1 text-[24px]">home</span>
-          <span className="font-headline text-[10px] font-bold tracking-wide uppercase">Inicio</span>
+          <span className="font-headline text-[10px] font-medium tracking-wide uppercase">Inicio</span>
         </Link>
         <Link
           href="/explore"
           className="flex flex-col items-center justify-center px-4 py-2 text-zinc-400 hover:text-primary transition-colors"
         >
           <span className="material-symbols-outlined mb-1 text-[24px]">search</span>
-          <span className="font-headline text-[10px] font-bold tracking-wide uppercase">Explorar</span>
+          <span className="font-headline text-[10px] font-medium tracking-wide uppercase">Explorar</span>
         </Link>
         <Link
           href="/client"
           className="flex flex-col items-center justify-center px-4 py-2 bg-primary/10 text-primary rounded-full transition-colors"
         >
           <span className="material-symbols-outlined mb-1 text-[24px]" style={{ fontVariationSettings: "'FILL' 1" }}>calendar_today</span>
-          <span className="font-headline text-[10px] font-bold tracking-wide uppercase">Mis Citas</span>
+          <span className="font-headline text-[10px] font-medium tracking-wide uppercase">Mis Citas</span>
         </Link>
         <button
           onClick={handleLogout}
           className="flex flex-col items-center justify-center px-4 py-2 text-zinc-400 hover:text-red-500 transition-colors"
         >
           <span className="material-symbols-outlined mb-1 text-[24px]">logout</span>
-          <span className="font-headline text-[10px] font-bold tracking-wide uppercase">Salir</span>
+          <span className="font-headline text-[10px] font-medium tracking-wide uppercase">Salir</span>
         </button>
       </nav>
     </div>

@@ -48,7 +48,7 @@ export function Avatar({ src, name, size = "md", className }: AvatarProps) {
         />
       ) : (
         <span
-          className="font-ui font-semibold text-sienna-700 select-none leading-none"
+          className="font-ui font-medium text-sienna-700 select-none leading-none"
           aria-hidden="true"
         >
           {initials}

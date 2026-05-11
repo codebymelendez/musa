@@ -31,9 +31,9 @@ export function Card({
     <div
       className={cn(
         "bg-surface-raised border border-border-subtle rounded-2xl",
-        elevated ? "shadow-md" : "shadow-xs",
+        elevated ? "shadow-primary-sm" : "shadow-none ring-1 ring-border",
         interactive &&
-          "transition-all duration-[160ms] ease-out cursor-pointer hover:shadow-md hover:-translate-y-px active:scale-[0.99] active:shadow-xs",
+          "transition-all duration-[160ms] ease-out cursor-pointer hover:shadow-primary-sm hover:-translate-y-px active:scale-[0.99] active:shadow-none ring-1 ring-border",
         paddingMap[padding],
         className
       )}

@@ -101,7 +101,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center px-2.5 py-0.5 rounded-full font-ui font-semibold text-[11px] leading-[1.4] tracking-[0.01em]",
+        "inline-flex items-center px-2.5 py-0.5 rounded-full font-ui font-medium text-[11px] leading-[1.4] tracking-[0.01em]",
         cls,
         className
       )}
@@ -133,7 +133,7 @@ export function Badge({ children, variant = "default", className }: BadgeProps) 
   return (
     <span
       className={cn(
-        "inline-flex items-center px-2.5 py-0.5 rounded-full font-ui font-semibold text-[11px] leading-[1.4]",
+        "inline-flex items-center px-2.5 py-0.5 rounded-full font-ui font-medium text-[11px] leading-[1.4]",
         badgeVariants[variant],
         className
       )}

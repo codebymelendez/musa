@@ -51,15 +51,15 @@ export default function BusinessSettingsPage() {
     <div className="min-h-screen bg-background p-6 pb-32 pt-20">
       <div className="max-w-md mx-auto space-y-8">
         <header className="space-y-1">
-          <h1 className="font-headline text-3xl font-extrabold text-on-surface">Configuración</h1>
-          <p className="text-on-surface-variant">Personaliza los datos públicos de tu negocio.</p>
+          <h1 className="font-cormorant font-normal text-[28px] text-on-surface">Configuración</h1>
+          <p className="text-on-surface-variant text-[15px]">Personaliza los datos públicos de tu negocio.</p>
         </header>
 
-        <form onSubmit={handleSave} className="bg-surface-container-low p-6 rounded-3xl space-y-6">
+        <form onSubmit={handleSave} className="bg-surface border border-outline-variant/30 p-6 rounded-xl space-y-6">
 
           {/* Logo del negocio */}
           <div className="space-y-3">
-            <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest ml-1">Logo del Negocio</p>
+            <p className="musa-sublabel">Logo del Negocio</p>
             <ImageUploader
               currentUrl={logoUrl || null}
               bucket="business-avatars"
@@ -73,22 +73,22 @@ export default function BusinessSettingsPage() {
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-xs font-bold text-on-surface-variant uppercase ml-1">Nombre del Negocio</label>
+              <label className="musa-sublabel">Nombre del Negocio</label>
               <input
                 required
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full h-14 px-5 bg-surface-container-high rounded-2xl border-none focus:ring-2 focus:ring-primary text-on-surface font-bold"
+                className="musa-input"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-bold text-on-surface-variant uppercase ml-1">Ciudad</label>
+              <label className="musa-sublabel">Ciudad</label>
               <input
                 type="text"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
-                className="w-full h-14 px-5 bg-surface-container-high rounded-2xl border-none focus:ring-2 focus:ring-primary text-on-surface"
+                className="musa-input"
               />
             </div>
           </div>
@@ -101,23 +101,23 @@ export default function BusinessSettingsPage() {
 
           <button
             disabled={saving}
-            className="w-full h-14 bg-primary text-on-primary font-bold rounded-full shadow-primary-sm flex items-center justify-center gap-2"
+            className="w-full h-14 bg-primary text-on-primary font-medium rounded-full shadow-primary-sm flex items-center justify-center gap-2"
           >
             {saving ? "Guardando..." : "Guardar Cambios"}
           </button>
         </form>
 
-        <section className="bg-surface-container-low p-6 rounded-3xl space-y-4">
-           <h2 className="font-bold text-on-surface">Plan Actual</h2>
-           <div className="flex items-center justify-between p-4 bg-primary/10 rounded-2xl">
+        <section className="bg-surface border border-outline-variant/30 p-6 rounded-xl space-y-4">
+           <h2 className="font-ui font-medium text-[15px] text-on-surface">Plan Actual</h2>
+           <div className="flex items-center justify-between p-4 bg-primary/5 border border-primary/10 rounded-xl">
               <div>
-                <p className="font-bold text-primary">{user.business?.plan?.name || "FREE"}</p>
+                <p className="font-ui font-medium text-primary">{user.business?.plan?.name || "FREE"}</p>
                 <p className="text-xs text-on-surface-variant">Límite de 30 citas/mes</p>
               </div>
               <button 
                 type="button"
                 onClick={() => router.push("/settings/plans")}
-                className="text-primary font-bold text-sm underline"
+                className="text-primary font-medium text-sm underline"
               >
                 Ver Planes
               </button>

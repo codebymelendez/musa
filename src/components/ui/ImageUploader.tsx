@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import Image from "next/image";
+import { CameraIcon } from "@heroicons/react/24/outline";
 
 interface Props {
   /** URL actual de la imagen (para mostrar preview antes de subir) */
@@ -147,7 +148,7 @@ export default function ImageUploader({
           isCircle
             ? "w-28 h-28 rounded-full"
             : "w-full aspect-video max-w-xs rounded-2xl"
-        } ${loading ? "opacity-70" : "hover:ring-2 hover:ring-primary"} bg-surface-container-high`}
+        } ${loading ? "opacity-70" : "hover:ring-2 hover:ring-primary"} bg-surface border border-outline-variant/30`}
       >
         {displayUrl ? (
           <Image
@@ -160,9 +161,9 @@ export default function ImageUploader({
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center text-on-surface-variant/40">
             {fallbackInitials ? (
-              <span className="text-4xl font-bold text-primary/60">{fallbackInitials}</span>
+              <span className="text-[32px] font-cormorant font-normal text-primary/60">{fallbackInitials}</span>
             ) : (
-              <span className="material-symbols-outlined text-5xl">add_photo_alternate</span>
+              <CameraIcon className="w-10 h-10" />
             )}
           </div>
         )}
@@ -170,8 +171,8 @@ export default function ImageUploader({
         {/* Overlay hover */}
         {!loading && (
           <div className={`absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity ${isCircle ? "rounded-full" : "rounded-2xl"}`}>
-            <span className="material-symbols-outlined text-white text-3xl">photo_camera</span>
-            <span className="text-white text-xs mt-1 font-semibold">Cambiar</span>
+            <CameraIcon className="w-8 h-8 text-white" />
+            <span className="text-white text-xs mt-1 font-medium">Cambiar</span>
           </div>
         )}
 
@@ -188,7 +189,7 @@ export default function ImageUploader({
         {/* Loading spinner */}
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-            <span className="material-symbols-outlined text-white animate-spin text-3xl">progress_activity</span>
+            <div className="w-8 h-8 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
           </div>
         )}
       </div>

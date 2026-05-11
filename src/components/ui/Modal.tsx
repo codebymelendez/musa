@@ -68,7 +68,7 @@ export function Modal({
       >
         {title && (
           <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-border-subtle">
-            <h2 className="font-ui font-semibold text-[16px] text-on-surface">
+            <h2 className="font-ui font-medium text-[16px] text-on-surface">
               {title}
             </h2>
             <button
@@ -137,7 +137,7 @@ export function BottomSheet({
 
         {title && (
           <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle">
-            <h2 className="font-ui font-semibold text-[16px] text-on-surface">
+            <h2 className="font-ui font-medium text-[16px] text-on-surface">
               {title}
             </h2>
             <button

@@ -171,7 +171,7 @@ export default function AppointmentsPage() {
                 onClick={() => setPeriod(key)}
                 className={`flex-shrink-0 font-ui text-[13px] font-medium px-4 py-2 rounded-full transition-all duration-150 ${
                   period === key
-                    ? "bg-on-surface text-surface"
+                    ? "bg-primary text-on-primary"
                     : "text-on-surface-muted hover:text-on-surface"
                 }`}
               >
@@ -232,7 +232,7 @@ export default function AppointmentsPage() {
 
                 {/* Date group header */}
                 <div className="flex items-baseline gap-3 py-4 border-t border-border-subtle">
-                  <span className="font-display text-[10px] font-light uppercase tracking-[0.18em] text-on-surface-subtle capitalize">
+                  <span className="musa-sublabel capitalize">
                     {formatGroupDate(dateKey)}
                   </span>
                   <span className="font-ui text-[11px] text-on-surface-subtle">
@@ -264,8 +264,8 @@ export default function AppointmentsPage() {
                           {/* "Próxima" label */}
                           {isNext && (
                             <span
-                              className="absolute -top-[9px] left-3 font-display font-light uppercase text-primary bg-background px-1"
-                              style={{ fontSize: "9px", letterSpacing: "0.15em" }}
+                              className="absolute -top-[9px] left-3 font-ui font-medium uppercase text-primary bg-background px-1"
+                              style={{ fontSize: "9px", letterSpacing: "0.10em" }}
                             >
                               Próxima
                             </span>
@@ -274,10 +274,7 @@ export default function AppointmentsPage() {
                           <div className="flex items-start gap-3">
                             {/* Time */}
                             <div className="flex-shrink-0 w-[50px] pt-px text-right">
-                              <span
-                                className="text-[13px] text-on-surface-muted"
-                                style={{ fontFamily: "var(--font-mono)" }}
-                              >
+                              <span className="font-mono-num text-[13px] text-on-surface-muted">
                                 {formatTimeES(apt.startTime)}
                               </span>
                             </div>
@@ -302,10 +299,7 @@ export default function AppointmentsPage() {
                                     <span className="text-on-surface-subtle text-[10px]">
                                       ·
                                     </span>
-                                    <span
-                                      className="text-[11px] text-on-surface-subtle flex-shrink-0"
-                                      style={{ fontFamily: "var(--font-mono)" }}
-                                    >
+                                    <span className="font-mono-num text-[11px] text-on-surface-subtle flex-shrink-0">
                                       {apt.service.durationMin}min
                                     </span>
                                   </>
@@ -315,10 +309,7 @@ export default function AppointmentsPage() {
                                     <span className="text-on-surface-subtle text-[10px]">
                                       ·
                                     </span>
-                                    <span
-                                      className="text-[12px] text-on-surface flex-shrink-0 font-medium"
-                                      style={{ fontFamily: "var(--font-mono)" }}
-                                    >
+                                    <span className="font-mono-num text-[12px] text-on-surface flex-shrink-0 font-medium">
                                       {formatCurrency(apt.service.price)}
                                     </span>
                                   </>

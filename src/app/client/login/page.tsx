@@ -59,7 +59,7 @@ export default function ClientLoginPage() {
             <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary-sm">
               <span className="text-2xl">💅</span>
             </div>
-            <h1 className="font-headline text-2xl font-extrabold tracking-tighter text-on-surface">
+            <h1 className="font-headline font-cormorant font-normal text-3xl text-on-surface">
               Área de clientas
             </h1>
             <p className="text-sm text-on-surface-variant">
@@ -78,11 +78,11 @@ export default function ClientLoginPage() {
 
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+              <label className="musa-sublabel">
                 Teléfono
               </label>
               <input
-                className="w-full bg-surface-container-high border-none rounded-xl py-4 px-5 focus:ring-2 focus:ring-primary-container text-on-surface placeholder:text-on-surface-variant/50 text-sm"
+                className="w-full bg-surface border border-outline-variant/30 border-none rounded-xl py-4 px-5 focus:ring-2 focus:ring-primary-container text-on-surface placeholder:text-on-surface-variant/50 text-sm"
                 type="tel"
                 placeholder="+58 424 000 0000"
                 value={phone}
@@ -93,11 +93,11 @@ export default function ClientLoginPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+              <label className="musa-sublabel">
                 Tu nombre completo
               </label>
               <input
-                className="w-full bg-surface-container-high border-none rounded-xl py-4 px-5 focus:ring-2 focus:ring-primary-container text-on-surface placeholder:text-on-surface-variant/50 text-sm"
+                className="w-full bg-surface border border-outline-variant/30 border-none rounded-xl py-4 px-5 focus:ring-2 focus:ring-primary-container text-on-surface placeholder:text-on-surface-variant/50 text-sm"
                 type="text"
                 placeholder="Tu nombre completo"
                 value={name}
@@ -114,7 +114,7 @@ export default function ClientLoginPage() {
           <button
             type="submit"
             disabled={loading || !phone || !name}
-            className="w-full h-14 bg-primary text-white font-headline font-bold rounded-full shadow-lg shadow-primary-sm hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full h-14 bg-primary text-on-primary font-medium rounded-full shadow-primary-sm hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {loading ? (
               <span className="material-symbols-outlined animate-spin">progress_activity</span>
@@ -133,7 +133,7 @@ export default function ClientLoginPage() {
           </p>
           <Link
             href="/client/register"
-            className="inline-flex items-center gap-1 text-sm font-bold text-on-surface hover:text-primary transition-colors"
+            className="inline-flex items-center gap-1 text-sm font-medium text-on-surface hover:text-primary transition-colors"
           >
             Crea tu perfil de clienta →
           </Link>

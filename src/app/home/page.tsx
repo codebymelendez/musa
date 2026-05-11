@@ -193,12 +193,12 @@ export default function Home() {
         ) : (
           <>
             <h1
-              className="font-display font-light italic text-on-surface leading-none"
-              style={{ fontSize: "clamp(28px, 7vw, 36px)" }}
+              className="font-display font-normal italic text-on-surface leading-none"
+              style={{ fontSize: "clamp(30px, 7vw, 40px)" }}
             >
               {greeting}{displayName ? `, ${displayName}` : ""}.
             </h1>
-            <p className="font-ui text-[12px] text-on-surface-subtle mt-1.5 capitalize">
+            <p className="font-ui text-[12px] text-on-surface-subtle mt-2 capitalize tracking-[0.01em]">
               {dateLabel}
             </p>
           </>
@@ -213,24 +213,23 @@ export default function Home() {
 
       {/* ── HOY: hero stat + agenda ────────────────────────────────────── */}
       <section className="mb-10">
-        <p
-          className="font-display font-light uppercase tracking-[0.18em] text-on-surface-subtle mb-5"
-          style={{ fontSize: "10px" }}
-        >
+        <p className="musa-sublabel text-on-surface-subtle mb-5">
           Hoy
         </p>
 
-        {/* Hero number / empty / skeleton */}
+        {/* Hero metric — appointments + revenue as two-metric display */}
         {loadingToday ? (
-          <div className="space-y-2 mb-7">
-            <div className="w-20 h-16 rounded bg-surface-sunken animate-pulse" />
-            <div className="w-36 h-3 rounded bg-surface-sunken animate-pulse" />
-            <div className="w-28 h-3 rounded bg-surface-sunken animate-pulse" />
+          <div className="flex items-end gap-8 mb-7">
+            <div className="space-y-2">
+              <div className="w-20 h-16 rounded bg-surface-sunken animate-pulse" />
+              <div className="w-16 h-3 rounded bg-surface-sunken animate-pulse" />
+            </div>
           </div>
         ) : todayActive.length === 0 ? (
           <div className="py-6 mb-4">
+            <div className="musa-rule w-[60px] mb-5" />
             <p
-              className="font-display italic font-light text-on-surface mb-1"
+              className="font-display font-light italic text-on-surface mb-1"
               style={{ fontSize: "26px" }}
             >
               La agenda está libre hoy.
@@ -240,23 +239,36 @@ export default function Home() {
             </p>
           </div>
         ) : (
-          <div className="mb-7">
-            <span
-              className="font-display font-light text-on-surface leading-none"
-              style={{ fontSize: "72px" }}
-            >
-              {todayActive.length}
-            </span>
-            <p className="font-ui text-[13px] text-on-surface-muted mt-1">
-              {todayActive.length === 1 ? "cita agendada" : "citas agendadas"}
-            </p>
-            {expectedRevenue > 0 && (
-              <p
-                className="text-[13px] text-on-surface-muted mt-0.5"
-                style={{ fontFamily: "var(--font-mono)" }}
+          <div className="flex items-end gap-7 mb-7">
+            {/* Primary: appointment count */}
+            <div>
+              <span
+                className="font-display font-normal text-on-surface leading-none"
+                style={{ fontSize: "80px", letterSpacing: "-0.04em" }}
               >
-                {formatCurrency(expectedRevenue)} esperados
+                {todayActive.length}
+              </span>
+              <p className="font-ui text-[12px] text-on-surface-muted mt-1">
+                {todayActive.length === 1 ? "cita hoy" : "citas hoy"}
               </p>
+            </div>
+
+            {/* Divider + secondary metric: expected revenue */}
+            {expectedRevenue > 0 && (
+              <>
+                <div className="w-px h-12 bg-border-subtle self-center flex-shrink-0" />
+                <div>
+                  <p
+                    className="font-mono-num text-[22px] text-on-surface leading-none"
+                    style={{ letterSpacing: "-0.02em" }}
+                  >
+                    {formatCurrency(expectedRevenue)}
+                  </p>
+                  <p className="font-ui text-[12px] text-on-surface-muted mt-1">
+                    ingreso esperado
+                  </p>
+                </div>
+              </>
             )}
           </div>
         )}
@@ -266,10 +278,7 @@ export default function Home() {
           <>
             {todaySorted.filter((a) => a.status !== "cancelled").length > 0 && (
               <div className="flex items-center justify-between mb-3">
-                <p
-                  className="font-display font-light uppercase tracking-[0.18em] text-on-surface-subtle"
-                  style={{ fontSize: "10px" }}
-                >
+                <p className="musa-sublabel text-on-surface-subtle">
                   Agenda
                 </p>
                 <Link
@@ -296,8 +305,8 @@ export default function Home() {
                     <div key={apt.id} className="relative">
                       {isNext && (
                         <span
-                          className="absolute -top-[9px] left-3 font-display font-light uppercase text-primary bg-background px-1 z-10"
-                          style={{ fontSize: "9px", letterSpacing: "0.15em" }}
+                          className="absolute -top-[9px] left-3 font-ui font-medium uppercase text-primary bg-background px-1 z-10"
+                          style={{ fontSize: "9px", letterSpacing: "0.10em" }}
                         >
                           Próxima
                         </span>
@@ -311,10 +320,7 @@ export default function Home() {
                         <div className="flex items-start gap-3">
                           {/* Time */}
                           <div className="flex-shrink-0 w-[50px] pt-px text-right">
-                            <span
-                              className="text-[13px] text-on-surface-muted"
-                              style={{ fontFamily: "var(--font-mono)" }}
-                            >
+                            <span className="font-mono-num text-[13px] text-on-surface-muted">
                               {formatTimeES(apt.startTime)}
                             </span>
                           </div>
@@ -335,10 +341,7 @@ export default function Home() {
                               {apt.service?.durationMin && (
                                 <>
                                   <span className="text-on-surface-subtle text-[10px]">·</span>
-                                  <span
-                                    className="text-[11px] text-on-surface-subtle flex-shrink-0"
-                                    style={{ fontFamily: "var(--font-mono)" }}
-                                  >
+                                  <span className="font-mono-num text-[11px] text-on-surface-subtle flex-shrink-0">
                                     {apt.service.durationMin}min
                                   </span>
                                 </>
@@ -346,10 +349,7 @@ export default function Home() {
                               {apt.service?.price != null && (
                                 <>
                                   <span className="text-on-surface-subtle text-[10px]">·</span>
-                                  <span
-                                    className="text-[12px] text-on-surface flex-shrink-0 font-medium"
-                                    style={{ fontFamily: "var(--font-mono)" }}
-                                  >
+                                  <span className="font-mono-num text-[12px] text-on-surface flex-shrink-0 font-medium">
                                     {formatCurrency(apt.service.price)}
                                   </span>
                                 </>
@@ -440,8 +440,8 @@ export default function Home() {
       {/* ── Stats: Esta semana + Este mes ─────────────────────────────── */}
       <section className="grid grid-cols-2 gap-4 mb-8">
 
-        {/* Esta semana */}
-        <div className="bg-surface-raised border border-border-subtle rounded-2xl p-5">
+        {/* Esta semana — slightly elevated card */}
+        <div className="bg-surface-raised border border-border-subtle rounded-xl p-6">
           {loadingWeek ? (
             <div className="space-y-2">
               <div className="w-20 h-3 rounded bg-surface-sunken animate-pulse" />
@@ -450,19 +450,16 @@ export default function Home() {
             </div>
           ) : (
             <>
-              <p
-                className="font-display font-light uppercase tracking-[0.18em] text-on-surface-subtle mb-2"
-                style={{ fontSize: "10px" }}
-              >
+              <p className="musa-sublabel text-on-surface-subtle mb-3">
                 Esta semana
               </p>
               <p
-                className="font-display font-light text-on-surface leading-none"
-                style={{ fontSize: "40px" }}
+                className="font-display font-normal text-on-surface leading-none"
+                style={{ fontSize: "42px", letterSpacing: "-0.03em" }}
               >
                 {weekCount}
               </p>
-              <p className="font-ui text-[12px] text-on-surface-muted mt-1.5">
+              <p className="font-ui text-[12px] text-on-surface-muted mt-2">
                 {weekCount === 1 ? "cita" : "citas"}
               </p>
             </>
@@ -470,7 +467,7 @@ export default function Home() {
         </div>
 
         {/* Este mes */}
-        <div className="bg-surface-raised border border-border-subtle rounded-2xl p-5">
+        <div className="bg-surface-raised border border-border-subtle rounded-xl p-6">
           {loadingStats ? (
             <div className="space-y-2">
               <div className="w-16 h-3 rounded bg-surface-sunken animate-pulse" />
@@ -479,19 +476,16 @@ export default function Home() {
             </div>
           ) : (
             <>
-              <p
-                className="font-display font-light uppercase tracking-[0.18em] text-on-surface-subtle mb-2"
-                style={{ fontSize: "10px" }}
-              >
+              <p className="musa-sublabel text-on-surface-subtle mb-3">
                 Este mes
               </p>
               <p
-                className="font-display font-light text-on-surface leading-none"
-                style={{ fontSize: "40px" }}
+                className="font-display font-normal text-on-surface leading-none"
+                style={{ fontSize: "42px", letterSpacing: "-0.03em" }}
               >
                 {stats?.completedAppointments ?? 0}
               </p>
-              <p className="font-ui text-[12px] text-on-surface-muted mt-1.5">
+              <p className="font-ui text-[12px] text-on-surface-muted mt-2">
                 {stats?.monthlyRevenue
                   ? `citas · ${formatCurrency(stats.monthlyRevenue)}`
                   : "citas completadas"}
@@ -503,30 +497,29 @@ export default function Home() {
 
       {/* ── Accesos rápidos ───────────────────────────────────────────── */}
       <section className="mb-8">
-        <p
-          className="font-display font-light uppercase tracking-[0.18em] text-on-surface-subtle mb-4"
-          style={{ fontSize: "10px" }}
-        >
+        <p className="musa-sublabel text-on-surface-subtle mb-4">
           Accesos rápidos
         </p>
         <div className="flex flex-wrap gap-2">
+          {/* Primary action — filled terracotta */}
           <button
             onClick={() => setNewModalOpen(true)}
-            className="flex items-center gap-1.5 h-9 px-4 rounded-full border border-border font-ui text-[13px] font-medium text-on-surface-muted hover:border-primary hover:text-primary transition-colors"
+            className="flex items-center gap-1.5 h-9 px-4 rounded-full bg-primary text-on-primary font-ui text-[13px] font-medium shadow-primary-sm hover:bg-primary-hover transition-colors"
           >
             <PlusIcon className="w-3.5 h-3.5" />
             Nueva cita
           </button>
+          {/* Secondary actions — refined outline */}
           <Link
             href="/clients"
-            className="flex items-center gap-1.5 h-9 px-4 rounded-full border border-border font-ui text-[13px] font-medium text-on-surface-muted hover:border-primary hover:text-primary transition-colors"
+            className="flex items-center gap-1.5 h-9 px-4 rounded-full border border-border font-ui text-[13px] font-medium text-on-surface-muted hover:border-primary-border hover:text-primary hover:bg-primary-surface transition-colors"
           >
             <UserPlusIcon className="w-3.5 h-3.5" />
             Añadir clienta
           </Link>
           <Link
             href="/calendar"
-            className="flex items-center gap-1.5 h-9 px-4 rounded-full border border-border font-ui text-[13px] font-medium text-on-surface-muted hover:border-primary hover:text-primary transition-colors"
+            className="flex items-center gap-1.5 h-9 px-4 rounded-full border border-border font-ui text-[13px] font-medium text-on-surface-muted hover:border-primary-border hover:text-primary hover:bg-primary-surface transition-colors"
           >
             <CalendarDaysIcon className="w-3.5 h-3.5" />
             Ver agenda
@@ -537,10 +530,7 @@ export default function Home() {
       {/* ── Actividad reciente ────────────────────────────────────────── */}
       {!loadingWeek && recentActivity.length > 0 && (
         <section className="mb-8">
-          <p
-            className="font-display font-light uppercase tracking-[0.18em] text-on-surface-subtle mb-4"
-            style={{ fontSize: "10px" }}
-          >
+          <p className="musa-sublabel text-on-surface-subtle mb-4">
             Actividad reciente
           </p>
           <div>
@@ -564,19 +554,13 @@ export default function Home() {
                     </p>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <p
-                      className="text-[11px] text-on-surface-subtle"
-                      style={{ fontFamily: "var(--font-mono)" }}
-                    >
+                    <p className="font-mono-num text-[11px] text-on-surface-subtle">
                       {new Date(apt.startTime).toLocaleDateString("es-VE", {
                         day:   "numeric",
                         month: "short",
                       })}
                     </p>
-                    <p
-                      className="text-[11px] text-on-surface-subtle"
-                      style={{ fontFamily: "var(--font-mono)" }}
-                    >
+                    <p className="font-mono-num text-[11px] text-on-surface-subtle">
                       {formatTimeES(apt.startTime)}
                     </p>
                   </div>

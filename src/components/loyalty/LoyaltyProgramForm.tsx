@@ -74,7 +74,7 @@ export default function LoyaltyProgramForm({ program, onSaved }: Props) {
     <form onSubmit={handleSubmit} className="space-y-5">
       {/* Nombre del programa */}
       <div>
-        <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+        <label className="musa-sublabel">
           Nombre del programa
         </label>
         <input
@@ -103,7 +103,7 @@ export default function LoyaltyProgramForm({ program, onSaved }: Props) {
 
       {/* Tipo de acumulación */}
       <div>
-        <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+        <label className="musa-sublabel">
           Tipo de acumulación
         </label>
         <div className="mt-1 grid grid-cols-2 gap-2">
@@ -112,13 +112,13 @@ export default function LoyaltyProgramForm({ program, onSaved }: Props) {
               key={type}
               type="button"
               onClick={() => setForm((f) => ({ ...f, accumulationType: type }))}
-              className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-2xl text-xs font-bold transition-colors ${
+              className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-2xl text-xs font-medium transition-colors ${
                 form.accumulationType === type
                   ? "bg-primary text-white"
                   : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container"
               }`}
             >
-              <span className="material-symbols-outlined text-lg">
+              <span className="w-5 h-5 rounded bg-surface-container-highest">
                 {type === "visits" ? "event" : "stars"}
               </span>
               {type === "visits" ? "Por visitas" : "Por puntos"}
@@ -135,7 +135,7 @@ export default function LoyaltyProgramForm({ program, onSaved }: Props) {
       {/* Puntos por visita (solo si accumulationType = points) */}
       {form.accumulationType === "points" && (
         <div>
-          <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+          <label className="musa-sublabel">
             Puntos por visita
           </label>
           <input
@@ -151,7 +151,7 @@ export default function LoyaltyProgramForm({ program, onSaved }: Props) {
 
       {/* Umbral de recompensa */}
       <div>
-        <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+        <label className="musa-sublabel">
           Umbral para recompensa
         </label>
         <input
@@ -167,7 +167,7 @@ export default function LoyaltyProgramForm({ program, onSaved }: Props) {
 
       {/* Descripción de la recompensa */}
       <div>
-        <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+        <label className="musa-sublabel">
           Descripción de la recompensa
         </label>
         <textarea
@@ -182,7 +182,7 @@ export default function LoyaltyProgramForm({ program, onSaved }: Props) {
 
       {/* Vigencia (opcional) */}
       <div>
-        <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+        <label className="musa-sublabel">
           Vigencia del programa (opcional)
         </label>
         <input
@@ -205,10 +205,10 @@ export default function LoyaltyProgramForm({ program, onSaved }: Props) {
       <button
         type="submit"
         disabled={saving}
-        className="w-full h-12 bg-gradient-to-r from-primary to-primary-container text-white font-bold rounded-full flex items-center justify-center gap-2 disabled:opacity-60"
+        className="w-full h-12 bg-primary text-on-primary shadow-primary-sm font-medium rounded-full flex items-center justify-center gap-2 disabled:opacity-60"
       >
         {saving ? (
-          <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+          <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
         ) : (
           "Guardar programa"
         )}

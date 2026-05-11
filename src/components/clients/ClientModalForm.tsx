@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { Client } from "@/types";
+import { ArrowLeftIcon, XMarkIcon, ExclamationCircleIcon, PhoneIcon, EnvelopeIcon, CalendarIcon, CheckIcon, UserPlusIcon } from "@heroicons/react/24/outline";
 
 interface Props {
   client?: Client | null;
@@ -85,17 +86,17 @@ export default function ClientModalForm({ client, onClose, onSaved }: Props) {
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
-      <div className="bg-surface-container-lowest w-full max-w-lg rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl max-h-[92vh] overflow-y-auto">
+      <div className="bg-surface w-full max-w-lg rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl max-h-[92vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-surface-container-lowest/95 backdrop-blur-sm flex items-center gap-4 px-6 pt-6 pb-4 rounded-t-[2.5rem] z-20">
+        <div className="sticky top-0 bg-surface/95 backdrop-blur-sm flex items-center gap-4 px-6 pt-6 pb-4 rounded-t-[2.5rem] z-20">
           <button
             onClick={onClose}
             className="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors"
           >
-            <span className="material-symbols-outlined text-2xl">arrow_back</span>
+            <ArrowLeftIcon className="w-6 h-6" />
           </button>
           <div className="flex-1">
-            <h2 className="font-headline text-xl font-bold text-on-surface leading-tight">
+            <h2 className="font-headline text-xl font-medium text-on-surface leading-tight">
               {isEditing ? "Editar clienta" : "Nueva clienta"}
             </h2>
           </div>
@@ -103,7 +104,7 @@ export default function ClientModalForm({ client, onClose, onSaved }: Props) {
             onClick={onClose}
             className="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors hidden sm:flex"
           >
-            <span className="material-symbols-outlined text-xl">close</span>
+            <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
 
@@ -111,14 +112,14 @@ export default function ClientModalForm({ client, onClose, onSaved }: Props) {
           {/* Error banner */}
           {error && (
             <div className="flex items-start gap-2 p-3 bg-error-container rounded-xl text-on-error-container text-sm">
-              <span className="material-symbols-outlined text-base mt-0.5 shrink-0">error</span>
+              <ExclamationCircleIcon className="w-5 h-5 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
           {/* Nombre */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">
+            <label className="musa-sublabel">
               Nombre completo <span className="text-error">*</span>
             </label>
             <input
@@ -126,24 +127,24 @@ export default function ClientModalForm({ client, onClose, onSaved }: Props) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="María García"
-              className="w-full h-12 px-4 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface placeholder:text-on-surface-variant/40 text-sm"
+              className="musa-input"
             />
           </div>
 
           {/* Teléfono */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">
+            <label className="musa-sublabel">
               Teléfono <span className="text-error">*</span>
             </label>
             <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant/50 text-xl">phone</span>
+              <PhoneIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant/50" />
               <input
                 ref={phoneRef}
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+58 412 123 4567"
-                className="w-full h-12 pl-11 pr-4 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface placeholder:text-on-surface-variant/40 text-sm"
+                className="musa-input pl-11"
               />
             </div>
             <p className="text-xs text-on-surface-variant/60">
@@ -153,47 +154,47 @@ export default function ClientModalForm({ client, onClose, onSaved }: Props) {
 
           {/* Email */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">
+            <label className="musa-sublabel">
               Email <span className="text-on-surface-variant/40 font-normal normal-case tracking-normal">(opcional)</span>
             </label>
             <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant/50 text-xl">mail</span>
+              <EnvelopeIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant/50" />
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="maria@email.com"
-                className="w-full h-12 pl-11 pr-4 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface placeholder:text-on-surface-variant/40 text-sm"
+                className="musa-input pl-11"
               />
             </div>
           </div>
 
           {/* Cumpleaños */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">
+            <label className="musa-sublabel">
               Cumpleaños <span className="text-on-surface-variant/40 font-normal normal-case tracking-normal">(opcional)</span>
             </label>
             <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant/50 text-xl">cake</span>
+              <CalendarIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant/50" />
               <input
                 type="date"
                 value={birthday}
                 onChange={(e) => setBirthday(e.target.value)}
-                className="w-full h-12 pl-11 pr-4 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface text-sm"
+                className="musa-input pl-11"
               />
             </div>
           </div>
 
           {/* Etiquetas */}
           <div className="space-y-2">
-            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Etiquetas</label>
+            <label className="musa-sublabel">Etiquetas</label>
             <div className="flex flex-wrap gap-2">
               {SUGGESTED_TAGS.map((tag) => (
                 <button
                   key={tag}
                   type="button"
                   onClick={() => toggleTag(tag)}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
                     tags.includes(tag)
                       ? "bg-primary text-on-primary shadow-sm"
                       : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container"
@@ -208,7 +209,7 @@ export default function ClientModalForm({ client, onClose, onSaved }: Props) {
             {tags.filter(t => !SUGGESTED_TAGS.includes(t)).length > 0 && (
               <div className="flex flex-wrap gap-2 pt-1">
                 {tags.filter(t => !SUGGESTED_TAGS.includes(t)).map((tag) => (
-                  <span key={tag} className="flex items-center gap-1 px-3 py-1 bg-secondary-container text-on-secondary-container rounded-full text-xs font-semibold">
+                  <span key={tag} className="flex items-center gap-1 px-3 py-1 bg-secondary-container text-on-secondary-container rounded-full text-xs font-medium">
                     {tag}
                     <button onClick={() => toggleTag(tag)} className="ml-0.5 hover:text-error">×</button>
                   </span>
@@ -237,7 +238,7 @@ export default function ClientModalForm({ client, onClose, onSaved }: Props) {
 
           {/* Preferencias */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">
+            <label className="musa-sublabel">
               Preferencias
             </label>
             <textarea
@@ -245,13 +246,13 @@ export default function ClientModalForm({ client, onClose, onSaved }: Props) {
               onChange={(e) => setPreferences(e.target.value)}
               placeholder="Alérgica a gel UV, prefiere tonos nude..."
               rows={2}
-              className="w-full px-4 py-3 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface placeholder:text-on-surface-variant/40 resize-none text-sm"
+              className="musa-input py-3"
             />
           </div>
 
           {/* Notas internas */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">
+            <label className="musa-sublabel">
               Notas internas
             </label>
             <textarea
@@ -259,7 +260,7 @@ export default function ClientModalForm({ client, onClose, onSaved }: Props) {
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Solo visible para el equipo..."
               rows={2}
-              className="w-full px-4 py-3 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface placeholder:text-on-surface-variant/40 resize-none text-sm"
+              className="musa-input py-3"
             />
           </div>
 
@@ -268,13 +269,13 @@ export default function ClientModalForm({ client, onClose, onSaved }: Props) {
             <button
               onClick={handleSave}
               disabled={loading}
-              className="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white font-bold rounded-full shadow-lg flex items-center justify-center gap-2 disabled:opacity-60 transition-opacity"
+              className="w-full h-14 bg-primary text-on-primary font-medium rounded-full shadow-primary-sm flex items-center justify-center gap-2 disabled:opacity-60 transition-opacity"
             >
               {loading ? (
-                <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                <div className="w-5 h-5 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
               ) : (
                 <>
-                  <span className="material-symbols-outlined">{isEditing ? "save" : "person_add"}</span>
+                  {isEditing ? <CheckIcon className="w-5 h-5" /> : <UserPlusIcon className="w-5 h-5" />}
                   {isEditing ? "Guardar cambios" : "Añadir clienta"}
                 </>
               )}

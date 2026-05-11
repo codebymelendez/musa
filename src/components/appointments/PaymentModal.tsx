@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Appointment, PaymentMethod } from "@/types";
 import { formatCurrency } from "@/lib/utils";
+import { XMarkIcon, BanknotesIcon } from "@heroicons/react/24/outline";
 
 interface Props {
   appointment: Appointment;
@@ -54,18 +55,18 @@ export default function PaymentModal({ appointment, onClose, onSaved }: Props) {
       <div className="bg-surface-container-lowest w-full max-w-sm rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl p-8 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h2 className="font-headline text-xl font-bold">Registrar Pago</h2>
+          <h2 className="font-headline text-xl font-medium">Registrar Pago</h2>
           <button
             onClick={onClose}
             className="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center"
           >
-            <span className="material-symbols-outlined">close</span>
+            <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
 
         {/* Info de la cita */}
         <div className="p-4 bg-surface-container-low rounded-2xl">
-          <p className="font-bold text-on-surface">{appointment.client?.name}</p>
+          <p className="font-medium text-on-surface">{appointment.client?.name}</p>
           <p className="text-sm text-on-surface-variant">
             {appointment.service?.name} ·{" "}
             {formatCurrency(
@@ -83,16 +84,16 @@ export default function PaymentModal({ appointment, onClose, onSaved }: Props) {
 
         {/* Monto */}
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-on-surface-variant uppercase tracking-wider">
+          <label className="text-sm font-medium text-on-surface-variant uppercase tracking-wider">
             Monto cobrado
           </label>
           <div className="flex items-center gap-2 bg-surface-container-high rounded-xl px-4 h-14">
-            <span className="text-on-surface-variant font-bold">$</span>
+            <span className="text-on-surface-variant font-medium">$</span>
             <input
               type="number"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="flex-1 bg-transparent border-none text-on-surface font-bold text-xl focus:outline-none"
+              className="flex-1 bg-transparent border-none text-on-surface font-medium text-xl focus:outline-none"
               min="0"
               step="0.01"
             />
@@ -101,7 +102,7 @@ export default function PaymentModal({ appointment, onClose, onSaved }: Props) {
 
         {/* Método de pago */}
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-on-surface-variant uppercase tracking-wider">
+          <label className="text-sm font-medium text-on-surface-variant uppercase tracking-wider">
             Método de pago
           </label>
           <div className="grid grid-cols-2 gap-2">
@@ -110,7 +111,7 @@ export default function PaymentModal({ appointment, onClose, onSaved }: Props) {
                 key={value}
                 type="button"
                 onClick={() => setMethod(value)}
-                className={`py-3 px-4 rounded-xl text-sm font-semibold transition-colors ${
+                className={`py-3 px-4 rounded-xl text-sm font-medium transition-colors ${
                   method === value
                     ? "bg-primary text-on-primary"
                     : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
@@ -135,7 +136,7 @@ export default function PaymentModal({ appointment, onClose, onSaved }: Props) {
         <button
           onClick={handleSave}
           disabled={loading}
-          className="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white font-bold rounded-full shadow-lg shadow-primary/20 flex items-center justify-center gap-2 disabled:opacity-60"
+          className="w-full h-14 bg-primary text-on-primary shadow-primary-sm font-medium rounded-full shadow-primary-sm flex items-center justify-center gap-2 disabled:opacity-60"
         >
           {loading ? (
             <span className="material-symbols-outlined animate-spin">
@@ -143,7 +144,7 @@ export default function PaymentModal({ appointment, onClose, onSaved }: Props) {
             </span>
           ) : (
             <>
-              <span className="material-symbols-outlined">payments</span>
+              <BanknotesIcon className="w-5 h-5" />
               Guardar Pago
             </>
           )}

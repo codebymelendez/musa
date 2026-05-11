@@ -41,7 +41,7 @@ function ToastItem({
   return (
     <div
       className={cn(
-        "flex items-center gap-3 bg-espresso-800 text-[#F5EDE8] rounded-xl px-4 py-3.5 shadow-lg max-w-[360px] w-full animate-in slide-in-from-bottom-2 fade-in duration-200 font-ui text-[13px] font-medium"
+        "flex items-center gap-3 bg-espresso-800 text-[#F5EDE8] rounded-xl px-4 py-3.5 shadow-primary-sm max-w-[360px] w-full animate-in slide-in-from-bottom-2 fade-in duration-200 font-ui text-[13px] font-medium"
       )}
       role="alert"
     >
