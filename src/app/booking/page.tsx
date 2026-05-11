@@ -14,7 +14,7 @@ export default function Booking() {
   return (
     <div className="bg-background font-body text-on-surface antialiased min-h-screen">
       {/* Top Navigation (Shell suppressed for transactional focus) */}
-      <header className="fixed top-0 w-full z-40 bg-white/80 backdrop-blur-lg px-6 py-4 flex items-center justify-between shadow-sm shadow-purple-500/5">
+      <header className="fixed top-0 w-full z-40 glass-nav border-b border-border-subtle px-5 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-surface-container-high overflow-hidden relative">
             <Image
@@ -33,7 +33,7 @@ export default function Booking() {
             </p>
           </div>
         </div>
-        <button className="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-purple-50 transition-colors">
+        <button className="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-sunken transition-colors">
           <span className="material-symbols-outlined">share</span>
         </button>
       </header>
@@ -328,7 +328,7 @@ export default function Booking() {
               </div>
               <button
                 type="submit"
-                className="flex-1 h-14 bg-gradient-to-r from-primary to-primary-container text-white font-headline font-bold rounded-full shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
+                className="flex-1 h-14 bg-primary text-on-primary font-ui font-semibold rounded-full shadow-primary-sm hover:bg-primary-hover active:scale-95 transition-all flex items-center justify-center gap-2"
               >
                 Reservar Ahora
                 <span className="material-symbols-outlined">arrow_forward</span>
@@ -340,7 +340,7 @@ export default function Booking() {
         {/* Confirmation Modal Overlay */}
         {showModal && (
           <div className="fixed inset-0 z-[100] bg-surface/95 backdrop-blur-md flex items-center justify-center p-6">
-            <div className="bg-surface-container-lowest p-10 rounded-[2.5rem] shadow-2xl shadow-purple-500/10 max-w-sm w-full text-center space-y-8 animate-in fade-in zoom-in duration-300">
+            <div className="bg-surface-container-lowest p-10 rounded-[2.5rem] shadow-2xl shadow-sm max-w-sm w-full text-center space-y-8 animate-in fade-in zoom-in duration-300">
               <div className="w-24 h-24 bg-tertiary-fixed rounded-full flex items-center justify-center mx-auto">
                 <span
                   className="material-symbols-outlined text-4xl text-tertiary"

@@ -8,6 +8,17 @@ import { useAppStore } from "@/store/useAppStore";
 import { User, ProfessionalSettings } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import ImageUploader from "@/components/ui/ImageUploader";
+import {
+  PencilIcon,
+  ClipboardDocumentIcon,
+  CheckIcon,
+  ArrowRightIcon,
+  BuildingStorefrontIcon,
+  ClockIcon,
+  ChatBubbleLeftEllipsisIcon,
+  StarIcon,
+  ArrowRightStartOnRectangleIcon,
+} from "@heroicons/react/24/outline";
 
 const DAY_NAMES = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
@@ -134,7 +145,7 @@ export default function Profile() {
   const settings = user?.settings as ProfessionalSettings | null;
 
   return (
-    <main className="max-w-screen-md mx-auto px-6 pt-24 space-y-8 pb-32">
+    <main className="max-w-screen-md mx-auto px-6 pt-24 space-y-8 pb-32 animate-page">
       {/* Profile Header */}
       <section className="flex flex-col items-center text-center space-y-4">
         <div className="relative">
@@ -142,16 +153,18 @@ export default function Profile() {
             {user?.avatarUrl ? (
               <Image className="object-cover" alt="Foto de perfil" src={user.avatarUrl} fill />
             ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <span className="material-symbols-outlined text-5xl text-on-surface-variant">person</span>
+              <div className="w-full h-full flex items-center justify-center bg-rose-100">
+                <span className="font-ui font-semibold text-[32px] text-sienna-500">
+                  {user?.name?.slice(0, 1) ?? "?"}
+                </span>
               </div>
             )}
           </div>
           <button
             onClick={() => { setEditMode("profile"); fillForm(user!); }}
-            className="absolute bottom-1 right-1 bg-primary text-on-primary p-2 rounded-full shadow-lg border-2 border-surface-container-lowest active:scale-95 transition-transform"
+            className="absolute bottom-1 right-1 bg-primary text-on-primary p-2 rounded-full shadow-md border-2 border-surface-raised active:scale-95 transition-transform"
           >
-            <span className="material-symbols-outlined text-sm">edit</span>
+            <PencilIcon className="w-4 h-4" />
           </button>
         </div>
         <div>
@@ -173,8 +186,8 @@ export default function Profile() {
           <div className="bg-surface-container-lowest w-full max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] p-8 space-y-5">
             <div className="flex items-center justify-between">
               <h3 className="font-headline text-xl font-bold">Editar Perfil</h3>
-              <button onClick={() => setEditMode("none")} className="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center">
-                <span className="material-symbols-outlined">close</span>
+              <button onClick={() => setEditMode("none")} className="w-10 h-10 rounded-full bg-surface-sunken flex items-center justify-center text-on-surface-muted hover:text-on-surface transition-colors">
+                ✕
               </button>
             </div>
              <div className="space-y-4">
@@ -194,7 +207,7 @@ export default function Profile() {
               <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="Tu nombre" className="w-full h-12 px-4 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface" />
             </div>
             <textarea value={formBio} onChange={(e) => setFormBio(e.target.value)} placeholder="Descripción de tu negocio..." rows={3} className="w-full px-4 py-3 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface text-sm resize-none" />
-            <button onClick={handleSave} disabled={saving} className="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white font-bold rounded-full">
+            <button onClick={handleSave} disabled={saving} className="w-full h-14 bg-primary text-on-primary font-semibold rounded-full hover:bg-primary-hover transition-colors">
               {saving ? "Guardando..." : "Guardar"}
             </button>
           </div>
@@ -207,8 +220,8 @@ export default function Profile() {
           <div className="bg-surface-container-lowest w-full max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] p-8 space-y-5">
             <div className="flex items-center justify-between">
               <h3 className="font-headline text-xl font-bold">Editar Negocio</h3>
-              <button onClick={() => setEditMode("none")} className="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center">
-                <span className="material-symbols-outlined">close</span>
+              <button onClick={() => setEditMode("none")} className="w-10 h-10 rounded-full bg-surface-sunken flex items-center justify-center text-on-surface-muted hover:text-on-surface transition-colors">
+                ✕
               </button>
             </div>
             <div className="space-y-2">
@@ -219,7 +232,7 @@ export default function Profile() {
               <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Ciudad</label>
               <input type="text" value={formCity} onChange={(e) => setFormCity(e.target.value)} placeholder="Ej. Caracas" className="w-full h-12 px-4 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface" />
             </div>
-            <button onClick={handleSave} disabled={saving || !formBusinessName} className="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white font-bold rounded-full disabled:opacity-50">
+            <button onClick={handleSave} disabled={saving || !formBusinessName} className="w-full h-14 bg-primary text-on-primary font-semibold rounded-full hover:bg-primary-hover transition-colors disabled:opacity-50">
               {saving ? "Guardando..." : "Guardar"}
             </button>
           </div>
@@ -230,25 +243,25 @@ export default function Profile() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Negocio */}
         {user?.role === "OWNER" && (
-          <section className="bg-surface-container-lowest rounded-xl p-6 space-y-4 shadow-sm border-l-4 border-secondary md:col-span-2">
+          <section className="bg-surface-raised border border-border-subtle rounded-xl p-6 space-y-4 shadow-xs border-l-[3px] border-l-primary md:col-span-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-secondary">storefront</span>
-                <h3 className="font-bold text-on-surface">Mi Negocio</h3>
+                <BuildingStorefrontIcon className="w-5 h-5 text-primary" />
+                <h3 className="font-ui font-semibold text-[15px] text-on-surface">Mi Negocio</h3>
               </div>
               <button
                 onClick={() => { setEditMode("business"); fillForm(user!); }}
-                className="p-2 rounded-full bg-secondary/10 text-secondary hover:bg-secondary/20 transition-colors"
+                className="p-2 rounded-full bg-primary/8 text-primary hover:bg-primary/15 transition-colors"
               >
-                <span className="material-symbols-outlined text-sm">edit</span>
+                <PencilIcon className="w-4 h-4" />
               </button>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center gap-4">
               <div className="flex-1">
-                <p className="text-xl font-extrabold text-on-surface">{user.business?.name ?? "Sin nombre"}</p>
-                <p className="text-sm text-on-surface-variant">{user.business?.city ?? "Ciudad no configurada"}</p>
+                <p className="font-ui font-semibold text-[18px] text-on-surface">{user.business?.name ?? "Sin nombre"}</p>
+                <p className="font-ui text-[13px] text-on-surface-muted">{user.business?.city ?? "Ciudad no configurada"}</p>
               </div>
-              <span className="self-start sm:self-auto px-3 py-1 bg-secondary-container text-on-secondary-container rounded-full text-xs font-bold uppercase">
+              <span className="self-start sm:self-auto px-3 py-1 bg-primary/10 text-primary rounded-full font-ui text-[11px] font-semibold uppercase">
                 Plan {user.business?.plan?.name ?? "FREE"}
               </span>
             </div>
@@ -256,10 +269,10 @@ export default function Profile() {
         )}
 
         {/* Horarios */}
-        <section className="bg-surface-container-lowest rounded-xl p-6 space-y-4 shadow-sm border-l-4 border-primary">
+        <section className="bg-surface-raised border border-border-subtle rounded-xl p-6 space-y-4 shadow-xs border-l-[3px] border-l-primary">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">schedule</span>
-            <h3 className="font-bold text-on-surface">Mi Horario</h3>
+            <ClockIcon className="w-5 h-5 text-primary" />
+            <h3 className="font-ui font-semibold text-[15px] text-on-surface">Mi Horario</h3>
           </div>
           <div className="space-y-3">
             <div className="flex justify-between items-center py-2 border-b border-outline-variant/10">
@@ -297,26 +310,26 @@ export default function Profile() {
         </section>
 
         {/* Contacto */}
-        <section className="bg-surface-container-lowest rounded-xl p-6 space-y-4 shadow-sm border-l-4 border-tertiary">
+        <section className="bg-surface-raised border border-border-subtle rounded-xl p-6 space-y-4 shadow-xs border-l-[3px] border-l-success">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-tertiary">contact_support</span>
-            <h3 className="font-bold text-on-surface">Canales de Contacto</h3>
+            <ChatBubbleLeftEllipsisIcon className="w-5 h-5 text-success" />
+            <h3 className="font-ui font-semibold text-[15px] text-on-surface">Canales de Contacto</h3>
           </div>
           <div className="space-y-3">
-            <div className="flex items-center gap-4 p-3 bg-surface-container-low rounded-lg">
-              <span className="material-symbols-outlined text-[#25D366]">chat</span>
+            <div className="flex items-center gap-4 p-3 bg-surface-sunken rounded-lg">
+              <span className="font-ui text-[13px] font-bold text-[#25D366]">WA</span>
               <div className="flex-1">
-                <p className="text-xs text-on-surface-variant font-medium">WhatsApp</p>
-                <p className="text-sm font-bold text-on-surface truncate">
+                <p className="font-ui text-[11px] text-on-surface-muted font-medium">WhatsApp</p>
+                <p className="font-ui text-[13px] font-semibold text-on-surface truncate">
                   {user?.whatsapp ?? "No configurado"}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-4 p-3 bg-surface-container-low rounded-lg">
-              <span className="material-symbols-outlined text-[#E1306C]">photo_camera</span>
+            <div className="flex items-center gap-4 p-3 bg-surface-sunken rounded-lg">
+              <span className="font-ui text-[13px] font-bold text-[#E1306C]">IG</span>
               <div className="flex-1">
-                <p className="text-xs text-on-surface-variant font-medium">Instagram</p>
-                <p className="text-sm font-bold text-on-surface truncate">
+                <p className="font-ui text-[11px] text-on-surface-muted font-medium">Instagram</p>
+                <p className="font-ui text-[13px] font-semibold text-on-surface truncate">
                   {user?.instagram ? `@${user.instagram.replace("@", "")}` : "No configurado"}
                 </p>
               </div>
@@ -324,7 +337,7 @@ export default function Profile() {
           </div>
           <button
             onClick={() => setEditMode("contact")}
-            className="w-full py-2.5 text-sm font-semibold text-tertiary bg-tertiary/5 rounded-full hover:bg-tertiary/10 transition-colors"
+            className="w-full py-2.5 font-ui text-[13px] font-semibold text-success bg-success-surface rounded-full hover:opacity-80 transition-opacity"
           >
             Editar Contacto
           </button>
@@ -337,8 +350,8 @@ export default function Profile() {
           <div className="bg-surface-container-lowest w-full max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] p-8 space-y-5 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <h3 className="font-headline text-xl font-bold">Editar Horarios</h3>
-              <button onClick={() => setEditMode("none")} className="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center">
-                <span className="material-symbols-outlined">close</span>
+              <button onClick={() => setEditMode("none")} className="w-10 h-10 rounded-full bg-surface-sunken flex items-center justify-center text-on-surface-muted hover:text-on-surface transition-colors">
+                ✕
               </button>
             </div>
             <div className="space-y-2">
@@ -403,7 +416,7 @@ export default function Profile() {
                 </div>
               </div>
             </div>
-            <button onClick={handleSave} disabled={saving} className="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white font-bold rounded-full">
+            <button onClick={handleSave} disabled={saving} className="w-full h-14 bg-primary text-on-primary font-semibold rounded-full hover:bg-primary-hover transition-colors">
               {saving ? "Guardando..." : "Guardar"}
             </button>
           </div>
@@ -416,8 +429,8 @@ export default function Profile() {
           <div className="bg-surface-container-lowest w-full max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] p-8 space-y-5">
             <div className="flex items-center justify-between">
               <h3 className="font-headline text-xl font-bold">Editar Contacto</h3>
-              <button onClick={() => setEditMode("none")} className="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center">
-                <span className="material-symbols-outlined">close</span>
+              <button onClick={() => setEditMode("none")} className="w-10 h-10 rounded-full bg-surface-sunken flex items-center justify-center text-on-surface-muted hover:text-on-surface transition-colors">
+                ✕
               </button>
             </div>
             <div className="space-y-2">
@@ -428,7 +441,7 @@ export default function Profile() {
               <label className="text-sm font-semibold text-on-surface-variant uppercase tracking-wider">Instagram</label>
               <input type="text" value={formInstagram} onChange={(e) => setFormInstagram(e.target.value)} placeholder="@tu_usuario" className="w-full h-12 px-4 bg-surface-container-high rounded-xl border-none focus:ring-2 focus:ring-primary text-on-surface" />
             </div>
-            <button onClick={handleSave} disabled={saving} className="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white font-bold rounded-full">
+            <button onClick={handleSave} disabled={saving} className="w-full h-14 bg-primary text-on-primary font-semibold rounded-full hover:bg-primary-hover transition-colors">
               {saving ? "Guardando..." : "Guardar"}
             </button>
           </div>
@@ -450,11 +463,9 @@ export default function Profile() {
             </div>
             <button
               onClick={handleCopy}
-              className="bg-primary hover:bg-primary-container text-on-primary px-6 py-2 rounded-full font-bold text-sm shadow-md transition-all active:scale-95 flex items-center gap-2"
+              className="bg-primary hover:bg-primary-hover text-on-primary px-5 py-2 rounded-full font-ui font-semibold text-[13px] shadow-primary-sm transition-all active:scale-95 flex items-center gap-2"
             >
-              <span className="material-symbols-outlined text-sm">
-                {copied ? "check" : "content_copy"}
-              </span>
+              {copied ? <CheckIcon className="w-4 h-4" /> : <ClipboardDocumentIcon className="w-4 h-4" />}
               {copied ? "¡Copiado!" : "Copiar"}
             </button>
           </div>
@@ -462,33 +473,37 @@ export default function Profile() {
       </section>
 
       {/* Gestión de Cuenta */}
-      <section className="bg-surface-container-low rounded-2xl overflow-hidden mb-8">
-        <div className="px-6 py-4 border-b border-outline-variant/10">
-          <h3 className="font-bold text-on-surface">Gestión de Cuenta</h3>
+      <section className="bg-surface-raised border border-border-subtle rounded-xl overflow-hidden mb-8 shadow-xs">
+        <div className="px-5 py-4 border-b border-border-subtle">
+          <h3 className="font-ui font-semibold text-[14px] text-on-surface">Gestión de Cuenta</h3>
         </div>
-        <div className="divide-y divide-outline-variant/10">
+        <div className="divide-y divide-border-subtle">
           <div
             onClick={() => router.push("/settings/plans")}
-            className="flex items-center justify-between px-6 py-4 hover:bg-black/5 transition-colors cursor-pointer"
+            className="flex items-center justify-between px-5 py-4 hover:bg-surface-sunken transition-colors cursor-pointer"
           >
-            <div className="flex items-center gap-4">
-              <span className="material-symbols-outlined text-on-surface-variant">stars</span>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-warning-surface flex items-center justify-center">
+                <StarIcon className="w-4 h-4 text-warning" />
+              </div>
               <div>
-                <p className="text-sm font-bold text-on-surface">Mi Plan</p>
-                <p className="text-xs text-primary font-bold capitalize">
+                <p className="font-ui font-semibold text-[14px] text-on-surface">Mi Plan</p>
+                <p className="font-ui text-[12px] text-primary font-semibold capitalize">
                   Plan {user?.business?.plan?.name ?? "FREE"}
                 </p>
               </div>
             </div>
-            <span className="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+            <ArrowRightIcon className="w-4 h-4 text-on-surface-subtle" />
           </div>
           <div
             onClick={logout}
-            className="flex items-center justify-between px-6 py-4 hover:bg-error/5 transition-colors cursor-pointer group"
+            className="flex items-center justify-between px-5 py-4 hover:bg-error-surface transition-colors cursor-pointer"
           >
-            <div className="flex items-center gap-4">
-              <span className="material-symbols-outlined text-error">logout</span>
-              <p className="text-sm font-bold text-error">Cerrar Sesión</p>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-error-surface flex items-center justify-center">
+                <ArrowRightStartOnRectangleIcon className="w-4 h-4 text-error" />
+              </div>
+              <p className="font-ui font-semibold text-[14px] text-error">Cerrar Sesión</p>
             </div>
           </div>
         </div>

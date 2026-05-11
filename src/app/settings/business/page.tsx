@@ -94,14 +94,14 @@ export default function BusinessSettingsPage() {
           </div>
 
           {message && (
-            <div className={`p-4 rounded-xl text-sm ${message.type === 'success' ? 'bg-primary-container text-on-primary-container' : 'bg-error-container text-on-error-container'}`}>
+            <div className={`p-4 rounded-xl font-ui text-[13px] ${message.type === 'success' ? 'bg-success-surface text-success' : 'bg-error-surface text-error'}`}>
               {message.text}
             </div>
           )}
 
           <button
             disabled={saving}
-            className="w-full h-14 bg-primary text-on-primary font-bold rounded-full shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
+            className="w-full h-14 bg-primary text-on-primary font-bold rounded-full shadow-primary-sm flex items-center justify-center gap-2"
           >
             {saving ? "Guardando..." : "Guardar Cambios"}
           </button>

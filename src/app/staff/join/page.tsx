@@ -129,7 +129,7 @@ function JoinContent() {
 
             <button
               disabled={loading}
-              className="w-full h-14 bg-primary text-on-primary font-bold rounded-full shadow-lg shadow-primary/20 flex items-center justify-center gap-2 mt-4"
+              className="w-full h-14 bg-primary text-on-primary font-bold rounded-full shadow-primary-sm flex items-center justify-center gap-2 mt-4"
             >
               {loading ? "Creando cuenta..." : "Aceptar Invitación"}
             </button>

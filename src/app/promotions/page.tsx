@@ -2,46 +2,53 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useToast } from "@/components/ui/Toast";
+import {
+  ArrowLeftIcon,
+  PlusIcon,
+  XMarkIcon,
+  TagIcon,
+  PencilIcon,
+  TrashIcon,
+  PaperAirplaneIcon,
+  CheckIcon,
+  ExclamationCircleIcon,
+} from "@heroicons/react/24/outline";
 
 interface Promotion {
-  id: string;
-  title: string;
-  description: string;
-  discount: number;
-  validFrom: string;
-  validUntil: string;
+  id:           string;
+  title:        string;
+  description:  string;
+  discount:     number;
+  validFrom:    string;
+  validUntil:   string;
   targetUserId: string | null;
-  isActive: boolean;
+  isActive:     boolean;
 }
 
 const EMPTY_FORM = {
-  title: "",
+  title:       "",
   description: "",
-  discount: 10,
-  validFrom: new Date().toISOString().split("T")[0],
-  validUntil: new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0],
-  isActive: true,
+  discount:    10,
+  validFrom:   new Date().toISOString().split("T")[0],
+  validUntil:  new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0],
+  isActive:    true,
 };
 
 export default function PromotionsPage() {
-  const [promotions, setPromotions] = useState<Promotion[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
+  const [promotions,   setPromotions]   = useState<Promotion[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [showForm,     setShowForm]     = useState(false);
+  const [form,         setForm]         = useState(EMPTY_FORM);
+  const [saving,       setSaving]       = useState(false);
   const [broadcasting, setBroadcasting] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
-  };
+  const [editingId,    setEditingId]    = useState<string | null>(null);
+  const [error,        setError]        = useState<string | null>(null);
 
   const fetchPromotions = useCallback(async () => {
     try {
-      const res = await fetch("/api/promotions", { credentials: "include" });
+      const res  = await fetch("/api/promotions", { credentials: "include" });
       const data = await res.json();
       setPromotions(data.promotions ?? []);
     } catch {
@@ -51,38 +58,29 @@ export default function PromotionsPage() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchPromotions();
-  }, [fetchPromotions]);
+  useEffect(() => { fetchPromotions(); }, [fetchPromotions]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError(null);
-
     try {
-      const url = editingId ? `/api/promotions/${editingId}` : "/api/promotions";
+      const url    = editingId ? `/api/promotions/${editingId}` : "/api/promotions";
       const method = editingId ? "PATCH" : "POST";
-
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           ...form,
-          discount: Number(form.discount),
-          validFrom: new Date(form.validFrom).toISOString(),
+          discount:   Number(form.discount),
+          validFrom:  new Date(form.validFrom).toISOString(),
           validUntil: new Date(form.validUntil + "T23:59:59").toISOString(),
         }),
       });
-
       const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Error al guardar");
-        return;
-      }
-
-      showToast(editingId ? "Promoción actualizada ✓" : "Promoción creada ✓");
+      if (!res.ok) { setError(data.error ?? "Error al guardar"); return; }
+      toast(editingId ? "Promoción actualizada" : "Promoción creada", "success");
       setShowForm(false);
       setEditingId(null);
       setForm(EMPTY_FORM);
@@ -97,11 +95,8 @@ export default function PromotionsPage() {
   const handleDelete = async (id: string) => {
     if (!confirm("¿Eliminar esta promoción?")) return;
     try {
-      await fetch(`/api/promotions/${id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      showToast("Promoción eliminada");
+      await fetch(`/api/promotions/${id}`, { method: "DELETE", credentials: "include" });
+      toast("Promoción eliminada", "info");
       setPromotions((prev) => prev.filter((p) => p.id !== id));
     } catch {
       setError("Error al eliminar");
@@ -112,17 +107,14 @@ export default function PromotionsPage() {
     setBroadcasting(promo.id);
     try {
       const res = await fetch("/api/promotions/broadcast", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method:      "POST",
+        headers:     { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ promotionId: promo.id }),
+        body:        JSON.stringify({ promotionId: promo.id }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Error al enviar");
-        return;
-      }
-      showToast("Push enviada a tus clientas ✓");
+      if (!res.ok) { setError(data.error ?? "Error al enviar"); return; }
+      toast("Push enviada a tus clientas", "success");
     } catch {
       setError("Error al enviar push");
     } finally {
@@ -132,12 +124,12 @@ export default function PromotionsPage() {
 
   const startEdit = (promo: Promotion) => {
     setForm({
-      title: promo.title,
+      title:       promo.title,
       description: promo.description,
-      discount: promo.discount,
-      validFrom: promo.validFrom.split("T")[0],
-      validUntil: promo.validUntil.split("T")[0],
-      isActive: promo.isActive,
+      discount:    promo.discount,
+      validFrom:   promo.validFrom.split("T")[0],
+      validUntil:  promo.validUntil.split("T")[0],
+      isActive:    promo.isActive,
     });
     setEditingId(promo.id);
     setShowForm(true);
@@ -145,81 +137,72 @@ export default function PromotionsPage() {
 
   const isActive = (promo: Promotion) => {
     const now = Date.now();
-    return (
-      promo.isActive &&
-      new Date(promo.validFrom).getTime() <= now &&
-      new Date(promo.validUntil).getTime() >= now
-    );
+    return promo.isActive && new Date(promo.validFrom).getTime() <= now && new Date(promo.validUntil).getTime() >= now;
   };
 
   return (
     <div className="min-h-screen bg-background pb-32">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-lg px-6 py-4 flex items-center gap-3 shadow-sm shadow-purple-500/5">
+      {/* ── Header ──────────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-40 glass-nav border-b border-border-subtle px-5 py-3 flex items-center gap-3">
         <Link
           href="/home"
-          className="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-purple-50 transition-colors"
+          className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-muted hover:bg-surface-sunken transition-colors"
+          aria-label="Volver"
         >
-          <span className="material-symbols-outlined">arrow_back</span>
+          <ArrowLeftIcon className="w-5 h-5" />
         </Link>
         <div className="flex-1">
-          <h1 className="font-headline text-lg font-bold text-on-surface">Promociones</h1>
-          <p className="text-xs text-on-surface-variant">{promotions.length} promociones creadas</p>
+          <h1 className="font-ui font-semibold text-[16px] text-on-surface">Promociones</h1>
+          <p className="font-ui text-[11px] text-on-surface-muted">
+            {promotions.length} promocion{promotions.length !== 1 ? "es" : ""} creada{promotions.length !== 1 ? "s" : ""}
+          </p>
         </div>
         <button
-          onClick={() => {
-            setEditingId(null);
-            setForm(EMPTY_FORM);
-            setShowForm(true);
-          }}
-          className="flex items-center gap-1.5 bg-primary text-white text-sm font-bold px-4 py-2 rounded-full shadow-sm shadow-primary/20"
+          onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setShowForm(true); }}
+          className="flex items-center gap-1.5 bg-primary text-on-primary font-ui text-[13px] font-semibold px-4 py-2 rounded-full shadow-primary-sm hover:bg-primary-hover transition-colors"
         >
-          <span className="material-symbols-outlined text-sm">add</span>
+          <PlusIcon className="w-4 h-4" />
           Nueva
         </button>
       </header>
 
-      <main className="px-6 pt-6 max-w-2xl mx-auto space-y-6">
-        {/* Error */}
+      <main className="px-5 pt-6 max-w-2xl mx-auto space-y-5">
+        {/* Error banner */}
         {error && (
-          <div className="bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
-            <span className="material-symbols-outlined text-sm">error</span>
-            {error}
-            <button onClick={() => setError(null)} className="ml-auto">
-              <span className="material-symbols-outlined text-sm">close</span>
+          <div className="bg-error-surface border border-error/20 rounded-xl px-4 py-3 flex items-center gap-2">
+            <ExclamationCircleIcon className="w-4 h-4 text-error shrink-0" />
+            <p className="font-ui text-[13px] text-error flex-1">{error}</p>
+            <button onClick={() => setError(null)}>
+              <XMarkIcon className="w-4 h-4 text-error" />
             </button>
           </div>
         )}
 
-        {/* Form de creación/edición */}
+        {/* Create / edit form */}
         {showForm && (
-          <div className="bg-surface-container-lowest rounded-2xl p-6 shadow-sm space-y-5 border border-outline-variant/20">
+          <div className="bg-surface-raised border border-border-subtle rounded-xl p-6 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="font-headline font-bold text-on-surface">
+              <h2 className="font-ui font-semibold text-[16px] text-on-surface">
                 {editingId ? "Editar Promoción" : "Nueva Promoción"}
               </h2>
               <button
-                onClick={() => {
-                  setShowForm(false);
-                  setEditingId(null);
-                  setForm(EMPTY_FORM);
-                }}
-                className="text-on-surface-variant"
+                onClick={() => { setShowForm(false); setEditingId(null); setForm(EMPTY_FORM); }}
+                className="w-8 h-8 rounded-full bg-surface-sunken flex items-center justify-center text-on-surface-muted hover:text-on-surface transition-colors"
               >
-                <span className="material-symbols-outlined">close</span>
+                <XMarkIcon className="w-4 h-4" />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <input
-                className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm focus:ring-2 focus:ring-primary-container text-on-surface placeholder:text-on-surface-variant/50"
+                className="w-full bg-surface-sunken border border-border rounded-lg py-2.5 px-4 font-ui text-[14px] text-on-surface placeholder:text-on-surface-subtle outline-none focus:border-border-focus transition-colors"
                 placeholder="Título (ej: 20% off en pedicure)"
                 value={form.title}
                 onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                 required
               />
               <textarea
-                className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm focus:ring-2 focus:ring-primary-container text-on-surface placeholder:text-on-surface-variant/50 resize-none"
+                className="w-full bg-surface-sunken border border-border rounded-lg py-2.5 px-4 font-ui text-[14px] text-on-surface placeholder:text-on-surface-subtle outline-none focus:border-border-focus transition-colors resize-none"
                 placeholder="Descripción de la oferta..."
                 rows={2}
                 value={form.description}
@@ -228,67 +211,49 @@ export default function PromotionsPage() {
               />
 
               <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-                    Descuento %
-                  </label>
-                  <input
-                    className="w-full mt-1 bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm focus:ring-2 focus:ring-primary-container"
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={form.discount}
-                    onChange={(e) => setForm((f) => ({ ...f, discount: Number(e.target.value) }))}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-                    Desde
-                  </label>
-                  <input
-                    className="w-full mt-1 bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm focus:ring-2 focus:ring-primary-container"
-                    type="date"
-                    value={form.validFrom}
-                    onChange={(e) => setForm((f) => ({ ...f, validFrom: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-                    Hasta
-                  </label>
-                  <input
-                    className="w-full mt-1 bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm focus:ring-2 focus:ring-primary-container"
-                    type="date"
-                    value={form.validUntil}
-                    onChange={(e) => setForm((f) => ({ ...f, validUntil: e.target.value }))}
-                    required
-                  />
-                </div>
+                {[
+                  { label: "Descuento %", type: "number", value: form.discount, key: "discount" as const, min: 1, max: 100 },
+                  { label: "Desde",       type: "date",   value: form.validFrom,  key: "validFrom"  as const },
+                  { label: "Hasta",       type: "date",   value: form.validUntil, key: "validUntil" as const },
+                ].map(({ label, type, value, key, ...rest }) => (
+                  <div key={key}>
+                    <label className="font-ui text-[11px] font-semibold text-on-surface-muted uppercase tracking-wider">
+                      {label}
+                    </label>
+                    <input
+                      className="w-full mt-1 bg-surface-sunken border border-border rounded-lg py-2.5 px-3 font-ui text-[13px] text-on-surface outline-none focus:border-border-focus transition-colors"
+                      type={type}
+                      value={String(value)}
+                      onChange={(e) => setForm((f) => ({ ...f, [key]: type === "number" ? Number(e.target.value) : e.target.value }))}
+                      required
+                      {...(rest as React.InputHTMLAttributes<HTMLInputElement>)}
+                    />
+                  </div>
+                ))}
               </div>
 
               <label className="flex items-center gap-3 cursor-pointer">
-                <div
-                  className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
-                    form.isActive ? "bg-primary border-primary" : "border-outline-variant"
-                  }`}
+                <button
+                  type="button"
                   onClick={() => setForm((f) => ({ ...f, isActive: !f.isActive }))}
+                  className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-colors ${
+                    form.isActive ? "bg-primary border-primary" : "border-border"
+                  }`}
                 >
-                  {form.isActive && (
-                    <span className="material-symbols-outlined text-white text-xs">check</span>
-                  )}
-                </div>
-                <span className="text-sm text-on-surface">Promo activa (visible en la página pública)</span>
+                  {form.isActive && <CheckIcon className="w-3 h-3 text-on-primary" />}
+                </button>
+                <span className="font-ui text-[13px] text-on-surface">
+                  Promo activa (visible en la página pública)
+                </span>
               </label>
 
               <button
                 type="submit"
                 disabled={saving}
-                className="w-full h-12 bg-gradient-to-r from-primary to-primary-container text-white font-bold rounded-full flex items-center justify-center gap-2 disabled:opacity-60"
+                className="w-full h-11 bg-primary text-on-primary font-ui font-semibold text-[14px] rounded-full flex items-center justify-center gap-2 shadow-primary-sm hover:bg-primary-hover transition-all disabled:opacity-60"
               >
                 {saving ? (
-                  <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                  <div className="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin" />
                 ) : (
                   editingId ? "Guardar cambios" : "Crear promoción"
                 )}
@@ -297,54 +262,49 @@ export default function PromotionsPage() {
           </div>
         )}
 
-        {/* Lista de promociones */}
+        {/* Promotions list */}
         {loading ? (
           <div className="flex justify-center py-16">
-            <span className="material-symbols-outlined text-primary animate-spin text-3xl">progress_activity</span>
+            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
         ) : promotions.length === 0 ? (
           <div className="text-center py-16 space-y-4">
-            <span
-              className="material-symbols-outlined text-5xl text-on-surface-variant"
-              style={{ fontVariationSettings: "'FILL' 0" }}
-            >
-              local_offer
-            </span>
+            <TagIcon className="w-10 h-10 text-on-surface-subtle mx-auto opacity-40" />
             <div>
-              <h3 className="font-headline font-bold text-on-surface">Sin promociones aún</h3>
-              <p className="text-sm text-on-surface-variant mt-1">
+              <h3 className="font-ui font-semibold text-[15px] text-on-surface">Sin promociones aún</h3>
+              <p className="font-ui text-[13px] text-on-surface-muted mt-1">
                 Crea tu primera promo para atraer clientas y fidelizarlas.
               </p>
             </div>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {promotions.map((promo) => {
               const active = isActive(promo);
               return (
                 <div
                   key={promo.id}
-                  className="bg-surface-container-lowest rounded-2xl p-5 shadow-sm border border-outline-variant/20 space-y-4"
+                  className="bg-surface-raised border border-border-subtle rounded-xl p-5 shadow-xs space-y-4"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-1 flex-1 min-w-0">
+                    <div className="space-y-1.5 flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest ${
+                          className={`font-ui text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-widest ${
                             active
-                              ? "bg-green-100 text-green-700"
-                              : "bg-surface-container-high text-on-surface-variant"
+                              ? "bg-success-surface text-success"
+                              : "bg-surface-sunken text-on-surface-muted"
                           }`}
                         >
                           {active ? "Activa" : "Inactiva"}
                         </span>
-                        <span className="text-xs bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-full">
+                        <span className="font-ui text-[10px] font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded-full">
                           {promo.discount}% OFF
                         </span>
                       </div>
-                      <h3 className="font-headline font-bold text-on-surface truncate">{promo.title}</h3>
-                      <p className="text-sm text-on-surface-variant line-clamp-2">{promo.description}</p>
-                      <p className="text-xs text-on-surface-variant">
+                      <h3 className="font-ui font-semibold text-[15px] text-on-surface truncate">{promo.title}</h3>
+                      <p className="font-ui text-[13px] text-on-surface-muted line-clamp-2">{promo.description}</p>
+                      <p className="font-ui text-[11px] text-on-surface-subtle">
                         {new Date(promo.validFrom).toLocaleDateString("es-VE", { day: "numeric", month: "short" })}
                         {" → "}
                         {new Date(promo.validUntil).toLocaleDateString("es-VE", { day: "numeric", month: "short", year: "numeric" })}
@@ -353,34 +313,31 @@ export default function PromotionsPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {/* Broadcast push */}
                     <button
                       onClick={() => handleBroadcast(promo)}
                       disabled={!!broadcasting}
-                      className="flex-1 h-10 bg-primary/10 text-primary text-sm font-bold rounded-xl flex items-center justify-center gap-1.5 hover:bg-primary/20 transition-colors disabled:opacity-50"
+                      className="flex-1 h-10 bg-primary/8 text-primary font-ui text-[13px] font-semibold rounded-lg flex items-center justify-center gap-1.5 hover:bg-primary/15 transition-colors disabled:opacity-50"
                     >
                       {broadcasting === promo.id ? (
-                        <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                        <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                       ) : (
-                        <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>
-                          send
-                        </span>
+                        <PaperAirplaneIcon className="w-4 h-4" />
                       )}
                       Enviar push
                     </button>
 
                     <button
                       onClick={() => startEdit(promo)}
-                      className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high transition-colors"
+                      className="w-10 h-10 rounded-lg bg-surface-sunken flex items-center justify-center text-on-surface-muted hover:bg-surface-raised hover:text-on-surface transition-colors border border-border-subtle"
                     >
-                      <span className="material-symbols-outlined text-sm">edit</span>
+                      <PencilIcon className="w-4 h-4" />
                     </button>
 
                     <button
                       onClick={() => handleDelete(promo.id)}
-                      className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center text-red-500 hover:bg-red-100 transition-colors"
+                      className="w-10 h-10 rounded-lg bg-error-surface flex items-center justify-center text-error hover:bg-error/20 transition-colors"
                     >
-                      <span className="material-symbols-outlined text-sm">delete</span>
+                      <TrashIcon className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -390,12 +347,6 @@ export default function PromotionsPage() {
         )}
       </main>
 
-      {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-on-surface text-surface text-sm font-bold px-6 py-3 rounded-full shadow-lg z-50 animate-in fade-in slide-in-from-bottom-2">
-          {toast}
-        </div>
-      )}
     </div>
   );
 }

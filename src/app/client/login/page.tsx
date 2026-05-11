@@ -51,12 +51,12 @@ export default function ClientLoginPage() {
             href="/"
             className="flex items-center gap-1.5 text-sm text-on-surface-variant hover:text-primary transition-colors"
           >
-            <span className="material-symbols-outlined text-sm">arrow_back</span>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
             Inicio
           </Link>
 
           <div className="space-y-2">
-            <div className="w-14 h-14 bg-gradient-to-br from-primary to-primary-container rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20">
+            <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary-sm">
               <span className="text-2xl">💅</span>
             </div>
             <h1 className="font-headline text-2xl font-extrabold tracking-tighter text-on-surface">
@@ -114,7 +114,7 @@ export default function ClientLoginPage() {
           <button
             type="submit"
             disabled={loading || !phone || !name}
-            className="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white font-headline font-bold rounded-full shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full h-14 bg-primary text-white font-headline font-bold rounded-full shadow-lg shadow-primary-sm hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {loading ? (
               <span className="material-symbols-outlined animate-spin">progress_activity</span>

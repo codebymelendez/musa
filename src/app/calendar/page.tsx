@@ -1,16 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  PlusIcon,
+  NoSymbolIcon,
+} from "@heroicons/react/24/outline";
 import { useAppointments } from "@/hooks/useAppointments";
 import { useAvailabilityBlocks } from "@/hooks/useAvailabilityBlocks";
 import { Appointment, AvailabilityBlock } from "@/types";
-import { weekRange, formatTimeES, statusLabel } from "@/lib/utils";
+import { weekRange, formatTimeES } from "@/lib/utils";
 import BlockTimeModal from "@/components/calendar/BlockTimeModal";
 import NewAppointmentModal from "@/components/appointments/NewAppointmentModal";
 
 const DAY_ABBR = ["DOM", "LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB"];
 const HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
-const HOUR_HEIGHT = 80; // px por hora
+const HOUR_HEIGHT = 80;
 
 function getWeekDays(baseDate: Date): Date[] {
   const { start } = weekRange(baseDate);
@@ -23,39 +29,41 @@ function getWeekDays(baseDate: Date): Date[] {
 
 function positionStyle(apt: Appointment): React.CSSProperties {
   const start = new Date(apt.startTime);
-  const end = new Date(apt.endTime);
+  const end   = new Date(apt.endTime);
   const startHour = start.getHours() + start.getMinutes() / 60;
-  const endHour = end.getHours() + end.getMinutes() / 60;
-  const top = (startHour - HOURS[0]) * HOUR_HEIGHT;
-  const height = (endHour - startHour) * HOUR_HEIGHT;
+  const endHour   = end.getHours()   + end.getMinutes()   / 60;
   return {
-    top: `${Math.max(0, top)}px`,
-    height: `${Math.max(20, height)}px`,
+    top:      `${Math.max(0, (startHour - HOURS[0]) * HOUR_HEIGHT)}px`,
+    height:   `${Math.max(20, (endHour - startHour) * HOUR_HEIGHT)}px`,
     position: "absolute",
-    left: "2px",
-    right: "2px",
+    left:     "2px",
+    right:    "2px",
   };
 }
 
 function blockPositionStyle(block: AvailabilityBlock): React.CSSProperties {
-  const start = new Date(block.startTime);
-  const end = new Date(block.endTime);
+  const start     = new Date(block.startTime);
+  const end       = new Date(block.endTime);
   const startHour = Math.max(start.getHours() + start.getMinutes() / 60, HOURS[0]);
-  const endHour = Math.min(end.getHours() + end.getMinutes() / 60, HOURS[HOURS.length - 1] + 1);
-  const top = (startHour - HOURS[0]) * HOUR_HEIGHT;
-  const height = Math.max((endHour - startHour) * HOUR_HEIGHT, 16);
-  return { top: `${top}px`, height: `${height}px`, position: "absolute", left: "0px", right: "0px" };
+  const endHour   = Math.min(end.getHours()   + end.getMinutes()   / 60, HOURS[HOURS.length - 1] + 1);
+  return {
+    top:      `${(startHour - HOURS[0]) * HOUR_HEIGHT}px`,
+    height:   `${Math.max((endHour - startHour) * HOUR_HEIGHT, 16)}px`,
+    position: "absolute",
+    left:     "0px",
+    right:    "0px",
+  };
 }
 
 export default function Calendar() {
-  const [viewMode, setViewMode] = useState<"weekly" | "monthly">("weekly");
-  const [baseDate, setBaseDate] = useState(new Date());
-  const [showBlockModal, setShowBlockModal] = useState(false);
+  const [viewMode, setViewMode]     = useState<"weekly" | "monthly">("weekly");
+  const [baseDate, setBaseDate]     = useState(new Date());
+  const [showBlockModal, setShowBlockModal]               = useState(false);
   const [showNewAppointmentModal, setShowNewAppointmentModal] = useState(false);
+
   const weekDays = getWeekDays(baseDate);
   const { appointments, loading, fetchByRange } = useAppointments();
   const { blocks, fetchBlocks } = useAvailabilityBlocks();
-
   const { start, end } = weekRange(baseDate);
 
   useEffect(() => {
@@ -64,44 +72,28 @@ export default function Calendar() {
   }, [baseDate, fetchByRange, fetchBlocks]);
 
   const todayStr = new Date().toDateString();
-
-  const weekNum = Math.ceil(
+  const weekNum  = Math.ceil(
     (baseDate.getDate() + new Date(baseDate.getFullYear(), baseDate.getMonth(), 1).getDay()) / 7
   );
 
-  const prevWeek = () => {
-    const d = new Date(baseDate);
-    d.setDate(d.getDate() - 7);
-    setBaseDate(d);
-  };
-  const nextWeek = () => {
-    const d = new Date(baseDate);
-    d.setDate(d.getDate() + 7);
-    setBaseDate(d);
-  };
+  const prevWeek = () => { const d = new Date(baseDate); d.setDate(d.getDate() - 7); setBaseDate(d); };
+  const nextWeek = () => { const d = new Date(baseDate); d.setDate(d.getDate() + 7); setBaseDate(d); };
 
-  // Mapear citas a días (0=Lun, ..., 6=Dom en la semana)
   const aptsByDay: Record<number, Appointment[]> = {};
   for (const apt of appointments) {
-    const d = new Date(apt.startTime);
-    const dayOfWeek = d.getDay(); // 0=Dom
-    // Convertir a índice de columna (0=Lun..6=Dom)
-    const colIdx = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const d      = new Date(apt.startTime);
+    const colIdx = d.getDay() === 0 ? 6 : d.getDay() - 1;
     if (!aptsByDay[colIdx]) aptsByDay[colIdx] = [];
     aptsByDay[colIdx].push(apt);
   }
 
-  // Mapear bloques a columnas de días
   const blocksByDay: Record<number, AvailabilityBlock[]> = {};
   for (const block of blocks) {
     const bStart = new Date(block.startTime);
-    const bEnd = new Date(block.endTime);
-    // Un bloque puede abarcar varios días
+    const bEnd   = new Date(block.endTime);
     weekDays.forEach((day, colIdx) => {
-      const dayStart = new Date(day);
-      dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(day);
-      dayEnd.setHours(23, 59, 59, 999);
+      const dayStart = new Date(day); dayStart.setHours(0, 0, 0, 0);
+      const dayEnd   = new Date(day); dayEnd.setHours(23, 59, 59, 999);
       if (bStart <= dayEnd && bEnd >= dayStart) {
         if (!blocksByDay[colIdx]) blocksByDay[colIdx] = [];
         blocksByDay[colIdx].push(block);
@@ -109,80 +101,93 @@ export default function Calendar() {
     });
   }
 
-  const STATUS_COLORS: Record<string, string> = {
-    confirmed: "from-primary to-primary-container",
-    pending: "from-outline-variant to-outline-variant",
-    completed: "from-tertiary to-tertiary",
-    no_show: "from-error to-error",
-    cancelled: "from-error to-error",
+  const BLOCK_LABELS: Record<string, string> = {
+    vacation: "Vacaciones",
+    break:    "Descanso",
+    manual:   "Bloqueado",
   };
 
   return (
-    <main className="pt-24 pb-32 px-4 max-w-5xl mx-auto">
-      {/* Header */}
+    <main className="pt-24 pb-32 px-4 max-w-5xl mx-auto animate-page">
+      {/* ── Header ───────────────────────────────────────────────────── */}
       <section className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="flex flex-col gap-2">
-          <span className="text-on-surface-variant font-medium text-sm tracking-wider uppercase">
+          <span className="font-ui text-[11px] font-semibold tracking-widest text-primary uppercase">
             Agenda
           </span>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <button
               onClick={prevWeek}
-              className="w-9 h-9 rounded-full bg-surface-container-low flex items-center justify-center hover:bg-surface-container transition-colors"
+              className="w-9 h-9 rounded-full bg-surface-sunken flex items-center justify-center hover:bg-surface-raised border border-border-subtle transition-colors"
+              aria-label="Semana anterior"
             >
-              <span className="material-symbols-outlined text-sm">chevron_left</span>
+              <ChevronLeftIcon className="w-4 h-4 text-on-surface-muted" />
             </button>
-            <h2 className="font-headline text-3xl font-extrabold text-on-surface tracking-tight">
+            <h2 className="font-display text-[32px] font-semibold text-on-surface tracking-[-0.02em] italic">
               Semana {weekNum}
             </h2>
             <button
               onClick={nextWeek}
-              className="w-9 h-9 rounded-full bg-surface-container-low flex items-center justify-center hover:bg-surface-container transition-colors"
+              className="w-9 h-9 rounded-full bg-surface-sunken flex items-center justify-center hover:bg-surface-raised border border-border-subtle transition-colors"
+              aria-label="Semana siguiente"
             >
-              <span className="material-symbols-outlined text-sm">chevron_right</span>
+              <ChevronRightIcon className="w-4 h-4 text-on-surface-muted" />
             </button>
           </div>
         </div>
-        <div className="flex bg-surface-container-low p-1.5 rounded-2xl w-fit">
+
+        <div className="flex bg-surface-sunken border border-border-subtle p-1 rounded-xl w-fit">
           <button
             onClick={() => setViewMode("weekly")}
-            className={`px-6 py-2 rounded-xl text-sm font-bold transition-colors ${viewMode === "weekly" ? "bg-surface-container-lowest text-primary shadow-sm" : "text-on-surface-variant hover:text-primary"}`}
+            className={`px-5 py-2 rounded-lg font-ui text-[13px] font-semibold transition-colors ${
+              viewMode === "weekly"
+                ? "bg-surface-raised text-primary shadow-sm"
+                : "text-on-surface-muted hover:text-on-surface"
+            }`}
           >
             Semana
           </button>
           <button
             onClick={() => setViewMode("monthly")}
-            className={`px-6 py-2 rounded-xl text-sm font-semibold transition-colors ${viewMode === "monthly" ? "bg-surface-container-lowest text-primary shadow-sm" : "text-on-surface-variant hover:text-primary"}`}
+            className={`px-5 py-2 rounded-lg font-ui text-[13px] font-semibold transition-colors ${
+              viewMode === "monthly"
+                ? "bg-surface-raised text-primary shadow-sm"
+                : "text-on-surface-muted hover:text-on-surface"
+            }`}
           >
             Mes
           </button>
         </div>
       </section>
 
+      {/* ── Loading ──────────────────────────────────────────────────── */}
       {loading && (
         <div className="flex justify-center py-16">
-          <span className="material-symbols-outlined text-primary animate-spin text-3xl">
-            progress_activity
-          </span>
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       )}
 
+      {/* ── Calendar grid ────────────────────────────────────────────── */}
       {!loading && (
-        <div className="bg-surface-container-lowest rounded-[2.5rem] shadow-2xl shadow-zinc-900/5 overflow-hidden">
-          {/* Day Headers */}
-          <div className="grid grid-cols-8 border-b border-surface-container py-6 bg-surface-container-low/30">
-            <div className="flex items-center justify-center text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">
+        <div className="bg-surface-raised border border-border-subtle rounded-2xl shadow-sm overflow-hidden">
+          {/* Day headers */}
+          <div className="grid grid-cols-8 border-b border-border-subtle py-5 bg-surface-sunken/40">
+            <div className="flex items-center justify-center font-ui text-[10px] font-bold text-on-surface-subtle uppercase tracking-widest">
               Hora
             </div>
             {weekDays.map((day, i) => {
               const isToday = day.toDateString() === todayStr;
               return (
-                <div key={i} className={`flex flex-col items-center gap-1 ${!weekDays.some((d) => [5, 6].includes(i)) ? "" : "opacity-50"}`}>
-                  <span className={`text-[11px] font-semibold ${isToday ? "text-primary font-bold" : "text-on-surface-variant"}`}>
+                <div key={i} className="flex flex-col items-center gap-1">
+                  <span className={`font-ui text-[11px] font-semibold ${isToday ? "text-primary" : "text-on-surface-muted"}`}>
                     {DAY_ABBR[day.getDay()]}
                   </span>
                   <span
-                    className={`text-lg font-headline font-bold ${isToday ? "w-8 h-8 flex items-center justify-center rounded-full bg-primary text-white" : "text-on-surface"}`}
+                    className={`font-ui text-[17px] font-semibold ${
+                      isToday
+                        ? "w-8 h-8 flex items-center justify-center rounded-full bg-primary text-on-primary"
+                        : "text-on-surface"
+                    }`}
                   >
                     {day.getDate()}
                   </span>
@@ -191,66 +196,56 @@ export default function Calendar() {
             })}
           </div>
 
-          {/* Time Grid */}
+          {/* Time grid */}
           <div className="grid grid-cols-8 relative">
-            {/* Time Labels */}
+            {/* Time labels */}
             <div className="flex flex-col">
               {HOURS.map((h) => (
                 <div
                   key={h}
                   style={{ height: `${HOUR_HEIGHT}px` }}
-                  className="flex items-start justify-center pt-2 text-[11px] font-medium text-on-surface-variant border-r border-surface-container"
+                  className="flex items-start justify-center pt-2 font-ui text-[11px] font-medium text-on-surface-subtle border-r border-border-subtle"
                 >
                   {h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`}
                 </div>
               ))}
             </div>
 
-            {/* Day Columns */}
+            {/* Day columns */}
             {weekDays.map((day, colIdx) => {
-              const colApts = aptsByDay[colIdx === 6 ? 6 : colIdx] ?? [];
+              const colApts   = aptsByDay[colIdx] ?? [];
               const totalHeight = HOURS.length * HOUR_HEIGHT;
 
               return (
                 <div
                   key={colIdx}
-                  className="relative border-r border-surface-container last:border-r-0"
+                  className="relative border-r border-border-subtle last:border-r-0"
                   style={{ height: `${totalHeight}px` }}
                 >
-                  {/* Grid lines */}
+                  {/* Hour grid lines */}
                   {HOURS.map((h) => (
                     <div
                       key={h}
-                      className="absolute left-0 right-0 border-b border-surface-container-low"
+                      className="absolute left-0 right-0 border-b border-border-subtle/50"
                       style={{ top: `${(h - HOURS[0]) * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}
                     />
                   ))}
 
-                  {/* Bloques de agenda */}
-                  {(blocksByDay[colIdx] ?? []).map((block) => {
-                    const blockLabel: Record<string, string> = {
-                      vacation: "Vacaciones",
-                      break: "Descanso",
-                      manual: "Bloqueado",
-                    };
-                    const label = blockLabel[block.blockType] ?? "Bloqueado";
-                    return (
-                      <div
-                        key={block.id}
-                        style={blockPositionStyle(block)}
-                        className="z-[5] overflow-hidden"
-                      >
-                        <div className="w-full h-full bg-zinc-100 border-l-[3px] border-zinc-400 rounded-r-md flex flex-col justify-start gap-0.5 pt-1 px-1.5">
-                          <span className="material-symbols-outlined text-[11px] text-zinc-500 leading-none">
-                            do_not_disturb_on
-                          </span>
-                          <span className="text-[9px] text-zinc-500 font-bold leading-tight uppercase tracking-tight hidden sm:block">
-                            {label}
-                          </span>
-                        </div>
+                  {/* Availability blocks */}
+                  {(blocksByDay[colIdx] ?? []).map((block) => (
+                    <div
+                      key={block.id}
+                      style={blockPositionStyle(block)}
+                      className="z-[5] overflow-hidden"
+                    >
+                      <div className="w-full h-full bg-stone-100 border-l-[3px] border-stone-400 rounded-r flex flex-col justify-start gap-0.5 pt-1 px-1">
+                        <NoSymbolIcon className="w-2.5 h-2.5 text-stone-400" />
+                        <span className="font-ui text-[9px] text-stone-500 font-semibold leading-tight uppercase tracking-tight hidden sm:block">
+                          {BLOCK_LABELS[block.blockType] ?? "Bloqueado"}
+                        </span>
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
 
                   {/* Appointments */}
                   {colApts.map((apt) => {
@@ -264,46 +259,46 @@ export default function Calendar() {
                       case "confirmed":
                       case "reprogrammed":
                       case "rescheduled":
-                        bgClass = "bg-primary shadow-md border border-primary/20";
-                        timeClass = "text-white/90 font-bold";
-                        titleClass = "text-white font-black";
-                        subtitleClass = "text-white/80";
+                        bgClass     = "bg-primary shadow-sm border border-primary/20";
+                        timeClass   = "text-white/90 font-bold";
+                        titleClass  = "text-white font-semibold";
+                        subtitleClass = "text-white/75";
                         break;
                       case "completed":
-                        bgClass = "bg-tertiary shadow-md border border-tertiary/20";
-                        timeClass = "text-white/90 font-bold";
-                        titleClass = "text-white font-black";
-                        subtitleClass = "text-white/80";
+                        bgClass     = "bg-success shadow-sm border border-success/20";
+                        timeClass   = "text-white/90 font-bold";
+                        titleClass  = "text-white font-semibold";
+                        subtitleClass = "text-white/75";
                         break;
                       case "no_show":
                       case "cancelled":
-                        bgClass = "bg-error shadow-md border border-error/20 opacity-90";
-                        timeClass = "text-white/90 font-bold";
-                        titleClass = "text-white font-black";
-                        subtitleClass = "text-white/80";
+                        bgClass     = "bg-error shadow-sm border border-error/20 opacity-80";
+                        timeClass   = "text-white/90 font-bold";
+                        titleClass  = "text-white font-semibold";
+                        subtitleClass = "text-white/75";
                         break;
                       case "pending":
                       default:
-                        bgClass = "bg-surface-container-lowest border-l-4 border-outline-variant shadow-sm";
-                        timeClass = "text-on-surface-variant font-bold";
-                        titleClass = "text-on-surface font-black";
-                        subtitleClass = "text-on-surface-variant";
+                        bgClass     = "bg-surface-raised border-l-[3px] border-border shadow-xs";
+                        timeClass   = "text-on-surface-muted font-semibold";
+                        titleClass  = "text-on-surface font-semibold";
+                        subtitleClass = "text-on-surface-muted";
                         break;
                     }
-                    
+
                     return (
                       <div
                         key={apt.id}
                         style={positionStyle(apt)}
-                        className={`rounded-xl p-2 overflow-hidden z-10 transition-all ${bgClass}`}
+                        className={`rounded-lg p-1.5 overflow-hidden z-10 transition-all ${bgClass}`}
                       >
-                        <p className={`text-[10px] leading-tight mb-0.5 ${timeClass}`}>
+                        <p className={`font-ui text-[10px] leading-tight mb-0.5 ${timeClass}`}>
                           {formatTimeES(apt.startTime)}
                         </p>
-                        <p className={`text-[11px] leading-tight truncate ${titleClass}`}>
+                        <p className={`font-ui text-[11px] leading-tight truncate ${titleClass}`}>
                           {apt.client?.name}
                         </p>
-                        <p className={`text-[10px] font-medium leading-tight truncate ${subtitleClass}`}>
+                        <p className={`font-ui text-[10px] leading-tight truncate ${subtitleClass}`}>
                           {apt.service?.name}
                         </p>
                       </div>
@@ -316,48 +311,41 @@ export default function Calendar() {
         </div>
       )}
 
-      {/* Legend */}
-      <div className="mt-8 flex flex-wrap items-center gap-4 md:gap-6 px-4" suppressHydrationWarning>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-outline-variant"></div>
-          <span className="text-xs font-medium text-on-surface-variant">Pendiente</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-primary"></div>
-          <span className="text-xs font-medium text-on-surface-variant">Confirmada</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-tertiary"></div>
-          <span className="text-xs font-medium text-on-surface-variant">Completada</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-error"></div>
-          <span className="text-xs font-medium text-on-surface-variant">Cancelada / No-show</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-sm bg-surface-container-high border-l-2 border-on-surface-variant/40"></div>
-          <span className="text-xs font-medium text-on-surface-variant">Bloqueado</span>
-        </div>
+      {/* ── Legend ───────────────────────────────────────────────────── */}
+      <div className="mt-6 flex flex-wrap items-center gap-4 px-1">
+        {[
+          { color: "bg-border",   label: "Pendiente"          },
+          { color: "bg-primary",  label: "Confirmada"         },
+          { color: "bg-success",  label: "Completada"         },
+          { color: "bg-error",    label: "Cancelada / No-show" },
+          { color: "bg-stone-400", label: "Bloqueado"         },
+        ].map(({ color, label }) => (
+          <div key={label} className="flex items-center gap-2">
+            <div className={`w-2.5 h-2.5 rounded-full ${color}`} />
+            <span className="font-ui text-[12px] text-on-surface-muted">{label}</span>
+          </div>
+        ))}
       </div>
 
-      {/* FAB — bloquear tiempo */}
+      {/* ── FAB — block time ─────────────────────────────────────────── */}
       <button
         onClick={() => setShowBlockModal(true)}
-        className="fixed bottom-44 right-6 w-12 h-12 rounded-full bg-surface-container-lowest border border-outline-variant/20 text-on-surface-variant shadow-lg flex items-center justify-center transition-transform active:scale-90 z-40"
+        className="fixed bottom-44 right-6 w-12 h-12 rounded-full bg-surface-raised border border-border-subtle text-on-surface-muted shadow-sm flex items-center justify-center transition-transform active:scale-90 z-40 hover:border-border-focus musa-fab"
         title="Bloquear tiempo"
       >
-        <span className="material-symbols-outlined text-xl">do_not_disturb_on</span>
+        <NoSymbolIcon className="w-5 h-5" />
       </button>
 
-      {/* FAB — nueva cita */}
+      {/* ── FAB — new appointment ────────────────────────────────────── */}
       <button
         onClick={() => setShowNewAppointmentModal(true)}
-        className="fixed bottom-28 right-6 w-14 h-14 rounded-full bg-gradient-to-br from-primary to-primary-container text-white shadow-xl shadow-purple-500/30 flex items-center justify-center transition-transform active:scale-90 z-40"
+        className="fixed bottom-28 right-6 w-14 h-14 rounded-full bg-primary text-on-primary shadow-primary-md flex items-center justify-center transition-transform active:scale-90 z-40 hover:bg-primary-hover musa-fab"
+        aria-label="Nueva cita"
       >
-        <span className="material-symbols-outlined text-3xl">add</span>
+        <PlusIcon className="w-6 h-6" />
       </button>
 
-      {/* Modal bloqueo */}
+      {/* Modals */}
       {showBlockModal && (
         <BlockTimeModal
           defaultDate={baseDate}
@@ -365,8 +353,6 @@ export default function Calendar() {
           onCreated={() => fetchBlocks(start.toISOString(), end.toISOString())}
         />
       )}
-
-      {/* Modal nueva cita */}
       {showNewAppointmentModal && (
         <NewAppointmentModal
           onClose={() => setShowNewAppointmentModal(false)}

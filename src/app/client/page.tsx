@@ -141,9 +141,9 @@ export default function ClientPortalPage() {
     return (
       <div className="min-h-screen bg-background font-body antialiased">
         {/* Header */}
-        <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-lg px-6 py-4 flex items-center gap-3 shadow-sm shadow-purple-500/5">
+        <header className="sticky top-0 z-40 glass-nav border-b border-border-subtle px-5 py-3 flex items-center gap-3">
           <Link href="/" className="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors">
-            <span className="material-symbols-outlined">arrow_back</span>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
           </Link>
           <h1 className="font-headline text-lg font-bold text-on-surface">Área de clientas</h1>
         </header>
@@ -162,7 +162,7 @@ export default function ClientPortalPage() {
           <div className="space-y-3">
             <Link
               href="/client/login"
-              className="flex items-center justify-center gap-2 w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white font-headline font-bold rounded-full shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform"
+              className="flex items-center justify-center gap-2 w-full h-14 bg-primary text-white font-headline font-bold rounded-full shadow-lg shadow-primary-sm hover:scale-[1.02] transition-transform"
             >
               <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>calendar_today</span>
               Ver mis citas
@@ -202,8 +202,8 @@ export default function ClientPortalPage() {
   return (
     <div className="min-h-screen bg-background font-body antialiased pb-28">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-lg px-6 py-4 flex items-center gap-3 shadow-sm shadow-purple-500/5">
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary-container flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+      <header className="sticky top-0 z-40 glass-nav border-b border-border-subtle px-5 py-3 flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
           {clientName?.charAt(0).toUpperCase() ?? "C"}
         </div>
         <div className="flex-1 min-w-0">
@@ -317,7 +317,7 @@ export default function ClientPortalPage() {
                       </div>
                       <div className="h-2 bg-surface-container-high rounded-full overflow-hidden">
                         <div
-                          className={`h-full rounded-full ${canRedeem ? "bg-green-500" : "bg-gradient-to-r from-primary to-primary-container"}`}
+                          className={`h-full rounded-full ${canRedeem ? "bg-green-500" : "bg-primary"}`}
                           style={{ width: `${progress}%` }}
                         />
                       </div>
@@ -516,7 +516,7 @@ export default function ClientPortalPage() {
         </Link>
         <Link
           href="/client"
-          className="flex flex-col items-center justify-center px-4 py-2 bg-purple-100 text-purple-900 rounded-full transition-colors"
+          className="flex flex-col items-center justify-center px-4 py-2 bg-primary/10 text-primary rounded-full transition-colors"
         >
           <span className="material-symbols-outlined mb-1 text-[24px]" style={{ fontVariationSettings: "'FILL' 1" }}>calendar_today</span>
           <span className="font-headline text-[10px] font-bold tracking-wide uppercase">Mis Citas</span>

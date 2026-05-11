@@ -83,7 +83,7 @@ export default function ClientRegisterPage() {
             href="/client"
             className="flex items-center gap-1.5 text-sm text-on-surface-variant hover:text-primary transition-colors"
           >
-            <span className="material-symbols-outlined text-sm">arrow_back</span>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
             Volver
           </Link>
           <div className="space-y-2">
@@ -193,7 +193,7 @@ export default function ClientRegisterPage() {
           <button
             type="submit"
             disabled={!form.name || !form.phone || loading}
-            className="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white font-headline font-bold rounded-full shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full h-14 bg-primary text-white font-headline font-bold rounded-full shadow-lg shadow-primary-sm hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {loading ? "Registrando..." : "Confirmar y buscar profesionales"}
             <span className="material-symbols-outlined">

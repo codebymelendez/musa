@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { use } from "react";
+import { useToast } from "@/components/ui/Toast";
 import { ClientLoyaltyAccount, LoyaltyTransaction, LoyaltyRedemption } from "@/types";
 import QRDisplay from "@/components/loyalty/QRDisplay";
 import RedeemModal from "@/components/loyalty/RedeemModal";
@@ -15,7 +16,7 @@ interface Detail {
 
 const TX_LABELS: Record<string, { label: string; color: string }> = {
   earn:       { label: "Visita completada",    color: "text-green-600"          },
-  redeem:     { label: "Recompensa canjeada",  color: "text-purple-600"         },
+  redeem:     { label: "Recompensa canjeada",  color: "text-primary"         },
   adjustment: { label: "Ajuste manual",        color: "text-blue-600"           },
   expiry:     { label: "Puntos expirados",     color: "text-on-surface-variant" },
 };
@@ -26,6 +27,7 @@ export default function LoyaltyAccountPage({
   params: Promise<{ accountId: string }>;
 }) {
   const { accountId } = use(params);
+  const { toast } = useToast();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(true);
   const [showQR, setShowQR] = useState(false);
@@ -35,12 +37,6 @@ export default function LoyaltyAccountPage({
   const [adjustNotes, setAdjustNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
-  };
 
   const fetchDetail = async () => {
     setLoading(true);
@@ -76,7 +72,7 @@ export default function LoyaltyAccountPage({
         setError(data.error ?? "Error al ajustar");
         return;
       }
-      showToast(`Puntos ajustados: ${adjustDelta > 0 ? "+" : ""}${adjustDelta}`);
+      toast(`Puntos ajustados: ${adjustDelta > 0 ? "+" : ""}${adjustDelta}`, "success");
       setAdjusting(false);
       setAdjustDelta(0);
       setAdjustNotes("");
@@ -114,12 +110,12 @@ export default function LoyaltyAccountPage({
   return (
     <div className="min-h-screen bg-background pb-32">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-lg px-6 py-4 flex items-center gap-3 shadow-sm shadow-purple-500/5">
+      <header className="sticky top-0 z-40 glass-nav border-b border-border-subtle px-5 py-3 flex items-center gap-3">
         <Link
           href="/loyalty"
-          className="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-purple-50 transition-colors"
+          className="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-sunken transition-colors"
         >
-          <span className="material-symbols-outlined">arrow_back</span>
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
         </Link>
         <div className="flex-1 min-w-0">
           <h1 className="font-headline text-base font-bold text-on-surface truncate">
@@ -137,7 +133,7 @@ export default function LoyaltyAccountPage({
 
       <main className="px-4 pt-4 max-w-2xl mx-auto space-y-4">
         {/* Points card */}
-        <div className="bg-gradient-to-br from-primary to-primary-container rounded-3xl p-6 text-white space-y-4 shadow-lg shadow-primary/20">
+        <div className="bg-primary rounded-3xl p-6 text-on-primary space-y-4 shadow-primary-md">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-white/70 text-xs font-medium uppercase tracking-wider">
@@ -300,7 +296,7 @@ export default function LoyaltyAccountPage({
                   key={r.id}
                   className="bg-surface-container-lowest rounded-xl px-4 py-3 shadow-sm border border-outline-variant/10"
                 >
-                  <p className="text-xs font-bold text-purple-600">Recompensa canjeada</p>
+                  <p className="text-xs font-bold text-primary">Recompensa canjeada</p>
                   <p className="text-sm text-on-surface">{r.rewardDescription}</p>
                   <p className="text-[10px] text-on-surface-variant mt-0.5">
                     {new Date(r.redeemedAt).toLocaleDateString("es-VE", {
@@ -349,17 +345,11 @@ export default function LoyaltyAccountPage({
           onClose={() => setShowRedeem(false)}
           onRedeemed={() => {
             fetchDetail();
-            showToast("¡Canje registrado!");
+            toast("¡Canje registrado!", "success");
           }}
         />
       )}
 
-      {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-on-surface text-surface text-sm font-bold px-6 py-3 rounded-full shadow-lg z-50">
-          {toast}
-        </div>
-      )}
     </div>
   );
 }

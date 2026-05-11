@@ -71,7 +71,7 @@ export default function PlansPage() {
                 key={plan.name}
                 className={`relative p-8 rounded-[2rem] border-2 transition-all ${
                   plan.highlight 
-                    ? 'bg-primary text-on-primary border-primary shadow-xl shadow-primary/20 scale-105' 
+                    ? 'bg-primary text-on-primary border-primary shadow-xl shadow-primary-sm scale-105' 
                     : 'bg-surface-container-low border-outline-variant text-on-surface'
                 }`}
               >

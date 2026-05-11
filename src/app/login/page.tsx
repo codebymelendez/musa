@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { ArrowRightIcon, EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 
 export default function Login() {
   const { login, register } = useAuth();
@@ -11,6 +11,7 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,7 +19,6 @@ export default function Login() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-
     try {
       if (isRegister) {
         await register({ email, name, password });
@@ -26,177 +26,200 @@ export default function Login() {
         await login({ email, password });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error inesperado");
+      setError(err instanceof Error ? err.message : "Error inesperado. Intenta de nuevo.");
     } finally {
       setLoading(false);
     }
   };
 
+  const switchMode = () => {
+    setIsRegister((v) => !v);
+    setError(null);
+  };
+
   return (
-    <div className="bg-surface text-on-surface antialiased min-h-screen flex flex-col items-center justify-center p-6 relative">
-      <main className="w-full max-w-md flex flex-col items-center gap-12 z-10">
-        {/* Brand Identity */}
-        <header className="text-center">
-          <h1 className="font-headline font-extrabold text-5xl tracking-tighter text-primary mb-2">
+    <div className="min-h-screen bg-cream-100 font-ui antialiased flex flex-col items-center justify-center px-5 py-12 relative">
+      {/* Subtle background texture */}
+      <div
+        className="absolute inset-0 opacity-[0.03] pointer-events-none"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 1px 1px, #1A0E0B 1px, transparent 0)",
+          backgroundSize: "24px 24px",
+        }}
+      />
+
+      <main className="relative w-full max-w-[400px] space-y-8 z-10">
+        {/* Brand */}
+        <header className="text-center space-y-1">
+          <h1 className="font-display text-[56px] font-semibold text-on-surface tracking-[-0.02em] leading-none italic">
             Musa
           </h1>
-          <p className="font-body text-on-surface-variant text-lg tracking-tight">
-            Gestión Profesional de Belleza
+          <p className="font-ui text-[14px] text-on-surface-muted">
+            {isRegister
+              ? "Crea tu espacio de trabajo"
+              : "Bienvenida de nuevo"}
           </p>
         </header>
 
-        {/* Login / Register Card */}
-        <section className="w-full bg-surface-container-lowest rounded-[2rem] p-8 shadow-sm">
-          <div className="mb-8">
-            <h2 className="font-headline text-2xl font-bold text-on-surface mb-2">
-              {isRegister ? "Crear cuenta" : "Bienvenida de nuevo"}
-            </h2>
-            <p className="font-body text-on-surface-variant">
-              {isRegister
-                ? "Regístrate para gestionar tu agenda."
-                : "Ingresa tus datos para acceder a tu estudio."}
-            </p>
-          </div>
-
+        {/* Card */}
+        <section className="bg-surface-raised border border-border-subtle rounded-2xl p-7 shadow-md space-y-6">
+          {/* Error */}
           {error && (
-            <div className="mb-6 p-4 bg-error-container rounded-xl text-on-error-container text-sm font-medium">
-              {error}
+            <div className="bg-error-surface border border-error/20 rounded-lg px-4 py-3">
+              <p className="font-ui text-[13px] text-error leading-snug">{error}</p>
             </div>
           )}
 
-          <form className="space-y-4" onSubmit={handleSubmit}>
-            {/* Nombre (solo registro) */}
+          <form className="space-y-4" onSubmit={handleSubmit} noValidate>
             {isRegister && (
-              <div className="space-y-2">
-                <label className="font-label text-sm font-semibold uppercase tracking-wider text-on-surface-variant ml-1">
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="name"
+                  className="font-ui text-[12px] font-semibold text-on-surface-muted tracking-[0.01em]"
+                >
                   Tu nombre
                 </label>
                 <input
-                  className="w-full h-14 px-5 bg-surface-container-high border-none rounded-xl font-body text-lg text-on-surface placeholder:text-outline focus:ring-2 focus:ring-primary focus:bg-surface-bright transition-all"
+                  id="name"
+                  className="w-full h-11 px-3.5 bg-surface-sunken border border-border rounded-md font-ui text-[15px] text-on-surface placeholder:text-on-surface-subtle outline-none transition-all focus:border-border-focus focus:bg-surface-raised focus:shadow-[0_0_0_3px_rgba(181,89,62,0.10)]"
                   placeholder="Ana López"
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required={isRegister}
+                  autoComplete="name"
                 />
               </div>
             )}
 
-            {/* Email */}
-            <div className="space-y-2">
-              <label className="font-label text-sm font-semibold uppercase tracking-wider text-on-surface-variant ml-1">
-                Correo Electrónico
+            <div className="space-y-1.5">
+              <label
+                htmlFor="email"
+                className="font-ui text-[12px] font-semibold text-on-surface-muted tracking-[0.01em]"
+              >
+                Correo electrónico
               </label>
               <input
-                className="w-full h-14 px-5 bg-surface-container-high border-none rounded-xl font-body text-lg text-on-surface placeholder:text-outline focus:ring-2 focus:ring-primary focus:bg-surface-bright transition-all"
-                placeholder="tu@email.com"
+                id="email"
+                className="w-full h-11 px-3.5 bg-surface-sunken border border-border rounded-md font-ui text-[15px] text-on-surface placeholder:text-on-surface-subtle outline-none transition-all focus:border-border-focus focus:bg-surface-raised focus:shadow-[0_0_0_3px_rgba(181,89,62,0.10)]"
+                placeholder="tu@correo.com"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="email"
               />
             </div>
 
-            {/* Contraseña */}
-            <div className="space-y-2">
-              <label className="font-label text-sm font-semibold uppercase tracking-wider text-on-surface-variant ml-1">
+            <div className="space-y-1.5">
+              <label
+                htmlFor="password"
+                className="font-ui text-[12px] font-semibold text-on-surface-muted tracking-[0.01em]"
+              >
                 Contraseña
               </label>
-              <input
-                className="w-full h-14 px-5 bg-surface-container-high border-none rounded-xl font-body text-lg text-on-surface placeholder:text-outline focus:ring-2 focus:ring-primary focus:bg-surface-bright transition-all"
-                placeholder="••••••••"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  className="w-full h-11 pl-3.5 pr-11 bg-surface-sunken border border-border rounded-md font-ui text-[15px] text-on-surface placeholder:text-on-surface-subtle outline-none transition-all focus:border-border-focus focus:bg-surface-raised focus:shadow-[0_0_0_3px_rgba(181,89,62,0.10)]"
+                  placeholder="Mínimo 6 caracteres"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  autoComplete={isRegister ? "new-password" : "current-password"}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-subtle hover:text-on-surface-muted transition-colors"
+                  aria-label={showPassword ? "Ocultar contraseña" : "Ver contraseña"}
+                >
+                  {showPassword ? (
+                    <EyeSlashIcon className="w-4 h-4" />
+                  ) : (
+                    <EyeIcon className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
             </div>
 
-            {/* Submit */}
             <button
-              className="editorial-gradient w-full h-14 rounded-full font-headline font-bold text-white text-lg shadow-lg active:scale-95 transition-transform duration-200 flex items-center justify-center gap-2 mt-2 disabled:opacity-60"
               type="submit"
               disabled={loading}
+              className="w-full h-11 bg-primary text-on-primary font-ui font-semibold text-[14px] rounded-full flex items-center justify-center gap-2 shadow-primary-sm hover:bg-primary-hover transition-all active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed mt-2"
             >
               {loading ? (
-                <span className="material-symbols-outlined animate-spin">
-                  progress_activity
-                </span>
+                <svg
+                  className="animate-spin w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
+                </svg>
               ) : (
                 <>
-                  {isRegister ? "Crear cuenta" : "Iniciar sesión"}
-                  <span className="material-symbols-outlined">arrow_forward</span>
+                  {isRegister ? "Crear mi cuenta" : "Entrar a mi espacio"}
+                  <ArrowRightIcon className="w-4 h-4" />
                 </>
               )}
             </button>
           </form>
 
-          {/* Olvidé mi contraseña */}
           {!isRegister && (
-            <div className="mt-4 text-center">
-              <a
+            <div className="text-center">
+              <Link
                 href="/forgot-password"
-                className="text-sm text-on-surface-variant hover:text-primary transition-colors"
+                className="font-ui text-[13px] text-on-surface-subtle hover:text-on-surface-muted transition-colors underline underline-offset-2"
               >
                 ¿Olvidaste tu contraseña?
-              </a>
+              </Link>
             </div>
           )}
 
-          {/* Cambiar modo */}
-          <footer className="mt-8 text-center">
-            <p className="font-body text-sm text-on-surface-variant">
+          <div className="border-t border-border-subtle pt-5 text-center">
+            <p className="font-ui text-[13px] text-on-surface-muted">
               {isRegister ? "¿Ya tienes cuenta? " : "¿Nueva en Musa? "}
               <button
                 type="button"
-                onClick={() => {
-                  setIsRegister(!isRegister);
-                  setError(null);
-                }}
-                className="text-primary font-semibold hover:underline decoration-2 underline-offset-4"
+                onClick={switchMode}
+                className="font-semibold text-primary hover:underline underline-offset-2 transition-colors"
               >
-                {isRegister ? "Iniciar sesión" : "Crear cuenta"}
+                {isRegister ? "Iniciar sesión" : "Crear cuenta gratis"}
               </button>
             </p>
-          </footer>
+          </div>
         </section>
 
-        {/* Editorial aesthetic */}
-        <div className="mt-12 flex flex-col items-center gap-6 opacity-40 grayscale pointer-events-none">
-          <div className="grid grid-cols-2 gap-4 max-w-[280px]">
-             <div className="h-24 w-24 rounded-2xl bg-surface-container-highest overflow-hidden relative">
-              <Image
-                className="object-cover"
-                alt="Beauty professional tools"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuBqdZAXr5cSXTYf8OpyRKuG5WXvRx9MVZYw-cehTsCaJg3RqtqZZ9jYkaivqf9IExmoNpjiOO3FuSzDaFUDsodNdMIqWnWhKPFNwbz42doMPQgyaHf1cvzh9XrIwiSh_KLsGg0jn-ELGXUX7w4exRB-n9tuxjS4dLp-BhijbEGS6CaxthzHcQ1msZRY2JWT6ZzWEJQM1Fazu1s8CAk-zQMM5-eHGNHrSIGQt1bi8YlhFVLRGp3E5J1lmfnwqfy5Tyxvqp7botkTX6lL"
-                fill
-              />
-            </div>
-            <div className="h-24 w-24 rounded-full bg-surface-container-highest overflow-hidden self-end relative">
-              <Image
-                className="object-cover"
-                alt="Makeup application"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuBp9NaZ-5aWldHtxc-4bC67Pw7IkAhCTejCygmjKgbake7dkouLEpaNQG5xtR-0f0lqu992Z6imUcp4NroEjvFXtETYHHYsfrJTwc7I85HRlYYgpy2689lhkIuAQD-b-UhP0jbao1VXEJ9K1VG73074-q467R9lNECM9WON1IzSH1cbo6bSplPJDFZpvjvLhmPReVVSZPPoWRUnP0b465Wfj_aq-gs8dZVnuHX69-AnefxbTITYkR-QqUlZSbusJ4GnyEfE43Vd34L4"
-                fill
-              />
-            </div>
-          </div>
-          <p className="font-headline italic text-on-surface-variant text-sm tracking-wide">
-            Elevando el Arte a través de la Organización
-          </p>
-        </div>
+        {/* Trust line */}
+        <p className="text-center font-ui text-[12px] text-on-surface-subtle">
+          Sin contratos · Sin tarjeta · Cancela cuando quieras
+        </p>
       </main>
 
-      {/* Legal */}
-      <footer className="fixed bottom-8 flex gap-6 text-[11px] font-label font-medium uppercase tracking-widest text-on-surface-variant opacity-60">
-        <Link className="hover:text-primary transition-colors" href="#">
+      {/* Legal footer */}
+      <footer className="absolute bottom-6 flex gap-6 font-ui text-[11px] font-medium text-on-surface-subtle/60">
+        <Link href="#" className="hover:text-on-surface-muted transition-colors">
           Privacidad
         </Link>
-        <Link className="hover:text-primary transition-colors" href="#">
+        <Link href="#" className="hover:text-on-surface-muted transition-colors">
           Términos
         </Link>
-        <Link className="hover:text-primary transition-colors" href="#">
+        <Link href="#" className="hover:text-on-surface-muted transition-colors">
           Soporte
         </Link>
       </footer>

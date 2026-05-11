@@ -75,7 +75,7 @@ function PaymentContent() {
     <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
       <header className="space-y-4">
         <Link href="/settings/plans" className="inline-flex items-center gap-2 text-primary font-bold text-sm">
-          <span className="material-symbols-outlined text-sm">arrow_back</span>
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
           Volver a planes
         </Link>
         <h1 className="font-headline text-3xl font-extrabold text-on-surface">Datos de Pago</h1>
@@ -165,7 +165,7 @@ function PaymentContent() {
           <button 
             onClick={handleActivate}
             disabled={loading}
-            className="w-full h-16 bg-gradient-to-r from-primary to-primary-container text-white font-black rounded-2xl shadow-xl shadow-primary/20 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50"
+            className="w-full h-16 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary-sm flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50"
           >
             {loading ? (
               <span className="material-symbols-outlined animate-spin">progress_activity</span>

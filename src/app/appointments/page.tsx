@@ -1,132 +1,335 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import Link from "next/link";
+import {
+  ArrowLeftIcon,
+  CalendarDaysIcon,
+} from "@heroicons/react/24/outline";
 import { useAppointments } from "@/hooks/useAppointments";
+import { formatTimeES, formatCurrency } from "@/lib/utils";
 import { Appointment } from "@/types";
-import { formatTimeES, formatDateES, statusLabel } from "@/lib/utils";
+
+type FilterPeriod = "today" | "week" | "upcoming" | "all";
+
+const PERIOD_LABELS: Record<FilterPeriod, string> = {
+  today:    "Hoy",
+  week:     "Esta semana",
+  upcoming: "Próximas",
+  all:      "Todo",
+};
+
+const STATUS_DOT: Record<string, string> = {
+  pending:     "bg-border",
+  confirmed:   "bg-primary",
+  completed:   "bg-success",
+  cancelled:   "bg-error",
+  no_show:     "bg-error",
+  rescheduled: "bg-warning",
+};
+
+const STATUS_BORDER: Record<string, string> = {
+  pending:     "border-l-border",
+  confirmed:   "border-l-primary",
+  completed:   "border-l-success",
+  cancelled:   "border-l-error",
+  no_show:     "border-l-error",
+  rescheduled: "border-l-warning",
+};
+
+/* Returns entries sorted by date key (YYYY-MM-DD → Appointment[]) */
+function groupByDate(appointments: Appointment[]): [string, Appointment[]][] {
+  const map = new Map<string, Appointment[]>();
+  for (const apt of appointments) {
+    const key = new Date(apt.startTime).toLocaleDateString("en-CA"); // YYYY-MM-DD
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(apt);
+  }
+  return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+}
+
+function formatGroupDate(dateKey: string): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const date     = new Date(y, m - 1, d);
+  const today    = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+
+  const sameDay = (a: Date, b: Date) =>
+    a.getDate() === b.getDate() &&
+    a.getMonth() === b.getMonth() &&
+    a.getFullYear() === b.getFullYear();
+
+  if (sameDay(date, today))    return "Hoy";
+  if (sameDay(date, tomorrow)) return "Mañana";
+
+  return date.toLocaleDateString("es-VE", {
+    weekday: "long",
+    day:     "numeric",
+    month:   "long",
+  });
+}
+
+function findNextAppointmentId(appointments: Appointment[]): string | null {
+  const now = new Date();
+  const upcoming = appointments
+    .filter(
+      (a) =>
+        new Date(a.startTime) > now &&
+        (a.status === "confirmed" || a.status === "pending")
+    )
+    .sort(
+      (a, b) =>
+        new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+    );
+  return upcoming[0]?.id ?? null;
+}
 
 export default function AppointmentsPage() {
   const { appointments, loading, fetchByRange } = useAppointments();
-  const [filter, setFilter] = useState<"pending" | "all">("pending");
+  const [period, setPeriod] = useState<FilterPeriod>("upcoming");
 
   const loadAppointments = useCallback(async () => {
-    // Cargar citas desde hoy hasta el futuro (30 días)
-    const now = new Date();
-    const future = new Date();
-    future.setDate(now.getDate() + 30);
-    await fetchByRange(now.toISOString(), future.toISOString());
-  }, [fetchByRange]);
+    const base = new Date();
+    let start: Date, end: Date;
+
+    switch (period) {
+      case "today": {
+        start = new Date(base);
+        start.setHours(0, 0, 0, 0);
+        end = new Date(base);
+        end.setHours(23, 59, 59, 999);
+        break;
+      }
+      case "week": {
+        start = new Date(base);
+        end = new Date(base);
+        end.setDate(base.getDate() + 7);
+        break;
+      }
+      case "upcoming": {
+        start = new Date(base);
+        end = new Date(base);
+        end.setDate(base.getDate() + 30);
+        break;
+      }
+      default: {
+        start = new Date(base);
+        start.setMonth(base.getMonth() - 3);
+        end = new Date(base);
+        end.setMonth(base.getMonth() + 1);
+        break;
+      }
+    }
+
+    await fetchByRange(start.toISOString(), end.toISOString());
+  }, [period, fetchByRange]);
 
   useEffect(() => {
     loadAppointments();
   }, [loadAppointments]);
 
-  const filteredAppointments = appointments.filter((apt) => {
-    if (filter === "pending") {
-      return apt.status === "confirmed" || apt.status === "pending";
-    }
-    return true;
-  });
+  const grouped    = groupByDate(appointments);
+  const nextAptId  = findNextAppointmentId(appointments);
 
   return (
-    <div className="min-h-screen bg-background pb-32">
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-lg px-6 py-4 flex items-center gap-3 shadow-sm shadow-purple-500/5">
-        <Link
-          href="/home"
-          className="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-purple-50 transition-colors"
-        >
-          <span className="material-symbols-outlined">arrow_back</span>
-        </Link>
-        <div className="flex-1">
-          <h1 className="font-headline text-lg font-bold text-on-surface">Mis Citas</h1>
-          <p className="text-xs text-on-surface-variant">Próximos 30 días</p>
+    <div className="min-h-screen bg-background pb-32 animate-page">
+
+      {/* ── Header ────────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-40 glass-nav border-b border-border-subtle">
+        <div className="max-w-3xl mx-auto px-5 h-14 flex items-center gap-3">
+          <Link
+            href="/home"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-muted hover:bg-surface-sunken transition-colors"
+            aria-label="Volver"
+          >
+            <ArrowLeftIcon className="w-5 h-5" />
+          </Link>
+          <div className="flex-1">
+            <h1 className="font-display text-[18px] font-light italic text-on-surface leading-none">
+              Citas
+            </h1>
+          </div>
+          <Link
+            href="/calendar"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-muted hover:bg-surface-sunken transition-colors"
+            aria-label="Ver agenda"
+          >
+            <CalendarDaysIcon className="w-5 h-5" />
+          </Link>
         </div>
       </header>
 
-      <main className="px-6 pt-6 max-w-2xl mx-auto space-y-6">
-        {/* Filtros */}
-        <div className="flex bg-surface-container-low p-1 rounded-xl w-full">
-          <button
-            onClick={() => setFilter("pending")}
-            className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
-              filter === "pending"
-                ? "bg-white text-primary shadow-sm"
-                : "text-on-surface-variant hover:text-on-surface"
-            }`}
-          >
-            Pendientes
-          </button>
-          <button
-            onClick={() => setFilter("all")}
-            className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
-              filter === "all"
-                ? "bg-white text-primary shadow-sm"
-                : "text-on-surface-variant hover:text-on-surface"
-            }`}
-          >
-            Todas
-          </button>
+      <main className="max-w-3xl mx-auto px-5 pt-5">
+
+        {/* ── Period filter ──────────────────────────────────────── */}
+        <div className="flex gap-1 overflow-x-auto pb-5 hide-scrollbar">
+          {(Object.entries(PERIOD_LABELS) as [FilterPeriod, string][]).map(
+            ([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setPeriod(key)}
+                className={`flex-shrink-0 font-ui text-[13px] font-medium px-4 py-2 rounded-full transition-all duration-150 ${
+                  period === key
+                    ? "bg-on-surface text-surface"
+                    : "text-on-surface-muted hover:text-on-surface"
+                }`}
+              >
+                {label}
+              </button>
+            )
+          )}
         </div>
 
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <span className="material-symbols-outlined text-primary animate-spin text-3xl">
-              progress_activity
-            </span>
-          </div>
-        ) : filteredAppointments.length === 0 ? (
-          <div className="text-center py-20 text-on-surface-variant">
-            <span className="material-symbols-outlined text-5xl mb-4 opacity-20">
-              event_busy
-            </span>
-            <p className="font-bold">No hay citas {filter === "pending" ? "pendientes" : ""}</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {filteredAppointments.map((apt) => (
+        {/* ── Loading skeletons ─────────────────────────────────── */}
+        {loading && (
+          <div>
+            {[1, 2, 3, 4, 5].map((i) => (
               <div
-                key={apt.id}
-                className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-outline-variant/10"
+                key={i}
+                className="py-4 border-t border-border-subtle flex items-start gap-4"
               >
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <span className="text-[10px] font-bold text-primary uppercase tracking-wider block mb-0.5">
-                      {formatDateES(new Date(apt.startTime))} · {formatTimeES(apt.startTime)}
-                    </span>
-                    <h3 className="text-lg font-bold text-on-surface">
-                      {apt.client?.name}
-                    </h3>
-                    <p className="text-on-surface-variant text-sm">
-                      {apt.service?.name}
-                    </p>
-                  </div>
-                  <span
-                    className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${
-                      apt.status === "completed"
-                        ? "bg-tertiary/10 text-tertiary"
-                        : apt.status === "cancelled" || apt.status === "no_show"
-                        ? "bg-error/10 text-error"
-                        : "bg-surface-container text-on-surface-variant"
-                    }`}
-                  >
-                    {statusLabel(apt.status)}
+                <div className="w-12 h-4 rounded bg-surface-sunken animate-pulse flex-shrink-0 mt-1" />
+                <div className="flex-1 space-y-2.5">
+                  <div
+                    className="h-[15px] rounded bg-surface-sunken animate-pulse"
+                    style={{ width: `${40 + (i * 17) % 40}%` }}
+                  />
+                  <div
+                    className="h-[11px] rounded bg-surface-sunken animate-pulse"
+                    style={{ width: `${25 + (i * 13) % 30}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── Empty state ───────────────────────────────────────── */}
+        {!loading && appointments.length === 0 && (
+          <div className="py-20 text-center">
+            <p
+              className="font-display italic font-light text-on-surface mb-2"
+              style={{ fontSize: "26px" }}
+            >
+              {period === "today"
+                ? "La agenda está libre hoy."
+                : "Sin citas en este período."}
+            </p>
+            <p className="font-ui text-[13px] text-on-surface-muted">
+              {period === "today"
+                ? "Un buen momento para planificar la semana."
+                : "Aquí aparecerán las citas cuando las haya."}
+            </p>
+          </div>
+        )}
+
+        {/* ── Grouped list ──────────────────────────────────────── */}
+        {!loading && appointments.length > 0 && (
+          <div>
+            {grouped.map(([dateKey, dayApts]) => (
+              <div key={dateKey}>
+
+                {/* Date group header */}
+                <div className="flex items-baseline gap-3 py-4 border-t border-border-subtle">
+                  <span className="font-display text-[10px] font-light uppercase tracking-[0.18em] text-on-surface-subtle capitalize">
+                    {formatGroupDate(dateKey)}
+                  </span>
+                  <span className="font-ui text-[11px] text-on-surface-subtle">
+                    {dayApts.length}{" "}
+                    {dayApts.length === 1 ? "cita" : "citas"}
                   </span>
                 </div>
-                
-                {apt.notes && (
-                  <div className="mt-3 p-3 bg-surface-container-low rounded-xl text-xs text-on-surface-variant italic">
-                    "{apt.notes}"
-                  </div>
-                )}
 
-                <div className="flex gap-2 mt-4">
-                  <Link
-                    href={`/appointments/${apt.id}`}
-                    className="flex-1 py-2 rounded-xl bg-surface-container-low text-on-surface-variant text-xs font-bold text-center hover:bg-surface-container-high transition-colors"
-                  >
-                    Ver detalles
-                  </Link>
+                {/* Appointments for this day */}
+                <div className="mb-1 space-y-1">
+                  {dayApts.map((apt) => {
+                    const isNext   = apt.id === nextAptId;
+                    const border   = STATUS_BORDER[apt.status] ?? "border-l-border";
+                    const dot      = STATUS_DOT[apt.status]    ?? "bg-border";
+                    const isCancelled =
+                      apt.status === "cancelled" || apt.status === "no_show";
+
+                    return (
+                      <Link
+                        key={apt.id}
+                        href={`/appointments/${apt.id}`}
+                        className="group block"
+                      >
+                        <div
+                          className={`relative border-l-2 ${border} rounded-r-lg pl-4 pr-3 py-3.5
+                                      hover:bg-surface-raised/80 transition-colors duration-200
+                                      ${isCancelled ? "opacity-55" : ""}`}
+                        >
+                          {/* "Próxima" label */}
+                          {isNext && (
+                            <span
+                              className="absolute -top-[9px] left-3 font-display font-light uppercase text-primary bg-background px-1"
+                              style={{ fontSize: "9px", letterSpacing: "0.15em" }}
+                            >
+                              Próxima
+                            </span>
+                          )}
+
+                          <div className="flex items-start gap-3">
+                            {/* Time */}
+                            <div className="flex-shrink-0 w-[50px] pt-px text-right">
+                              <span
+                                className="text-[13px] text-on-surface-muted"
+                                style={{ fontFamily: "var(--font-mono)" }}
+                              >
+                                {formatTimeES(apt.startTime)}
+                              </span>
+                            </div>
+
+                            {/* Content */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="font-ui font-medium text-[15px] text-on-surface leading-tight truncate">
+                                  {apt.client?.name}
+                                </p>
+                                <div
+                                  className={`w-[7px] h-[7px] rounded-full mt-1.5 flex-shrink-0 ${dot}`}
+                                />
+                              </div>
+
+                              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                <span className="font-ui text-[12px] text-on-surface-muted truncate">
+                                  {apt.service?.name}
+                                </span>
+                                {apt.service?.durationMin && (
+                                  <>
+                                    <span className="text-on-surface-subtle text-[10px]">
+                                      ·
+                                    </span>
+                                    <span
+                                      className="text-[11px] text-on-surface-subtle flex-shrink-0"
+                                      style={{ fontFamily: "var(--font-mono)" }}
+                                    >
+                                      {apt.service.durationMin}min
+                                    </span>
+                                  </>
+                                )}
+                                {apt.service?.price != null && (
+                                  <>
+                                    <span className="text-on-surface-subtle text-[10px]">
+                                      ·
+                                    </span>
+                                    <span
+                                      className="text-[12px] text-on-surface flex-shrink-0 font-medium"
+                                      style={{ fontFamily: "var(--font-mono)" }}
+                                    >
+                                      {formatCurrency(apt.service.price)}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
                 </div>
               </div>
             ))}

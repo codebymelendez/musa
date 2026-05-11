@@ -246,7 +246,7 @@ export default function Onboarding() {
             <button
               disabled={!serviceType || !businessName}
               onClick={() => setStep("hours")}
-              className="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white font-bold rounded-full disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg"
+              className="w-full h-14 bg-primary text-white font-bold rounded-full disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg"
             >
               Continuar
               <span className="material-symbols-outlined">arrow_forward</span>
@@ -344,7 +344,7 @@ export default function Onboarding() {
               </button>
               <button
                 onClick={() => setStep("services")}
-                className="flex-1 h-14 bg-gradient-to-r from-primary to-primary-container text-white font-bold rounded-full flex items-center justify-center gap-2"
+                className="flex-1 h-14 bg-primary text-white font-bold rounded-full flex items-center justify-center gap-2"
               >
                 Continuar
                 <span className="material-symbols-outlined">arrow_forward</span>
@@ -396,7 +396,7 @@ export default function Onboarding() {
               <button
                 onClick={handleFinish}
                 disabled={saving}
-                className="flex-1 h-14 bg-gradient-to-r from-primary to-primary-container text-white font-bold rounded-full flex items-center justify-center gap-2 disabled:opacity-60"
+                className="flex-1 h-14 bg-primary text-white font-bold rounded-full flex items-center justify-center gap-2 disabled:opacity-60"
               >
                 {saving ? (
                   <span className="material-symbols-outlined animate-spin">
@@ -434,7 +434,7 @@ export default function Onboarding() {
             </div>
             <button
               onClick={() => router.push("/home")}
-              className="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white font-bold rounded-full shadow-lg flex items-center justify-center gap-2"
+              className="w-full h-14 bg-primary text-white font-bold rounded-full shadow-lg flex items-center justify-center gap-2"
             >
               Ir a mi Agenda
               <span className="material-symbols-outlined">arrow_forward</span>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useToast } from "@/components/ui/Toast";
 import { LoyaltyProgram, ClientLoyaltyAccount } from "@/types";
 import LoyaltyProgramForm from "@/components/loyalty/LoyaltyProgramForm";
 import ClientLoyaltyCard from "@/components/loyalty/ClientLoyaltyCard";
@@ -10,21 +11,16 @@ import RedeemModal from "@/components/loyalty/RedeemModal";
 type Tab = "clients" | "config";
 
 export default function LoyaltyPage() {
+  const { toast } = useToast();
   const [tab, setTab] = useState<Tab>("clients");
   const [program, setProgram] = useState<LoyaltyProgram | null>(null);
   const [accounts, setAccounts] = useState<ClientLoyaltyAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [redeemAccount, setRedeemAccount] = useState<ClientLoyaltyAccount | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [scanToken, setScanToken] = useState("");
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
-
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
-  };
 
   const fetchProgram = useCallback(async () => {
     const res = await fetch("/api/loyalty/program");
@@ -84,12 +80,12 @@ export default function LoyaltyPage() {
   return (
     <div className="min-h-screen bg-background pb-32">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-lg px-6 py-4 flex items-center gap-3 shadow-sm shadow-purple-500/5">
+      <header className="sticky top-0 z-40 glass-nav border-b border-border-subtle px-5 py-3 flex items-center gap-3">
         <Link
           href="/home"
-          className="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-purple-50 transition-colors"
+          className="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-sunken transition-colors"
         >
-          <span className="material-symbols-outlined">arrow_back</span>
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
         </Link>
         <div className="flex-1">
           <h1 className="font-headline text-lg font-bold text-on-surface">Fidelización</h1>
@@ -261,7 +257,7 @@ export default function LoyaltyPage() {
               program={program}
               onSaved={(p) => {
                 setProgram(p);
-                showToast("Programa actualizado");
+                toast("Programa actualizado", "success");
               }}
             />
           </div>
@@ -275,17 +271,11 @@ export default function LoyaltyPage() {
           onClose={() => setRedeemAccount(null)}
           onRedeemed={() => {
             fetchAccounts(search);
-            showToast("¡Canje registrado exitosamente!");
+            toast("¡Canje registrado exitosamente!", "success");
           }}
         />
       )}
 
-      {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-on-surface text-surface text-sm font-bold px-6 py-3 rounded-full shadow-lg z-50 animate-in fade-in slide-in-from-bottom-2">
-          {toast}
-        </div>
-      )}
     </div>
   );
 }

@@ -1,24 +1,35 @@
 import type { Metadata } from "next";
-import { Inter, Manrope } from "next/font/google";
+import { Cormorant_Garamond, DM_Sans, DM_Mono } from "next/font/google";
 import "./globals.css";
 import BottomNavBar from "@/components/BottomNavBar";
 import TopAppBar from "@/components/TopAppBar";
+import { ToastProvider } from "@/components/ui/Toast";
 
-const inter = Inter({
-  variable: "--font-inter",
+const cormorant = Cormorant_Garamond({
+  variable: "--font-cormorant",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
+  display: "swap",
 });
 
-const manrope = Manrope({
-  variable: "--font-manrope",
+const dmSans = DM_Sans({
+  variable: "--font-dm-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+  weight: ["300", "400", "500", "600", "700"],
+  display: "swap",
+});
+
+const dmMono = DM_Mono({
+  variable: "--font-dm-mono",
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
   title: "Musa – Gestión de Belleza",
-  description: "Gestiona tu agenda de citas como profesional independiente de belleza",
+  description: "Tu agenda, tu imagen, tu negocio. Gestión profesional para emprendedoras de belleza.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -40,22 +51,23 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
           rel="stylesheet"
         />
-        {/* PWA meta tags */}
         <meta name="application-name" content="Musa" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Musa" />
-        <meta name="theme-color" content="#764797" />
+        <meta name="theme-color" content="#B5593E" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
         <link rel="manifest" href="/manifest.json" />
       </head>
       <body
-        className={`${inter.variable} ${manrope.variable} font-body antialiased min-h-screen pb-32`}
+        className={`${cormorant.variable} ${dmSans.variable} ${dmMono.variable} font-body antialiased min-h-screen pb-32 tap-highlight-transparent`}
       >
-        <TopAppBar />
-        {children}
-        <BottomNavBar />
+        <ToastProvider>
+          <TopAppBar />
+          {children}
+          <BottomNavBar />
+        </ToastProvider>
       </body>
     </html>
   );
