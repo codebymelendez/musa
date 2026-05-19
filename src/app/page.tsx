@@ -7,6 +7,7 @@ import {
   MagnifyingGlassIcon,
   ArrowRightIcon,
 } from "@heroicons/react/24/outline";
+import MusaLogo from "@/components/brand/MusaLogo";
 
 interface PublicPromotion {
   id: string;
@@ -96,11 +97,8 @@ export default function HomePage() {
       {/* ── Nav ─────────────────────────────────────────────────────── */}
       <header className="fixed top-0 w-full z-40 glass-nav border-b border-border-subtle">
         <div className="max-w-6xl mx-auto px-5 md:px-8 h-16 flex items-center justify-between">
-          <Link
-            href="/"
-            className="font-display font-normal italic text-[24px] text-on-surface tracking-[-0.01em]"
-          >
-            Musa
+          <Link href="/">
+            <MusaLogo variant="wordmark" size="md" />
           </Link>
           <nav className="flex items-center gap-1">
             <Link
@@ -632,11 +630,8 @@ export default function HomePage() {
         {/* ── Footer ─────────────────────────────────────────────────── */}
         <footer className="border-t border-border-subtle py-8">
           <div className="max-w-6xl mx-auto px-5 md:px-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <Link
-              href="/"
-              className="font-display font-normal italic text-[22px] text-on-surface tracking-[-0.01em]"
-            >
-              Musa
+            <Link href="/">
+              <MusaLogo variant="wordmark" size="sm" />
             </Link>
             <div className="flex items-center gap-5">
               <Link href="/explore" className="font-ui text-[12px] text-on-surface-muted hover:text-on-surface transition-colors">

@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useAppStore } from "@/store/useAppStore";
 import { Avatar } from "@/components/ui/Avatar";
 import NotificationBell from "./NotificationBell";
+import MusaLogo from "@/components/brand/MusaLogo";
 
 const HIDDEN_PATHS = [
   "/",
@@ -30,25 +31,27 @@ export default function TopAppBar() {
 
   if (isHidden) return null;
 
-  const displayName = user?.business?.name || user?.name || "Musa";
+  const displayName = user?.business?.name || user?.name || "Mi estudio";
   const avatarSrc = user?.avatarUrl ?? null;
 
   return (
     <header className="fixed top-0 w-full z-40 glass-nav border-b border-border-subtle flex items-center justify-between px-5 h-[60px]">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5">
+        <MusaLogo variant="monogram" size="xs" />
+        <span className="w-px h-4 bg-border flex-shrink-0" aria-hidden="true" />
+        <h1 className="font-ui font-medium text-[14px] text-on-surface leading-tight truncate max-w-[160px]">
+          {displayName}
+        </h1>
+      </div>
+      <div className="flex items-center gap-2.5">
+        <NotificationBell />
         <Avatar
           src={avatarSrc}
           name={displayName}
           size="sm"
           className="ring-1 ring-border"
         />
-        <div>
-          <h1 className="font-ui font-medium text-[15px] text-on-surface leading-tight truncate max-w-[180px]">
-            {displayName}
-          </h1>
-        </div>
       </div>
-      <NotificationBell />
     </header>
   );
 }

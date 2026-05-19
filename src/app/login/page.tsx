@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { ArrowRightIcon, EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
+import MusaLogo from "@/components/brand/MusaLogo";
 
 export default function Login() {
   const { login, register } = useAuth();
@@ -51,10 +52,10 @@ export default function Login() {
 
       <main className="relative w-full max-w-[400px] space-y-8 z-10">
         {/* Brand */}
-        <header className="text-center space-y-1">
-          <h1 className="font-display text-[56px] font-semibold text-on-surface tracking-[-0.02em] leading-none italic">
-            Musa
-          </h1>
+        <header className="text-center space-y-2">
+          <div className="flex justify-center">
+            <MusaLogo variant="combo" size="lg" />
+          </div>
           <p className="font-ui text-[14px] text-on-surface-muted">
             {isRegister
               ? "Crea tu espacio de trabajo"
@@ -76,7 +77,7 @@ export default function Login() {
               <div className="space-y-1.5">
                 <label
                   htmlFor="name"
-                  className="font-ui text-[12px] font-semibold text-on-surface-muted tracking-[0.01em]"
+                  className="musa-sublabel"
                 >
                   Tu nombre
                 </label>
@@ -96,7 +97,7 @@ export default function Login() {
             <div className="space-y-1.5">
               <label
                 htmlFor="email"
-                className="font-ui text-[12px] font-semibold text-on-surface-muted tracking-[0.01em]"
+                className="musa-sublabel"
               >
                 Correo electrónico
               </label>
@@ -115,7 +116,7 @@ export default function Login() {
             <div className="space-y-1.5">
               <label
                 htmlFor="password"
-                className="font-ui text-[12px] font-semibold text-on-surface-muted tracking-[0.01em]"
+                className="musa-sublabel"
               >
                 Contraseña
               </label>
@@ -149,28 +150,10 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-11 bg-primary text-on-primary font-ui font-semibold text-[14px] rounded-full flex items-center justify-center gap-2 shadow-primary-sm hover:bg-primary-hover transition-all active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+              className="w-full h-11 bg-primary text-on-primary font-ui font-medium text-[14px] rounded-full flex items-center justify-center gap-2 shadow-primary-sm hover:bg-primary-hover transition-all active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed mt-2"
             >
               {loading ? (
-                <svg
-                  className="animate-spin w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                  />
-                </svg>
+                <div className="w-4 h-4 border border-on-primary border-t-transparent rounded-full animate-spin" />
               ) : (
                 <>
                   {isRegister ? "Crear mi cuenta" : "Entrar a mi espacio"}
@@ -197,7 +180,7 @@ export default function Login() {
               <button
                 type="button"
                 onClick={switchMode}
-                className="font-semibold text-primary hover:underline underline-offset-2 transition-colors"
+                className="font-medium text-primary hover:underline underline-offset-2 transition-colors"
               >
                 {isRegister ? "Iniciar sesión" : "Crear cuenta gratis"}
               </button>

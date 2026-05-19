@@ -7,6 +7,7 @@ import { TimeSlot, formatCurrency, formatTimeES } from "@/lib/utils";
 import { Service } from "@/types";
 import { usePushSubscription } from "@/hooks/usePushSubscription";
 import PromotionBanner from "@/components/PromotionBanner";
+import MusaLogo from "@/components/brand/MusaLogo";
 import {
   ArrowLeftIcon,
   ShareIcon,
@@ -273,12 +274,16 @@ export default function PublicBookingPage() {
               )}
             </div>
           </div>
-          <button
-            className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-muted hover:bg-surface-sunken transition-colors"
-            aria-label="Compartir"
-          >
-            <ShareIcon className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-muted hover:bg-surface-sunken transition-colors"
+              aria-label="Compartir"
+            >
+              <ShareIcon className="w-5 h-5" />
+            </button>
+            <span className="w-px h-4 bg-border-subtle" aria-hidden="true" />
+            <MusaLogo variant="monogram" size="xs" className="opacity-55" />
+          </div>
         </div>
       </header>
 

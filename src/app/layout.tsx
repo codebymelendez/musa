@@ -28,13 +28,17 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Musa – Gestión de Belleza",
+  title: "MUSA – Gestión de Belleza",
   description: "Tu agenda, tu imagen, tu negocio. Gestión profesional para emprendedoras de belleza.",
   manifest: "/manifest.json",
+  icons: {
+    icon: [{ url: "/brand/favicon.svg", type: "image/svg+xml" }],
+    apple: "/brand/apple-touch-icon.svg",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Musa",
+    title: "MUSA",
   },
   formatDetection: { telephone: false },
 };
@@ -47,18 +51,16 @@ export default function RootLayout({
   return (
     <html lang="es">
       <head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
-          rel="stylesheet"
-        />
-        <meta name="application-name" content="Musa" />
+        <meta name="application-name" content="MUSA" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="Musa" />
+        <meta name="apple-mobile-web-app-title" content="MUSA" />
         <meta name="theme-color" content="#B5593E" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
         <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/brand/apple-touch-icon.svg" />
       </head>
       <body
         className={`${cormorant.variable} ${dmSans.variable} ${dmMono.variable} font-body antialiased min-h-screen pb-32 tap-highlight-transparent`}

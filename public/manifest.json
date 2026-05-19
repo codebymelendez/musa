@@ -1,24 +1,29 @@
 {
-  "name": "Musa – Gestión de Belleza",
-  "short_name": "Musa",
+  "name": "MUSA – Gestión de Belleza",
+  "short_name": "MUSA",
   "description": "Gestiona tu agenda de citas como profesional independiente de belleza",
   "start_url": "/home",
   "display": "standalone",
-  "background_color": "#FFFBFE",
-  "theme_color": "#764797",
+  "background_color": "#FAF5F0",
+  "theme_color": "#B5593E",
   "orientation": "portrait",
   "categories": ["business", "productivity"],
   "icons": [
     {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "src": "/brand/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
     },
     {
-      "src": "/icon-512.png",
+      "src": "/brand/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/icon-512.svg",
       "sizes": "512x512",
-      "type": "image/png",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ],
@@ -28,14 +33,14 @@
       "short_name": "Nueva Cita",
       "description": "Agregar una cita rápidamente",
       "url": "/home",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/brand/icon-192.svg", "sizes": "192x192" }]
     },
     {
       "name": "Mi Agenda",
       "short_name": "Agenda",
       "description": "Ver las citas de hoy",
       "url": "/calendar",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/brand/icon-192.svg", "sizes": "192x192" }]
     }
   ]
 }
