@@ -5,7 +5,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 
 // Rutas que requieren autenticación
-const PRIVATE_ROUTES = ["/home", "/calendar", "/services", "/stats", "/profile", "/onboarding", "/promotions", "/loyalty"];
+const PRIVATE_ROUTES = [
+  "/home", "/calendar", "/services", "/stats", "/profile",
+  "/onboarding", "/promotions", "/loyalty",
+  "/clients",       // ficha de clientas — datos personales
+  "/appointments",  // citas con datos de clientas
+  "/booking",       // formulario interno de cita
+  "/team",          // gestión de staff
+  "/settings",      // configuración del negocio
+  "/notifications", // gestión de notificaciones
+];
 
 // Rutas solo para usuarios NO autenticados
 const AUTH_ROUTES = ["/login", "/register"];

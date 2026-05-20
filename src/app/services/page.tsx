@@ -154,6 +154,7 @@ export default function ServicesPage() {
                       src={service.imageUrl}
                       alt={service.name}
                       fill
+                      sizes="(max-width: 640px) calc(50vw - 2rem), 300px"
                       className="object-cover"
                     />
                   </div>

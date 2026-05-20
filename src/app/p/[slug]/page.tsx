@@ -255,6 +255,7 @@ export default function PublicBookingPage() {
                   src={professional.avatarUrl}
                   alt={professional.name}
                   fill
+                  sizes="36px"
                   className="object-cover"
                 />
               ) : (

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRightIcon } from "@heroicons/react/24/outline";
 import MusaLogo from "@/components/brand/MusaLogo";
 import HomeSearch from "@/components/HomeSearch";
+import IOSInstallHint from "@/components/IOSInstallHint";
 import { createAdminClient } from "@/lib/supabase-admin";
 
 // ISR: revalidar promos cada 60s (stale-while-revalidate)
@@ -573,6 +574,9 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ── iOS install hint (solo Safari iPhone/iPad, se puede descartar) ── */}
+        <IOSInstallHint />
+
         {/* ── Footer ─────────────────────────────────────────────────── */}
         <footer className="border-t border-border-subtle py-8">
           <div className="max-w-6xl mx-auto px-5 md:px-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -591,7 +595,7 @@ export default function HomePage() {
               </Link>
             </div>
             <p className="font-ui text-[11px] text-on-surface-subtle">
-              © 2025 Musa ·{" "}
+              © {new Date().getFullYear()} Musa ·{" "}
               <a
                 href="https://codebymelendez.com"
                 target="_blank"

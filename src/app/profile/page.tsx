@@ -151,7 +151,7 @@ export default function Profile() {
         <div className="relative">
           <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-surface-container-lowest shadow-sm relative bg-surface-container-high">
             {user?.avatarUrl ? (
-              <Image className="object-cover" alt="Foto de perfil" src={user.avatarUrl} fill />
+              <Image className="object-cover" alt="Foto de perfil" src={user.avatarUrl} fill sizes="128px" />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-rose-100">
                 <span className="font-ui font-semibold text-[32px] text-sienna-500">

@@ -21,6 +21,7 @@ export default function Booking() {
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuApfWxZ2vWecuBtL1wnWFigEXWkMvS-XiWXPGf5LlcwmQK23GJCJ8dSnc3084nNzUy4_haWztAfqGpyI4ReRJJwwbE84Im83JQnBRUizJz2aOw3NQDB5A9h5yjoeZQbYrfumqLy9sX5OjjUlIjBR3n3raAtWEY-9AdNJ2INab9OamKYjuiL__NGSWDVkhrDpkXQUFhHIhtDX-ykKK6bAe7Q8kThu2fozhfQA-lv8PLj70lrK1iOdRP6-oJxNP6mLJA-uZ00vvqvS7Bi"
               alt="Professional stylist profile picture"
               fill
+              sizes="40px"
               className="object-cover"
             />
           </div>

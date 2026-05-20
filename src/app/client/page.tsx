@@ -431,6 +431,7 @@ export default function ClientPortalPage() {
                           src={appt.user.avatarUrl}
                           alt={appt.user.name}
                           fill
+                          sizes="48px"
                           className="object-cover"
                         />
                       ) : (
