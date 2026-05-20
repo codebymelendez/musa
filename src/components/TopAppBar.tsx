@@ -22,6 +22,10 @@ export default function TopAppBar() {
   const { user } = useAppStore();
 
   const isHidden =
+    !pathname ||
+    pathname === "" ||
+    pathname === "/" ||
+    pathname === "/index.html" ||
     HIDDEN_PATHS.includes(pathname) ||
     pathname.startsWith("/booking") ||
     pathname.startsWith("/p/") ||

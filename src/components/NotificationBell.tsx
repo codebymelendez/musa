@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { BellIcon } from "@heroicons/react/24/outline";
 
 export default function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
@@ -32,9 +33,7 @@ export default function NotificationBell() {
       onClick={() => router.push("/notifications")}
       className="p-2 hover:bg-surface-container-high dark:hover:bg-zinc-800 transition-colors rounded-full relative"
     >
-      <span className="material-symbols-outlined text-zinc-900 dark:text-zinc-50">
-        notifications
-      </span>
+      <BellIcon className="w-6 h-6 text-zinc-900 dark:text-zinc-50" />
       {unreadCount > 0 && (
         <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-zinc-950"></span>
       )}
