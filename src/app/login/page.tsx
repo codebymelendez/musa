@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { ArrowRightIcon, EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 import MusaLogo from "@/components/brand/MusaLogo";
+import GoogleSignInButton from "@/components/GoogleSignInButton";
 
 export default function Login() {
   const { login, register } = useAuth();
@@ -65,6 +66,18 @@ export default function Login() {
 
         {/* Card */}
         <section className="bg-surface-raised border border-border-subtle rounded-2xl p-7 shadow-md space-y-6">
+          {/* Google OAuth */}
+          <GoogleSignInButton
+            label={isRegister ? "Registrarme con Google" : "Continuar con Google"}
+          />
+
+          {/* Divider */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-border-subtle" />
+            <span className="font-ui text-[12px] text-on-surface-subtle">o</span>
+            <div className="flex-1 h-px bg-border-subtle" />
+          </div>
+
           {/* Error */}
           {error && (
             <div className="bg-error-surface border border-error/20 rounded-lg px-4 py-3">

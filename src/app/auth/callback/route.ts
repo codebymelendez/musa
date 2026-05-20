@@ -1,18 +1,26 @@
 // GET /auth/callback
-// Supabase redirige aquí tras confirmación de email o magic link.
-// Intercambia el code por una sesión y redirige al destino correcto.
+// Supabase redirige aquí tras confirmación de email, magic link u OAuth (Google).
+// Intercambia el code por una sesión, crea el perfil si no existe (OAuth new user),
+// y redirige al destino correcto.
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
+
+// Previene open redirects — solo acepta rutas relativas dentro de la app
+function safeNext(raw: string | null): string {
+  if (!raw) return "/home";
+  if (!raw.startsWith("/") || raw.startsWith("//")) return "/home";
+  return raw;
+}
 
 export async function GET(req: NextRequest) {
   const { searchParams, origin } = req.nextUrl;
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/home";
+  const next = safeNext(searchParams.get("next"));
 
   if (!code) {
-    // Sin code → redirigir a login con error
     return NextResponse.redirect(new URL("/login?error=missing_code", origin));
   }
 
@@ -28,15 +36,51 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Verificar si el usuario completó el onboarding
-  const { data: profile } = await supabase
+  const authUser = data.session.user;
+  const admin = createAdminClient();
+
+  // Verificar si el perfil ya existe en la tabla User
+  const { data: profile } = await admin
     .from("User")
     .select("onboardingDone")
-    .eq("id", data.session.user.id)
+    .eq("id", authUser.id)
     .single();
 
-  const destination = profile?.onboardingDone ? "/home" : "/onboarding";
+  // Usuario nuevo via OAuth (Google) — crear perfil mínimo para que el onboarding pueda actualizarlo
+  if (!profile) {
+    const rawName =
+      (authUser.user_metadata?.full_name as string | undefined) ??
+      (authUser.user_metadata?.name as string | undefined) ??
+      authUser.email?.split("@")[0] ??
+      "Usuario";
 
+    const slug =
+      rawName
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .replace(/[^a-z0-9]/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "") +
+      "-" +
+      Math.random().toString(36).substring(2, 7);
+
+    const { error: insertError } = await admin.from("User").insert({
+      id: authUser.id,
+      email: authUser.email ?? null,
+      name: rawName,
+      slug,
+      avatarUrl: (authUser.user_metadata?.avatar_url as string | undefined) ?? null,
+      onboardingDone: false,
+      updatedAt: new Date().toISOString(),
+    });
+
+    if (insertError) {
+      console.error("[auth/callback] Error creando perfil OAuth:", insertError);
+    }
+  }
+
+  const destination = profile?.onboardingDone ? "/home" : "/onboarding";
   const finalResponse = NextResponse.redirect(new URL(destination, origin));
 
   // Copiar las cookies de sesión que Supabase seteó en `response` a `finalResponse`

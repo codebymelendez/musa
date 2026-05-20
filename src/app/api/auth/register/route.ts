@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient(req, response);
 
     // 1. Registrar en Supabase Auth
-    const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const APP_URL = process.env.NEXT_PUBLIC_APP_URL!;
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
