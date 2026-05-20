@@ -198,7 +198,7 @@ export default function HomePage() {
       <header className="fixed top-0 w-full z-40 glass-nav border-b border-border-subtle">
         <div className="max-w-6xl mx-auto px-5 md:px-8 h-16 flex items-center justify-between">
           <Link href="/">
-            <MusaLogo variant="wordmark" size="md" />
+            <MusaLogo variant="combo" size="md" />
           </Link>
           <nav className="flex items-center gap-1">
             <Link
@@ -555,7 +555,7 @@ export default function HomePage() {
                 </p>
                 <div className="flex flex-wrap items-center gap-3">
                   <Link
-                    href="/register"
+                    href="/login"
                     className="font-ui text-[14px] font-medium px-7 py-3 rounded-full bg-primary text-on-primary transition-opacity hover:opacity-90 shadow-primary-sm"
                   >
                     Empezar gratis

@@ -2,10 +2,81 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase-browser";
+import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
+import { useRouter } from "next/navigation";
 
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://getmusa.app";
 
 export default function GoogleSignInButton({
+  label = "Continuar con Google",
+}: {
+  label?: string;
+}) {
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+
+  const handleSuccess = async (credentialResponse: { credential?: string }) => {
+    if (!credentialResponse.credential) {
+      console.error("No credential provided");
+      return;
+    }
+
+    setLoading(true);
+    const supabase = createClient();
+    
+    const { data, error } = await supabase.auth.signInWithIdToken({
+      provider: "google",
+      token: credentialResponse.credential,
+    });
+
+    if (error) {
+      console.error("Error signing in with Google:", error);
+      setLoading(false);
+      return;
+    }
+
+    // Redirect or refresh upon successful login
+    router.push("/auth/callback");
+  };
+
+  const handleError = () => {
+    console.error("Google login failed");
+    setLoading(false);
+  };
+
+  if (!GOOGLE_CLIENT_ID) {
+    // Fallback: If no Client ID is provided, show the old button that uses Supabase's redirect.
+    // This ensures the app doesn't crash if the env var is missing during setup.
+    return <LegacyGoogleSignInButton />;
+  }
+
+  return (
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <div className="w-full flex justify-center [&>div]:w-full [&>div>div]:!w-full [&>div>div>div]:!w-full">
+        {/* We use a container with styles to try to make the Google button full width if possible */}
+        <GoogleLogin
+          onSuccess={handleSuccess}
+          onError={handleError}
+          useOneTap
+          theme="outline"
+          size="large"
+          text="continue_with"
+          shape="pill"
+          width="100%"
+        />
+      </div>
+      {loading && (
+        <div className="flex justify-center mt-2">
+          <div className="w-4 h-4 border border-on-surface border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+    </GoogleOAuthProvider>
+  );
+}
+
+// Legacy button for fallback if Client ID is not set yet
+function LegacyGoogleSignInButton({
   label = "Continuar con Google",
 }: {
   label?: string;
@@ -21,7 +92,6 @@ export default function GoogleSignInButton({
         redirectTo: `${APP_URL}/auth/callback`,
       },
     });
-    // No resetear loading — el navegador redirige a Google
   };
 
   return (

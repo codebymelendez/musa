@@ -190,7 +190,7 @@ export default function Home() {
 
   /* ─────────────────────────────────────────────────────────────────── */
   return (
-    <main className="pt-[76px] px-5 max-w-3xl mx-auto pb-36 animate-page">
+    <main className="pt-[88px] px-5 max-w-3xl mx-auto pb-36 animate-page">
 
       {/* ── Greeting ──────────────────────────────────────────────────── */}
       <section className="pt-8 mb-6">
