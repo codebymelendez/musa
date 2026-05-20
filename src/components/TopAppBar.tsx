@@ -6,35 +6,28 @@ import { Avatar } from "@/components/ui/Avatar";
 import NotificationBell from "./NotificationBell";
 import MusaLogo from "@/components/brand/MusaLogo";
 
-const HIDDEN_PATHS = [
-  "/",
-  "/login",
-  "/register",
-  "/onboarding",
-  "/forgot-password",
-  "/reset-password",
-  "/promotions",
-  "/appointments",
+const ALLOWED_PATHS = [
+  "/home",
+  "/calendar",
+  "/services",
+  "/stats",
+  "/profile",
+  "/team",
+  "/settings",
+  "/notifications",
+  "/loyalty",
+  "/clients",
 ];
 
 export default function TopAppBar() {
   const pathname = usePathname();
   const { user } = useAppStore();
 
-  const isHidden =
-    !pathname ||
-    pathname === "" ||
-    pathname === "/" ||
-    pathname === "/index.html" ||
-    HIDDEN_PATHS.includes(pathname) ||
-    pathname.startsWith("/booking") ||
-    pathname.startsWith("/p/") ||
-    pathname.startsWith("/staff/join") ||
-    pathname.startsWith("/explore") ||
-    pathname.startsWith("/client") ||
-    pathname.startsWith("/cita/");
+  const isAllowed =
+    pathname &&
+    ALLOWED_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
 
-  if (isHidden) return null;
+  if (!isAllowed) return null;
 
   const displayName = user?.business?.name || user?.name || null;
   const avatarSrc = user?.avatarUrl ?? null;

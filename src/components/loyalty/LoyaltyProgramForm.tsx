@@ -1,5 +1,7 @@
 "use client";
 
+import { CalendarDaysIcon, MagnifyingGlassIcon, TagIcon, QrCodeIcon, ArrowPathIcon, PencilSquareIcon, HomeIcon, ArrowRightOnRectangleIcon, StarIcon, Cog6ToothIcon, UserMinusIcon } from "@heroicons/react/24/outline";
+
 import { useState, useEffect } from "react";
 import { LoyaltyProgram } from "@/types";
 

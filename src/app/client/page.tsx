@@ -1,5 +1,7 @@
 "use client";
 
+import { CalendarDaysIcon, MagnifyingGlassIcon, TagIcon, QrCodeIcon, ArrowPathIcon, PencilSquareIcon, HomeIcon, ArrowRightOnRectangleIcon, StarIcon, Cog6ToothIcon, UserMinusIcon } from "@heroicons/react/24/outline";
+
 import { useEffect, useState, lazy, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -164,7 +166,7 @@ export default function ClientPortalPage() {
               href="/client/login"
               className="flex items-center justify-center gap-2 w-full h-14 bg-primary text-on-primary font-medium rounded-full shadow-primary-sm hover:scale-[1.02] transition-transform"
             >
-              <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>calendar_today</span>
+              <CalendarDaysIcon className="w-5 h-5" />
               Ver mis citas
             </Link>
             <Link
@@ -188,7 +190,7 @@ export default function ClientPortalPage() {
             href="/explore"
             className="flex items-center justify-center gap-2 text-sm font-medium text-primary hover:underline"
           >
-            <span className="material-symbols-outlined text-sm">search</span>
+            <MagnifyingGlassIcon className="w-4 h-4" />
             Explorar profesionales cerca
           </Link>
         </main>
@@ -225,14 +227,14 @@ export default function ClientPortalPage() {
             href="/explore"
             className="flex-1 flex items-center justify-center gap-2 bg-primary/10 text-primary text-sm font-medium rounded-2xl py-3 hover:bg-primary/20 transition-colors"
           >
-            <span className="material-symbols-outlined text-sm">search</span>
+            <MagnifyingGlassIcon className="w-4 h-4" />
             Nueva reserva
           </Link>
           <Link
             href="/"
             className="flex-1 flex items-center justify-center gap-2 bg-surface border border-outline-variant/30 text-on-surface-variant text-sm font-medium rounded-2xl py-3 hover:bg-surface-container transition-colors"
           >
-            <span className="material-symbols-outlined text-sm">local_offer</span>
+            <TagIcon className="w-4 h-4" />
             Ofertas
           </Link>
         </div>
@@ -333,7 +335,7 @@ export default function ClientPortalPage() {
                       onClick={() => setShowQRFor(showQRFor === acc.id ? null : acc.id)}
                       className="w-full h-10 flex items-center justify-center gap-2 bg-surface-container text-on-surface-variant text-xs font-medium rounded-xl hover:bg-surface border border-outline-variant/30 transition-colors"
                     >
-                      <span className="material-symbols-outlined text-sm">qr_code</span>
+                      <QrCodeIcon className="w-4 h-4" />
                       {showQRFor === acc.id ? "Ocultar QR" : "Mostrar mi QR"}
                     </button>
 
@@ -363,7 +365,7 @@ export default function ClientPortalPage() {
                     className="bg-surface-container-lowest rounded-2xl p-5 shadow-sm border border-outline-variant/10 flex items-center gap-4"
                   >
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center flex-shrink-0">
-                      <span className="material-symbols-outlined text-white text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>stars</span>
+                      <StarIcon className="w-5 h-5 text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-on-surface text-sm truncate">{biz.businessName}</p>
@@ -375,10 +377,10 @@ export default function ClientPortalPage() {
                       className="flex-shrink-0 h-9 px-4 bg-primary text-white text-xs font-medium rounded-full disabled:opacity-50 flex items-center gap-1 hover:bg-primary/90 transition-colors"
                     >
                       {enrolling === biz.businessId ? (
-                        <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                        <ArrowPathIcon className="w-4 h-4 animate-spin" />
                       ) : (
                         <>
-                          <span className="material-symbols-outlined text-sm">qr_code</span>
+                          <QrCodeIcon className="w-4 h-4" />
                           Mi QR
                         </>
                       )}
@@ -467,7 +469,7 @@ export default function ClientPortalPage() {
                         href={`/cita/${appt.rescheduleToken}`}
                         className="flex-1 h-10 bg-primary text-white text-xs font-medium rounded-xl flex items-center justify-center gap-1 hover:bg-primary/90 transition-colors"
                       >
-                        <span className="material-symbols-outlined text-sm">edit_calendar</span>
+                        <PencilSquareIcon className="w-4 h-4" />
                         Gestionar cita
                       </Link>
                     ) : (
@@ -475,7 +477,7 @@ export default function ClientPortalPage() {
                         href={`/p/${appt.user.slug}`}
                         className="flex-1 h-10 bg-primary/10 text-primary text-xs font-medium rounded-xl flex items-center justify-center gap-1 hover:bg-primary/20 transition-colors"
                       >
-                        <span className="material-symbols-outlined text-sm">calendar_add_on</span>
+                        <CalendarDaysIcon className="w-4 h-4" />
                         Reservar de nuevo
                       </Link>
                     )}
@@ -505,28 +507,28 @@ export default function ClientPortalPage() {
           href="/"
           className="flex flex-col items-center justify-center px-4 py-2 text-zinc-400 hover:text-primary transition-colors"
         >
-          <span className="material-symbols-outlined mb-1 text-[24px]">home</span>
+          <HomeIcon className="w-6 h-6 mb-1" />
           <span className="font-headline text-[10px] font-medium tracking-wide uppercase">Inicio</span>
         </Link>
         <Link
           href="/explore"
           className="flex flex-col items-center justify-center px-4 py-2 text-zinc-400 hover:text-primary transition-colors"
         >
-          <span className="material-symbols-outlined mb-1 text-[24px]">search</span>
+          <MagnifyingGlassIcon className="w-6 h-6 mb-1" />
           <span className="font-headline text-[10px] font-medium tracking-wide uppercase">Explorar</span>
         </Link>
         <Link
           href="/client"
           className="flex flex-col items-center justify-center px-4 py-2 bg-primary/10 text-primary rounded-full transition-colors"
         >
-          <span className="material-symbols-outlined mb-1 text-[24px]" style={{ fontVariationSettings: "'FILL' 1" }}>calendar_today</span>
+          <CalendarDaysIcon className="w-6 h-6 mb-1" />
           <span className="font-headline text-[10px] font-medium tracking-wide uppercase">Mis Citas</span>
         </Link>
         <button
           onClick={handleLogout}
           className="flex flex-col items-center justify-center px-4 py-2 text-zinc-400 hover:text-red-500 transition-colors"
         >
-          <span className="material-symbols-outlined mb-1 text-[24px]">logout</span>
+          <ArrowRightOnRectangleIcon className="w-6 h-6 mb-1" />
           <span className="font-headline text-[10px] font-medium tracking-wide uppercase">Salir</span>
         </button>
       </nav>

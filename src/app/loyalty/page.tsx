@@ -1,5 +1,7 @@
 "use client";
 
+import { CalendarDaysIcon, MagnifyingGlassIcon, TagIcon, QrCodeIcon, ArrowPathIcon, PencilSquareIcon, HomeIcon, ArrowRightOnRectangleIcon, StarIcon, Cog6ToothIcon, UserMinusIcon } from "@heroicons/react/24/outline";
+
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useToast } from "@/components/ui/Toast";
@@ -149,12 +151,7 @@ export default function LoyaltyPage() {
           <div className="space-y-4">
             {!program ? (
               <div className="text-center py-16 space-y-4">
-                <span
-                  className="material-symbols-outlined text-5xl text-on-surface-variant"
-                  style={{ fontVariationSettings: "'FILL' 0" }}
-                >
-                  loyalty
-                </span>
+                <TagIcon className="w-12 h-12 text-on-surface-variant mx-auto" />
                 <div>
                   <h3 className="font-headline font-bold text-on-surface">Sin programa activo</h3>
                   <p className="text-sm text-on-surface-variant mt-1">
@@ -165,7 +162,7 @@ export default function LoyaltyPage() {
                   onClick={() => setTab("config")}
                   className="mx-auto flex items-center gap-2 text-sm font-bold text-primary hover:underline"
                 >
-                  <span className="material-symbols-outlined text-sm">settings</span>
+                  <Cog6ToothIcon className="w-4 h-4" />
                   Configurar programa
                 </button>
               </div>
@@ -193,9 +190,9 @@ export default function LoyaltyPage() {
                       className="w-12 h-10 bg-primary text-white rounded-xl flex items-center justify-center flex-shrink-0 disabled:opacity-50"
                     >
                       {scanning ? (
-                        <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                        <ArrowPathIcon className="w-5 h-5 animate-spin" />
                       ) : (
-                        <span className="material-symbols-outlined text-sm">qr_code_scanner</span>
+                        <QrCodeIcon className="w-5 h-5" />
                       )}
                     </button>
                   </div>
@@ -206,9 +203,7 @@ export default function LoyaltyPage() {
 
                 {/* Search */}
                 <div className="relative">
-                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">
-                    search
-                  </span>
+                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
                   <input
                     className="w-full bg-surface-container-high rounded-2xl pl-9 pr-4 py-3 text-sm focus:ring-2 focus:ring-primary-container border-none outline-none"
                     placeholder="Buscar clienta..."
@@ -226,7 +221,7 @@ export default function LoyaltyPage() {
                   </div>
                 ) : accounts.length === 0 ? (
                   <div className="text-center py-12 text-on-surface-variant">
-                    <span className="material-symbols-outlined text-4xl">person_off</span>
+                    <UserMinusIcon className="w-10 h-10 mx-auto text-on-surface-variant" />
                     <p className="text-sm mt-2">
                       {search ? "Sin resultados" : "Aún no hay clientas en el programa"}
                     </p>

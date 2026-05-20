@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BellSlashIcon } from "@heroicons/react/24/outline";
 
 interface Notification {
   id: string;
@@ -57,7 +58,7 @@ export default function NotificationsPage() {
 
         {notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-on-surface-variant opacity-50 space-y-4">
-             <span className="material-symbols-outlined text-6xl">notifications_off</span>
+             <BellSlashIcon className="w-16 h-16 mx-auto" />
              <p className="font-bold">Todo al día por aquí</p>
           </div>
         ) : (
