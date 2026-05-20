@@ -12,7 +12,8 @@ const PLANS = [
     price: "0",
     currency: "Bs",
     features: [
-      "Hasta 20 citas / mes",
+      "Hasta 25 citas / mes",
+      "Hasta 10 clientas activas",
       "1 profesional (tú)",
       "Gestión de clientes",
       "Calendario online",

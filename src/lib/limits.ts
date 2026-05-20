@@ -1,39 +1,96 @@
-import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
 
-export async function checkAppointmentLimit(businessId: string) {
-  const supabase = await createClient();
-  const { data: business, error } = await supabase
-    .from('Business')
-    .select('*, plan:Plan(*)')
-    .eq('id', businessId)
-    .single();
+// ── Free-plan defaults (used when Plan.limits is missing fields) ──────────────
+export const FREE_PLAN_LIMITS = {
+  maxMonthlyAppointments: 25,
+  maxActiveClients: 10,
+};
 
-  if (error || !business || !business.plan) return true;
-
-  const limits = business.plan.limits as any;
-  const maxAppointments = limits?.maxMonthlyAppointments || 30;
-
-  if (business.currentMonthBookings >= maxAppointments) {
-    return false;
-  }
-
-  return true;
+// Bounds for the current calendar month
+function currentMonthBounds() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  return { start: start.toISOString(), end: end.toISOString() };
 }
 
-export async function incrementAppointmentCount(businessId: string) {
-  const supabase = await createClient();
-  
-  // Obtenemos el valor actual (no es idealmente atómico pero similar a la implementación previa si no usamos RPC)
-  const { data: business } = await supabase
-    .from('Business')
-    .select('currentMonthBookings')
-    .eq('id', businessId)
+async function getPlanConfig(businessId: string) {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("Business")
+    .select("plan:Plan(name, limits)")
+    .eq("id", businessId)
     .single();
 
-  if (business) {
-    await supabase
-      .from('Business')
-      .update({ currentMonthBookings: (business.currentMonthBookings || 0) + 1 })
-      .eq('id', businessId);
-  }
+  const plan = Array.isArray(data?.plan) ? data?.plan[0] : data?.plan;
+  const limits = (plan?.limits ?? {}) as Record<string, number>;
+
+  return {
+    planName: (plan?.name ?? "FREE") as string,
+    maxMonthlyAppointments:
+      limits.maxMonthlyAppointments ?? FREE_PLAN_LIMITS.maxMonthlyAppointments,
+    maxActiveClients:
+      limits.maxActiveClients ?? FREE_PLAN_LIMITS.maxActiveClients,
+  };
 }
+
+// ── Public: used by dashboard widget and limit checks ────────────────────────
+export async function getLimitStatus(businessId: string) {
+  const admin = createAdminClient();
+  const { start, end } = currentMonthBounds();
+
+  const { data: users } = await admin
+    .from("User")
+    .select("id")
+    .eq("businessId", businessId);
+
+  const userIds = (users ?? []).map((u: { id: string }) => u.id);
+
+  const [planConfig, aptResult, clientResult] = await Promise.all([
+    getPlanConfig(businessId),
+
+    // Count appointments scheduled this month (cancelled/no_show not counted —
+    // professionals shouldn't be penalised for slots outside their control)
+    userIds.length > 0
+      ? admin
+          .from("Appointment")
+          .select("id", { count: "exact", head: true })
+          .in("userId", userIds)
+          .not("status", "in", "(cancelled,no_show)")
+          .gte("startTime", start)
+          .lte("startTime", end)
+      : Promise.resolve({ count: 0 as number | null }),
+
+    // Count active client profiles for this business
+    admin
+      .from("Client")
+      .select("id", { count: "exact", head: true })
+      .eq("businessId", businessId)
+      .eq("isActive", true),
+  ]);
+
+  return {
+    planName: planConfig.planName,
+    appointments: {
+      used: aptResult.count ?? 0,
+      limit: planConfig.maxMonthlyAppointments,
+    },
+    clients: {
+      used: clientResult.count ?? 0,
+      limit: planConfig.maxActiveClients,
+    },
+  };
+}
+
+// ── Enforcement helpers ───────────────────────────────────────────────────────
+
+export async function checkAppointmentLimit(businessId: string): Promise<boolean> {
+  const status = await getLimitStatus(businessId);
+  return status.appointments.used < status.appointments.limit;
+}
+
+export async function checkClientLimit(businessId: string): Promise<boolean> {
+  const status = await getLimitStatus(businessId);
+  return status.clients.used < status.clients.limit;
+}
+

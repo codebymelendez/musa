@@ -46,7 +46,6 @@ export interface Business {
   logoUrl: string | null;
   planId: string;
   plan?: PlanDef;
-  currentMonthBookings: number;
 }
 
 export interface PlanDef {

@@ -4,6 +4,7 @@ import "./globals.css";
 import BottomNavBar from "@/components/BottomNavBar";
 import TopAppBar from "@/components/TopAppBar";
 import { ToastProvider } from "@/components/ui/Toast";
+import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 
 const cormorant = Cormorant_Garamond({
   variable: "--font-cormorant",
@@ -30,10 +31,14 @@ const dmMono = DM_Mono({
 export const metadata: Metadata = {
   title: "MUSA – Gestión de Belleza",
   description: "Tu agenda, tu imagen, tu negocio. Gestión profesional para emprendedoras de belleza.",
+  metadataBase: new URL("https://getmusa.app"),
   manifest: "/manifest.json",
   icons: {
-    icon: [{ url: "/brand/favicon.svg", type: "image/svg+xml" }],
-    apple: "/brand/apple-touch-icon.svg",
+    icon: [
+      { url: "/favicon.png", type: "image/png", sizes: "32x32" },
+      { url: "/brand/favicon.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
   appleWebApp: {
     capable: true,
@@ -60,11 +65,13 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" href="/brand/apple-touch-icon.svg" />
+        <link rel="icon" href="/favicon.png" type="image/png" sizes="32x32" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
       </head>
       <body
         className={`${cormorant.variable} ${dmSans.variable} ${dmMono.variable} font-body antialiased min-h-screen pb-32 tap-highlight-transparent`}
       >
+        <ServiceWorkerRegistration />
         <ToastProvider>
           <TopAppBar />
           {children}

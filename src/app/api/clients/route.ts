@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase-server";
 import { createAdminClient } from "@/lib/supabase-admin";
+import { checkClientLimit } from "@/lib/limits";
 
 function normalizePhone(phone: string) {
   return phone.replace(/\D/g, "");
@@ -122,6 +123,21 @@ export async function POST(req: NextRequest) {
       .eq('businessId', businessId)
       .eq('phone', normalizedPhone)
       .maybeSingle();
+
+    // Solo verificar límite al crear una clienta NUEVA (no al actualizar una existente)
+    if (!existingClient) {
+      const canCreate = await checkClientLimit(businessId);
+      if (!canCreate) {
+        return NextResponse.json(
+          {
+            error:
+              "Has alcanzado el límite de clientas activas en tu plan gratuito (máx. 10). Actualiza a PRO para clientas ilimitadas.",
+            code: "CLIENT_LIMIT_REACHED",
+          },
+          { status: 403 }
+        );
+      }
+    }
 
     let client;
     if (existingClient) {

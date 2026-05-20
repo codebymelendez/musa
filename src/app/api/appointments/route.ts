@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase-server";
 import { createAdminClient } from "@/lib/supabase-admin";
-import { checkAppointmentLimit, incrementAppointmentCount } from "@/lib/limits";
+import { checkAppointmentLimit } from "@/lib/limits";
 import { getBlocksInRange, isSlotBlocked } from "@/lib/availability";
 
 const createSchema = z.object({
@@ -91,22 +91,11 @@ export async function POST(req: NextRequest) {
     const { clientId, serviceId, startTime, notes } = parsed.data;
     const supabase = await createClient();
 
-    // 0. Verificar límites del plan
     const { data: user } = await supabase
       .from('User')
       .select('businessId')
       .eq('id', session.userId)
       .single();
-
-    if (user?.businessId) {
-      const canCreate = await checkAppointmentLimit(user.businessId);
-      if (!canCreate) {
-        return NextResponse.json(
-          { error: "Has alcanzado el límite de citas de tu plan gratuito. Actualiza a PRO para citas ilimitadas." },
-          { status: 403 }
-        );
-      }
-    }
 
     // Obtener duración del servicio
     const { data: service } = await supabase
@@ -149,6 +138,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Verificar límite inmediatamente antes del INSERT para minimizar ventana de race condition
+    if (user?.businessId) {
+      const canCreate = await checkAppointmentLimit(user.businessId);
+      if (!canCreate) {
+        return NextResponse.json(
+          { error: "Has alcanzado el límite de citas de tu plan gratuito. Actualiza a PRO para citas ilimitadas." },
+          { status: 403 }
+        );
+      }
+    }
+
     const { data: appointment, error: createError } = await supabase
       .from('Appointment')
       .insert({
@@ -168,11 +168,6 @@ export async function POST(req: NextRequest) {
     if (createError) {
       console.error("[appointment create error]", createError);
       return NextResponse.json({ error: "Error al crear la cita" }, { status: 500 });
-    }
-
-    // 3. Incrementar contador de citas del negocio
-    if (user?.businessId) {
-      await incrementAppointmentCount(user.businessId);
     }
 
     return NextResponse.json(appointment, { status: 201 });

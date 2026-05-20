@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { sendNotification, sendClientNotification } from "@/lib/notifications";
 import { getBlocksInRange, isSlotBlocked } from "@/lib/availability";
+import { checkAppointmentLimit } from "@/lib/limits";
 
 function normalizePhone(phone: string) {
   return phone.replace(/\D/g, "");
@@ -156,6 +157,17 @@ export async function POST(req: NextRequest, { params }: Params) {
         return NextResponse.json({ error: "Error al registrar cliente" }, { status: 500 });
       }
       client = newClient;
+    }
+
+    // Verificar límite de citas inmediatamente antes del INSERT (reduce ventana de race condition)
+    if (user.businessId) {
+      const canBook = await checkAppointmentLimit(user.businessId);
+      if (!canBook) {
+        return NextResponse.json(
+          { error: "La agenda de esta profesional está completa para este mes. Por favor contáctala directamente." },
+          { status: 503 }
+        );
+      }
     }
 
     // Crear cita con token de reschedule

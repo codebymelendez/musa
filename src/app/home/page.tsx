@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useCallback, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useAppStore } from "@/store/useAppStore";
 import { useAuth } from "@/hooks/useAuth";
@@ -8,8 +9,7 @@ import { useAppointments } from "@/hooks/useAppointments";
 import { useStats } from "@/hooks/useStats";
 import { Appointment, AppointmentStatus } from "@/types";
 import { formatTimeES, formatCurrency } from "@/lib/utils";
-import NewAppointmentModal from "@/components/appointments/NewAppointmentModal";
-import PaymentModal from "@/components/appointments/PaymentModal";
+import PlanUsageWidget from "@/components/PlanUsageWidget";
 import {
   PlusIcon,
   CheckCircleIcon,
@@ -19,6 +19,15 @@ import {
   CalendarDaysIcon,
   ArrowRightIcon,
 } from "@heroicons/react/24/outline";
+
+const NewAppointmentModal = dynamic(
+  () => import("@/components/appointments/NewAppointmentModal"),
+  { ssr: false }
+);
+const PaymentModal = dynamic(
+  () => import("@/components/appointments/PaymentModal"),
+  { ssr: false }
+);
 
 const STATUS_BORDER: Record<string, string> = {
   pending:     "border-l-border",
@@ -494,6 +503,11 @@ export default function Home() {
           )}
         </div>
       </section>
+
+      {/* ── Plan usage ───────────────────────────────────────────────── */}
+      <div className="mb-8">
+        <PlanUsageWidget />
+      </div>
 
       {/* ── Accesos rápidos ───────────────────────────────────────────── */}
       <section className="mb-8">

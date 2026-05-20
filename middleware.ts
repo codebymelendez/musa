@@ -26,6 +26,11 @@ export async function middleware(req: NextRequest) {
 
   const session = await getSession(req);
 
+  // ── Usuario autenticado en "/" → redirigir al dashboard (evita que staff vea la landing)
+  if (session && pathname === "/") {
+    return NextResponse.redirect(new URL("/home", req.url));
+  }
+
   // ── Usuario autenticado intenta acceder a login/register → redirigir a home
   if (session && AUTH_ROUTES.some((r) => pathname.startsWith(r))) {
     return NextResponse.redirect(new URL("/home", req.url));
