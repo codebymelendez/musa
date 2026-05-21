@@ -320,8 +320,8 @@ function PaymentContent() {
               )}
             </div>
             <div className="font-ui text-[13px] text-on-surface space-y-0.5">
-              <p>Correo: <span className="font-semibold">pagos@musa-app.com</span></p>
-              <p>Nombre: <span className="font-semibold">Musa Tech LLC</span></p>
+              <p>Correo: <span className="font-semibold">duran6910@gmail.com</span></p>
+              <p>Celular: <span className="font-semibold">+1 (786) 322-0620</span></p>
             </div>
             {selectedMethod === "zelle" && (
               <div className="mt-4 pt-4 border-t border-primary/20">
