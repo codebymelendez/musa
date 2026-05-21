@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { useRouter } from "next/navigation";
 import ImageUploader from "@/components/ui/ImageUploader";
@@ -8,15 +8,55 @@ import ImageUploader from "@/components/ui/ImageUploader";
 export default function BusinessSettingsPage() {
   const { user, setUser } = useAppStore();
   const router = useRouter();
-  
-  const [name,      setName]      = useState(user?.business?.name || "");
-  const [city,      setCity]      = useState(user?.business?.city || "");
-  const [logoUrl,   setLogoUrl]   = useState(user?.business?.logoUrl || "");
+
+  const [name,      setName]      = useState("");
+  const [city,      setCity]      = useState("");
+  const [logoUrl,   setLogoUrl]   = useState("");
   const [saving,    setSaving]    = useState(false);
   const [message,   setMessage]   = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [hydrated,  setHydrated]  = useState(false);
 
-  if (user?.role !== "OWNER") {
-    return <div className="p-8 text-center">No autorizado</div>;
+  // Sincronizar valores del formulario cuando el store de Zustand cargue
+  useEffect(() => {
+    if (user !== undefined) {
+      if (user) {
+        setName(user.business?.name || "");
+        setCity(user.business?.city || "");
+        setLogoUrl((user.business as any)?.logoUrl || "");
+      }
+      setHydrated(true);
+    }
+  }, [user]);
+
+  // Skeleton mientras el store hidrata
+  if (!hydrated) {
+    return (
+      <div className="min-h-screen bg-background p-6 pb-32 pt-20">
+        <div className="max-w-md mx-auto space-y-8">
+          <div className="space-y-2">
+            <div className="h-8 w-40 bg-surface-sunken rounded-lg animate-pulse" />
+            <div className="h-4 w-64 bg-surface-sunken rounded animate-pulse" />
+          </div>
+          <div className="bg-surface border border-outline-variant/30 p-6 rounded-xl space-y-6">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-full aspect-video max-w-xs rounded-2xl bg-surface-sunken animate-pulse" />
+            </div>
+            <div className="space-y-3">
+              <div className="h-4 w-32 bg-surface-sunken rounded animate-pulse" />
+              <div className="h-12 w-full bg-surface-sunken rounded-xl animate-pulse" />
+            </div>
+            <div className="space-y-3">
+              <div className="h-4 w-20 bg-surface-sunken rounded animate-pulse" />
+              <div className="h-12 w-full bg-surface-sunken rounded-xl animate-pulse" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user || user.role !== "OWNER") {
+    return <div className="p-8 text-center text-on-surface-muted">No autorizado</div>;
   }
 
   const handleSave = async (e: React.FormEvent) => {
@@ -63,8 +103,11 @@ export default function BusinessSettingsPage() {
             <ImageUploader
               currentUrl={logoUrl || null}
               bucket="business-avatars"
-              storagePath={`business/${user?.business?.id ?? 'new'}/logo`}
-              onUploaded={(url) => setLogoUrl(url)}
+              storagePath={`business/${user.business?.id ?? 'new'}/logo`}
+              onUploaded={(url) => {
+                setLogoUrl(url);
+                setMessage({ type: 'success', text: 'Imagen cargada. Haz clic en "Guardar Cambios" para aplicar.' });
+              }}
               shape="rounded"
               fallbackInitials={name ? name.slice(0,2).toUpperCase() : undefined}
               hint="Imagen de tu negocio · JPG, PNG o WebP · máx. 5 MB"

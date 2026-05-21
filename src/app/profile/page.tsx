@@ -77,7 +77,11 @@ export default function Profile() {
     try {
       const payload: Record<string, unknown> = {};
 
-      if (editMode === "hours") {
+      if (editMode === "profile") {
+        payload.name = formName;
+        payload.bio = formBio;
+        payload.avatarUrl = formAvatarUrl;
+      } else if (editMode === "hours") {
         if (formStartHour >= formEndHour) {
           alert("La hora de inicio debe ser anterior a la de cierre");
           setSaving(false);
@@ -144,7 +148,21 @@ export default function Profile() {
 
   const settings = user?.settings as ProfessionalSettings | null;
 
+  // Bloquear scroll del body cuando cualquier modal está abierto
+  useEffect(() => {
+    if (editMode !== "none") {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [editMode]);
+
+  // ── Shell ──────────────────────────────────────────────────────────────────
+  // Los modales se renderizan FUERA de <main> para evitar que el transform
+  // de animate-page los saque del viewport (CSS: transform crea containing block).
   return (
+    <>
     <main className="max-w-screen-md mx-auto px-6 pt-24 space-y-8 pb-32 animate-page">
       {/* Profile Header */}
       <section className="flex flex-col items-center text-center space-y-4">
@@ -179,65 +197,6 @@ export default function Profile() {
           )}
         </div>
       </section>
-
-      {/* Edit Profile Modal */}
-      {editMode === "profile" && (
-        <div className="fixed inset-0 z-[100] bg-surface/95 backdrop-blur-md flex items-end sm:items-center justify-center">
-          <div className="bg-surface-container-lowest w-full max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] p-8 space-y-5">
-            <div className="flex items-center justify-between">
-              <h3 className="font-ui text-lg font-medium">Editar Perfil</h3>
-              <button onClick={() => setEditMode("none")} className="w-10 h-10 rounded-full bg-surface-sunken flex items-center justify-center text-on-surface-muted hover:text-on-surface transition-colors">
-                ✕
-              </button>
-            </div>
-             <div className="space-y-4">
-              <label className="musa-sublabel">Foto de Perfil</label>
-              <ImageUploader
-                currentUrl={formAvatarUrl || null}
-                bucket="staff-avatars"
-                storagePath={`staff/${user?.id ?? 'new'}/avatar`}
-                onUploaded={(url) => setFormAvatarUrl(url)}
-                shape="circle"
-                fallbackInitials={formName ? formName.slice(0,2).toUpperCase() : undefined}
-                hint="Tu foto profesional · JPG, PNG o WebP"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="musa-sublabel">Nombre</label>
-              <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="Tu nombre" className="musa-input" />
-            </div>
-            <textarea value={formBio} onChange={(e) => setFormBio(e.target.value)} placeholder="Descripción de tu negocio..." rows={3} className="musa-input resize-none py-3" />
-            <button onClick={handleSave} disabled={saving} className="w-full h-14 bg-primary text-on-primary font-medium shadow-primary-sm rounded-full hover:bg-primary-hover transition-colors">
-              {saving ? "Guardando..." : "Guardar"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Business Modal */}
-      {editMode === "business" && (
-        <div className="fixed inset-0 z-[100] bg-surface/95 backdrop-blur-md flex items-end sm:items-center justify-center">
-          <div className="bg-surface-container-lowest w-full max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] p-8 space-y-5">
-            <div className="flex items-center justify-between">
-              <h3 className="font-ui text-lg font-medium">Editar Negocio</h3>
-              <button onClick={() => setEditMode("none")} className="w-10 h-10 rounded-full bg-surface-sunken flex items-center justify-center text-on-surface-muted hover:text-on-surface transition-colors">
-                ✕
-              </button>
-            </div>
-            <div className="space-y-2">
-              <label className="musa-sublabel">Nombre del Negocio</label>
-              <input type="text" value={formBusinessName} onChange={(e) => setFormBusinessName(e.target.value)} placeholder="Ej. Aurora Atelier" className="musa-input" />
-            </div>
-            <div className="space-y-2">
-              <label className="musa-sublabel">Ciudad</label>
-              <input type="text" value={formCity} onChange={(e) => setFormCity(e.target.value)} placeholder="Ej. Caracas" className="musa-input" />
-            </div>
-            <button onClick={handleSave} disabled={saving || !formBusinessName} className="w-full h-14 bg-primary text-on-primary font-medium shadow-primary-sm rounded-full hover:bg-primary-hover transition-colors disabled:opacity-50">
-              {saving ? "Guardando..." : "Guardar"}
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Bento Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -344,111 +303,7 @@ export default function Profile() {
         </section>
       </div>
 
-      {/* Edit Hours Modal */}
-      {editMode === "hours" && (
-        <div className="fixed inset-0 z-[100] bg-surface/95 backdrop-blur-md flex items-end sm:items-center justify-center">
-          <div className="bg-surface-container-lowest w-full max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] p-8 space-y-5 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <h3 className="font-ui text-lg font-medium">Editar Horarios</h3>
-              <button onClick={() => setEditMode("none")} className="w-10 h-10 rounded-full bg-surface-sunken flex items-center justify-center text-on-surface-muted hover:text-on-surface transition-colors">
-                ✕
-              </button>
-            </div>
-            <div className="space-y-2">
-              <label className="musa-sublabel">Días disponibles</label>
-              <div className="flex gap-2 flex-wrap">
-                {DAY_NAMES.map((name, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => toggleWorkDay(idx)}
-                    className={`w-10 h-10 rounded-full text-sm font-medium transition-colors ${formWorkDays.includes(idx) ? "bg-primary text-on-primary shadow-primary-sm" : "bg-surface-container-low text-on-surface-variant hover:bg-outline-variant/20"}`}
-                  >
-                    {name[0]}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="musa-sublabel">Hora inicio</label>
-                <div className="flex gap-1">
-                  <select 
-                    value={Math.floor(formStartHour / 100)} 
-                    onChange={(e) => setFormStartHour(parseInt(e.target.value) * 100 + (formStartHour % 100))}
-                    className="musa-input flex-1 px-3"
-                  >
-                    {Array.from({ length: 24 }, (_, i) => (
-                      <option key={i} value={i}>{i.toString().padStart(2, "0")}</option>
-                    ))}
-                  </select>
-                  <select 
-                    value={formStartHour % 100} 
-                    onChange={(e) => setFormStartHour(Math.floor(formStartHour / 100) * 100 + parseInt(e.target.value))}
-                    className="musa-input flex-1 px-3"
-                  >
-                    {[0, 15, 30, 45].map((m) => (
-                      <option key={m} value={m}>{m.toString().padStart(2, "0")}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="musa-sublabel">Hora cierre</label>
-                <div className="flex gap-1">
-                  <select 
-                    value={Math.floor(formEndHour / 100)} 
-                    onChange={(e) => setFormEndHour(parseInt(e.target.value) * 100 + (formEndHour % 100))}
-                    className="musa-input flex-1 px-3"
-                  >
-                    {Array.from({ length: 25 }, (_, i) => (
-                      <option key={i} value={i}>{i.toString().padStart(2, "0")}</option>
-                    ))}
-                  </select>
-                  <select 
-                    value={formEndHour % 100} 
-                    onChange={(e) => setFormEndHour(Math.floor(formEndHour / 100) * 100 + parseInt(e.target.value))}
-                    className="musa-input flex-1 px-3"
-                  >
-                    {[0, 15, 30, 45].map((m) => (
-                      <option key={m} value={m}>{m.toString().padStart(2, "0")}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-            <button onClick={handleSave} disabled={saving} className="w-full h-14 bg-primary text-on-primary font-medium shadow-primary-sm rounded-full hover:bg-primary-hover transition-colors">
-              {saving ? "Guardando..." : "Guardar"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Contact Modal */}
-      {editMode === "contact" && (
-        <div className="fixed inset-0 z-[100] bg-surface/95 backdrop-blur-md flex items-end sm:items-center justify-center">
-          <div className="bg-surface-container-lowest w-full max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] p-8 space-y-5">
-            <div className="flex items-center justify-between">
-              <h3 className="font-ui text-lg font-medium">Editar Contacto</h3>
-              <button onClick={() => setEditMode("none")} className="w-10 h-10 rounded-full bg-surface-sunken flex items-center justify-center text-on-surface-muted hover:text-on-surface transition-colors">
-                ✕
-              </button>
-            </div>
-            <div className="space-y-2">
-              <label className="musa-sublabel">WhatsApp</label>
-              <input type="tel" value={formWhatsapp} onChange={(e) => setFormWhatsapp(e.target.value)} placeholder="+58 412 000 0000" className="musa-input" />
-            </div>
-            <div className="space-y-2">
-              <label className="musa-sublabel">Instagram</label>
-              <input type="text" value={formInstagram} onChange={(e) => setFormInstagram(e.target.value)} placeholder="@tu_usuario" className="musa-input" />
-            </div>
-            <button onClick={handleSave} disabled={saving} className="w-full h-14 bg-primary text-on-primary font-medium shadow-primary-sm rounded-full hover:bg-primary-hover transition-colors">
-              {saving ? "Guardando..." : "Guardar"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Enlace de Reserva */}
+      {/* ── Enlace de Reserva ── */}
       <section className="relative overflow-hidden bg-primary/5 rounded-2xl p-6 border border-primary/10">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-1">
@@ -509,5 +364,182 @@ export default function Profile() {
         </div>
       </section>
     </main>
+
+    {/* ── Modal: Editar Perfil ── */}
+    {editMode === "profile" && (
+      <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center">
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditMode("none")} />
+        <div className="relative w-full sm:max-w-md bg-surface rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl">
+          <h2 className="font-cormorant text-[22px] text-on-surface mb-6">Editar Perfil</h2>
+          <div className="space-y-4">
+            <div className="flex justify-center">
+              <ImageUploader
+                bucket="staff-avatars"
+                storagePath={`avatar-${user?.id ?? "unknown"}`}
+                currentUrl={formAvatarUrl || null}
+                shape="circle"
+                onUploaded={(url) => setFormAvatarUrl(url)}
+              />
+            </div>
+            <div>
+              <label className="font-ui text-[12px] font-medium text-on-surface-muted uppercase tracking-wide">Nombre</label>
+              <input
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                className="mt-1 w-full px-4 py-3 bg-surface-sunken rounded-xl font-ui text-[14px] text-on-surface border border-outline-variant/30 focus:outline-none focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="font-ui text-[12px] font-medium text-on-surface-muted uppercase tracking-wide">Biografía</label>
+              <textarea
+                value={formBio}
+                onChange={(e) => setFormBio(e.target.value)}
+                rows={3}
+                className="mt-1 w-full px-4 py-3 bg-surface-sunken rounded-xl font-ui text-[14px] text-on-surface border border-outline-variant/30 focus:outline-none focus:border-primary resize-none"
+              />
+            </div>
+          </div>
+          <div className="flex gap-3 mt-6">
+            <button onClick={() => setEditMode("none")} className="flex-1 py-3 font-ui font-medium text-[14px] text-on-surface-variant border border-outline-variant/30 rounded-full">Cancelar</button>
+            <button onClick={handleSave} disabled={saving} className="flex-1 py-3 font-ui font-medium text-[14px] bg-primary text-on-primary rounded-full disabled:opacity-50">
+              {saving ? "Guardando…" : "Guardar"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ── Modal: Mi Negocio ── */}
+    {editMode === "business" && (
+      <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center">
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditMode("none")} />
+        <div className="relative w-full sm:max-w-md bg-surface rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl">
+          <h2 className="font-cormorant text-[22px] text-on-surface mb-6">Mi Negocio</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="font-ui text-[12px] font-medium text-on-surface-muted uppercase tracking-wide">Nombre del Negocio</label>
+              <input
+                value={formBusinessName}
+                onChange={(e) => setFormBusinessName(e.target.value)}
+                className="mt-1 w-full px-4 py-3 bg-surface-sunken rounded-xl font-ui text-[14px] text-on-surface border border-outline-variant/30 focus:outline-none focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="font-ui text-[12px] font-medium text-on-surface-muted uppercase tracking-wide">Ciudad</label>
+              <input
+                value={formCity}
+                onChange={(e) => setFormCity(e.target.value)}
+                className="mt-1 w-full px-4 py-3 bg-surface-sunken rounded-xl font-ui text-[14px] text-on-surface border border-outline-variant/30 focus:outline-none focus:border-primary"
+              />
+            </div>
+          </div>
+          <div className="flex gap-3 mt-6">
+            <button onClick={() => setEditMode("none")} className="flex-1 py-3 font-ui font-medium text-[14px] text-on-surface-variant border border-outline-variant/30 rounded-full">Cancelar</button>
+            <button onClick={handleSave} disabled={saving} className="flex-1 py-3 font-ui font-medium text-[14px] bg-primary text-on-primary rounded-full disabled:opacity-50">
+              {saving ? "Guardando…" : "Guardar"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ── Modal: Horarios ── */}
+    {editMode === "hours" && (
+      <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center">
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditMode("none")} />
+        <div className="relative w-full sm:max-w-md bg-surface rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl">
+          <h2 className="font-cormorant text-[22px] text-on-surface mb-6">Editar Horarios</h2>
+          <div className="space-y-5">
+            <div>
+              <label className="font-ui text-[12px] font-medium text-on-surface-muted uppercase tracking-wide mb-3 block">Días de Trabajo</label>
+              <div className="flex gap-2 flex-wrap">
+                {DAY_NAMES.map((name, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => toggleWorkDay(idx)}
+                    className={`px-3 py-2 rounded-full font-ui text-[13px] font-medium transition-colors ${
+                      formWorkDays.includes(idx)
+                        ? "bg-primary text-on-primary"
+                        : "bg-surface-sunken text-on-surface-variant border border-outline-variant/30"
+                    }`}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="font-ui text-[12px] font-medium text-on-surface-muted uppercase tracking-wide">Apertura</label>
+                <select
+                  value={formStartHour}
+                  onChange={(e) => setFormStartHour(Number(e.target.value))}
+                  className="mt-1 w-full px-4 py-3 bg-surface-sunken rounded-xl font-ui text-[14px] text-on-surface border border-outline-variant/30 focus:outline-none focus:border-primary"
+                >
+                  {Array.from({ length: 24 }, (_, i) => i * 100).map((h) => (
+                    <option key={h} value={h}>{`${String(Math.floor(h / 100)).padStart(2, "0")}:00`}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="font-ui text-[12px] font-medium text-on-surface-muted uppercase tracking-wide">Cierre</label>
+                <select
+                  value={formEndHour}
+                  onChange={(e) => setFormEndHour(Number(e.target.value))}
+                  className="mt-1 w-full px-4 py-3 bg-surface-sunken rounded-xl font-ui text-[14px] text-on-surface border border-outline-variant/30 focus:outline-none focus:border-primary"
+                >
+                  {Array.from({ length: 24 }, (_, i) => i * 100).map((h) => (
+                    <option key={h} value={h}>{`${String(Math.floor(h / 100)).padStart(2, "0")}:00`}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-3 mt-6">
+            <button onClick={() => setEditMode("none")} className="flex-1 py-3 font-ui font-medium text-[14px] text-on-surface-variant border border-outline-variant/30 rounded-full">Cancelar</button>
+            <button onClick={handleSave} disabled={saving} className="flex-1 py-3 font-ui font-medium text-[14px] bg-primary text-on-primary rounded-full disabled:opacity-50">
+              {saving ? "Guardando…" : "Guardar"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ── Modal: Contacto ── */}
+    {editMode === "contact" && (
+      <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center">
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditMode("none")} />
+        <div className="relative w-full sm:max-w-md bg-surface rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl">
+          <h2 className="font-cormorant text-[22px] text-on-surface mb-6">Canales de Contacto</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="font-ui text-[12px] font-medium text-[#25D366] uppercase tracking-wide">WhatsApp</label>
+              <input
+                value={formWhatsapp}
+                onChange={(e) => setFormWhatsapp(e.target.value)}
+                placeholder="04121234567"
+                className="mt-1 w-full px-4 py-3 bg-surface-sunken rounded-xl font-mono-num text-[14px] text-on-surface border border-outline-variant/30 focus:outline-none focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="font-ui text-[12px] font-medium text-[#E1306C] uppercase tracking-wide">Instagram</label>
+              <input
+                value={formInstagram}
+                onChange={(e) => setFormInstagram(e.target.value)}
+                placeholder="@tunombre"
+                className="mt-1 w-full px-4 py-3 bg-surface-sunken rounded-xl font-ui text-[14px] text-on-surface border border-outline-variant/30 focus:outline-none focus:border-primary"
+              />
+            </div>
+          </div>
+          <div className="flex gap-3 mt-6">
+            <button onClick={() => setEditMode("none")} className="flex-1 py-3 font-ui font-medium text-[14px] text-on-surface-variant border border-outline-variant/30 rounded-full">Cancelar</button>
+            <button onClick={handleSave} disabled={saving} className="flex-1 py-3 font-ui font-medium text-[14px] bg-primary text-on-primary rounded-full disabled:opacity-50">
+              {saving ? "Guardando…" : "Guardar"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+  </>
   );
 }

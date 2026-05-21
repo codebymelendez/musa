@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import Image from "next/image";
 import { TimeSlot, formatCurrency, formatTimeES } from "@/lib/utils";
 import { Service } from "@/types";
@@ -93,10 +94,37 @@ export default function PublicBookingPage() {
     whatsapp: string | null;
   } | null>(null);
 
+  const [shareCopied, setShareCopied] = useState(false);
+
   const { subscribe: activatePush, loading: pushLoading, subscribed: pushSubscribed } =
     usePushSubscription({ endpoint: "/api/push/subscribe-client", clientId: confirmed?.clientId });
 
   const next14Days = getNext14Days();
+
+  // Bug 5: Web Share API con fallback a clipboard
+  const handleShare = useCallback(async () => {
+    const url = `${window.location.origin}/p/${slug}`;
+    const name = data?.professional.name ?? "esta profesional";
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({
+          title: name,
+          text: `Reserva una cita con ${name} en Musa`,
+          url,
+        });
+      } catch {
+        // El usuario canceló el diálogo — no se requiere acción
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(url);
+        setShareCopied(true);
+        setTimeout(() => setShareCopied(false), 2000);
+      } catch {
+        // Navegador muy antiguo, ignorar
+      }
+    }
+  }, [slug, data]);
 
   useEffect(() => {
     const savedName  = localStorage.getItem(`musa_name_${slug}`);
@@ -247,8 +275,19 @@ export default function PublicBookingPage() {
 
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <header className="fixed top-0 w-full z-40 glass-nav border-b border-border-subtle">
-        <div className="max-w-2xl mx-auto px-5 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="max-w-2xl mx-auto px-5 h-14 flex items-center justify-between gap-3">
+
+          {/* Izquierda: botón volver + avatar + nombre */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            {/* Bug 6: botón Volver → home */}
+            <Link
+              href="/"
+              aria-label="Volver al inicio"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-muted hover:bg-surface-sunken transition-colors flex-shrink-0"
+            >
+              <ArrowLeftIcon className="w-4 h-4" />
+            </Link>
+
             <div className="w-9 h-9 rounded-full bg-rose-50 overflow-hidden relative flex-shrink-0">
               {professional.avatarUrl ? (
                 <Image
@@ -264,8 +303,8 @@ export default function PublicBookingPage() {
                 </div>
               )}
             </div>
-            <div>
-              <h1 className="font-ui font-medium text-[14px] text-on-surface leading-tight">
+            <div className="min-w-0">
+              <h1 className="font-ui font-medium text-[14px] text-on-surface leading-tight truncate">
                 {professional.name}
               </h1>
               {professional.serviceType && (
@@ -275,15 +314,33 @@ export default function PublicBookingPage() {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-muted hover:bg-surface-sunken transition-colors"
-              aria-label="Compartir"
-            >
-              <ShareIcon className="w-5 h-5" />
-            </button>
+
+          {/* Derecha: compartir + logo → home */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Bug 5: Web Share API con fallback clipboard */}
+            <div className="relative">
+              <button
+                onClick={handleShare}
+                className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-muted hover:bg-surface-sunken transition-colors"
+                aria-label="Compartir perfil"
+              >
+                {shareCopied ? (
+                  <CheckIcon className="w-5 h-5 text-success" />
+                ) : (
+                  <ShareIcon className="w-5 h-5" />
+                )}
+              </button>
+              {shareCopied && (
+                <span className="absolute -bottom-7 right-0 text-[10px] font-ui font-medium text-success bg-success-surface border border-success/20 px-2 py-0.5 rounded-full whitespace-nowrap">
+                  ¡Copiado!
+                </span>
+              )}
+            </div>
             <span className="w-px h-4 bg-border-subtle" aria-hidden="true" />
-            <MusaLogo variant="monogram" size="xs" className="opacity-55" />
+            {/* Bug 6: logo navega al home */}
+            <Link href="/" aria-label="Ir al inicio">
+              <MusaLogo variant="monogram" size="xs" className="opacity-55 hover:opacity-100 transition-opacity" />
+            </Link>
           </div>
         </div>
       </header>
@@ -336,54 +393,80 @@ export default function PublicBookingPage() {
             <div className="space-y-3">
               {services.map((s) => {
                 const isSelected = selectedService?.id === s.id;
+                const svc = s as unknown as Service;
                 return (
-                  <button
+                  <div
                     key={s.id}
-                    type="button"
-                    onClick={() => setSelectedService(s as unknown as Service)}
                     className={cn(
-                      "w-full text-left p-4 rounded-xl border transition-all duration-[160ms]",
+                      "rounded-xl border transition-all duration-[160ms]",
                       isSelected
                         ? "bg-primary-surface border-primary shadow-primary-sm"
-                        : "bg-surface-raised border-border-subtle hover:border-primary-border hover:shadow-sm"
+                        : "bg-surface-raised border-border-subtle"
                     )}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p
+                    {/* Info del servicio — tap para seleccionar */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedService(svc)}
+                      className="w-full text-left p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p
+                            className={cn(
+                              "font-ui font-medium text-[15px] leading-tight",
+                              isSelected ? "text-primary" : "text-on-surface"
+                            )}
+                          >
+                            {s.name}
+                          </p>
+                          {s.description && (
+                            <p className="font-ui text-[12px] text-on-surface-muted mt-1 leading-relaxed">
+                              {s.description}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-3 mt-2">
+                            <span className="flex items-center gap-1 text-on-surface-subtle">
+                              <ClockIcon className="w-3.5 h-3.5" />
+                              <span className="font-mono-num text-[12px]">{s.durationMin}</span>
+                              <span className="font-ui text-[12px]">min</span>
+                            </span>
+                            <span className="font-mono-num text-[14px] text-primary">
+                              {formatCurrency(s.price, s.currency)}
+                            </span>
+                          </div>
+                        </div>
+                        <div
                           className={cn(
-                            "font-ui font-medium text-[15px] leading-tight",
-                            isSelected ? "text-primary" : "text-on-surface"
+                            "w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center mt-0.5 transition-colors",
+                            isSelected ? "bg-primary border-primary" : "border-border"
                           )}
                         >
-                          {s.name}
-                        </p>
-                        {s.description && (
-                          <p className="font-ui text-[12px] text-on-surface-muted mt-1 leading-relaxed">
-                            {s.description}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-3 mt-2">
-                          <span className="flex items-center gap-1 text-on-surface-subtle">
-                            <ClockIcon className="w-3.5 h-3.5" />
-                            <span className="font-mono-num text-[12px]">{s.durationMin}</span>
-                            <span className="font-ui text-[12px]">min</span>
-                          </span>
-                          <span className="font-mono-num text-[14px] text-primary">
-                            {formatCurrency(s.price, s.currency)}
-                          </span>
+                          {isSelected && <CheckIcon className="w-3 h-3 text-white" />}
                         </div>
                       </div>
-                      <div
+                    </button>
+
+                    {/* CTA "Reservar" — visible siempre para acción directa */}
+                    <div className="px-4 pb-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedService(svc);
+                          setStep("datetime");
+                        }}
                         className={cn(
-                          "w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center mt-0.5 transition-colors",
-                          isSelected ? "bg-primary border-primary" : "border-border"
+                          "w-full h-10 rounded-xl font-ui font-medium text-[13px] flex items-center justify-center gap-2 transition-all duration-[160ms]",
+                          isSelected
+                            ? "bg-primary text-on-primary shadow-primary-sm"
+                            : "bg-surface-sunken text-on-surface hover:bg-primary-surface hover:text-primary border border-border hover:border-primary-border"
                         )}
                       >
-                        {isSelected && <CheckIcon className="w-3 h-3 text-white" />}
-                      </div>
+                        Reservar
+                        <ArrowRightIcon className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>

@@ -7,7 +7,8 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   try {
-    const { planName } = await req.json();
+    const body = await req.json();
+    const { planName, professionalsCount, paymentMethod, referenceNumber, amountUSD, amountBS, bcvRate } = body;
 
     if (!planName) {
       return NextResponse.json({ error: "Nombre de plan requerido" }, { status: 400 });
@@ -44,6 +45,22 @@ export async function POST(req: NextRequest) {
       .eq('id', user.businessId);
 
     if (updateError) throw updateError;
+
+    // Log de verificación manual del pago (el equipo MUSA revisa los logs)
+    if (referenceNumber) {
+      console.info("[plan-payment-verification]", {
+        businessId:  user.businessId,
+        userId:      session.userId,
+        planName,
+        professionalsCount: professionalsCount ?? 1,
+        paymentMethod,
+        referenceNumber,
+        amountUSD,
+        amountBS,
+        bcvRate,
+        ts: new Date().toISOString(),
+      });
+    }
 
     return NextResponse.json({ success: true, plan: plan.name });
   } catch (error) {

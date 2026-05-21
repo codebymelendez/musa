@@ -155,8 +155,9 @@ export default function ImageUploader({
             src={displayUrl}
             alt="Foto"
             fill
+            sizes={isCircle ? "112px" : "(max-width: 640px) 100vw, 320px"}
             className="object-cover"
-            unoptimized={!!preview} // preview es blob URL
+            unoptimized={!!preview}
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center text-on-surface-variant/40">

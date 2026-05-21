@@ -196,22 +196,31 @@ export default function HomePage() {
 
       {/* ── Nav ─────────────────────────────────────────────────────── */}
       <header className="fixed top-0 w-full z-40 glass-nav border-b border-border-subtle">
-        <div className="max-w-6xl mx-auto px-5 md:px-8 h-16 flex items-center justify-between">
-          <Link href="/">
-            <MusaLogo variant="combo" size="md" />
+        <div className="max-w-6xl mx-auto px-5 md:px-8 h-16 flex items-center justify-between gap-3">
+          <Link href="/" className="flex-shrink-0">
+            {/* Mobile: solo monograma para ahorrar espacio */}
+            <span className="md:hidden">
+              <MusaLogo variant="monogram" size="sm" />
+            </span>
+            {/* Desktop: combo completo */}
+            <span className="hidden md:inline-flex">
+              <MusaLogo variant="combo" size="md" />
+            </span>
           </Link>
-          <nav className="flex items-center gap-1">
+          <nav className="flex items-center gap-1.5 md:gap-2">
+            {/* Bug 7: visible en todos los tamaños con tipografía responsiva */}
             <Link
               href="/client"
-              className="font-ui text-[13px] font-medium text-on-surface-muted hover:text-on-surface transition-colors px-3 md:px-4 py-2"
+              className="font-ui text-[12px] sm:text-[13px] font-medium text-on-surface-muted hover:text-on-surface transition-colors px-2.5 sm:px-3 md:px-4 py-2 whitespace-nowrap"
             >
               Mis citas
             </Link>
             <Link
               href="/login"
-              className="font-ui text-[13px] font-medium bg-on-surface text-surface px-4 md:px-5 py-2.5 rounded-full hover:opacity-85 transition-opacity"
+              className="font-ui text-[12px] sm:text-[13px] font-medium bg-on-surface text-surface px-3 sm:px-4 md:px-5 py-2 sm:py-2.5 rounded-full hover:opacity-85 transition-opacity whitespace-nowrap"
             >
-              Para profesionales
+              <span className="sm:hidden">Profesionales</span>
+              <span className="hidden sm:inline">Para profesionales</span>
             </Link>
           </nav>
         </div>
