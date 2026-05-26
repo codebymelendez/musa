@@ -5,11 +5,7 @@ import { createAdminClient } from "@/lib/supabase-admin";
 import { sendNotification, sendClientNotification } from "@/lib/notifications";
 import { getBlocksInRange, isSlotBlocked } from "@/lib/availability";
 import { checkAppointmentLimit } from "@/lib/limits";
-import { sendWhatsAppMessage, buildBookingConfirmationMsg } from "@/lib/whatsapp";
-
-function normalizePhone(phone: string) {
-  return phone.replace(/\D/g, "");
-}
+import { sendWhatsAppMessage, buildBookingConfirmationMsg, normalizePhone } from "@/lib/whatsapp";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -221,9 +217,11 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     // WhatsApp de confirmación — awaited para que Vercel no mate la promesa antes
     // de que Twilio complete la llamada a su API.
-    if (client.phone) {
+    // Usamos clientPhone (input original del formulario) en lugar de client.phone
+    // (almacenado en BD como solo dígitos) para preservar el código de país (+34, +1, etc.)
+    if (clientPhone) {
       await sendWhatsAppMessage(
-        client.phone,
+        clientPhone,
         buildBookingConfirmationMsg({
           clientName,
           professionalName: user.name,

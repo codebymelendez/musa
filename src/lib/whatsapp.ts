@@ -24,7 +24,7 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://getmusa.app";
 //   "0034637087616"  → "+34637087616"   (prefijo 00)
 //   "04241234567"    → "+584241234567"  (local venezolano con 0)
 //   "4241234567"     → "+584241234567"  (local venezolano sin 0)
-function normalizePhone(raw: string): string {
+export function normalizePhone(raw: string): string {
   const trimmed = raw.trim();
 
   // Caso 1: ya tiene "+" → solo limpiar caracteres no numéricos y devolver
