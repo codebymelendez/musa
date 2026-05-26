@@ -11,12 +11,40 @@
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://getmusa.app";
 
-// ── Normaliza un número venezolano a formato E.164 ─────────────────────────
-// Acepta: "04241234567", "4241234567", "+584241234567", "584241234567"
-function normalizeVEPhone(raw: string): string {
-  const digits = raw.replace(/\D/g, "");
-  if (digits.startsWith("58")) return `+${digits}`;
-  if (digits.startsWith("0")) return `+58${digits.slice(1)}`;
+// ── Normaliza un número de teléfono a formato E.164 ───────────────────────
+// Reglas:
+//   1. Si el número empieza con "+" → ya tiene código de país, se respeta tal cual.
+//   2. Si empieza con "00" → prefijo internacional, se convierte a "+" (ej. 0034 → +34).
+//   3. Si empieza con "0" (pero no "00") → formato local venezolano, se añade +58.
+//   4. Sin prefijo → se asume Venezuela (+58) como mercado principal.
+//
+// Ejemplos:
+//   "+34637087616"   → "+34637087616"   (España, respetado)
+//   "+584241234567"  → "+584241234567"  (Venezuela con +, respetado)
+//   "0034637087616"  → "+34637087616"   (prefijo 00)
+//   "04241234567"    → "+584241234567"  (local venezolano con 0)
+//   "4241234567"     → "+584241234567"  (local venezolano sin 0)
+function normalizePhone(raw: string): string {
+  const trimmed = raw.trim();
+
+  // Caso 1: ya tiene "+" → solo limpiar caracteres no numéricos y devolver
+  if (trimmed.startsWith("+")) {
+    return `+${trimmed.replace(/\D/g, "")}`;
+  }
+
+  const digits = trimmed.replace(/\D/g, "");
+
+  // Caso 2: prefijo internacional "00XX..."
+  if (digits.startsWith("00")) {
+    return `+${digits.slice(2)}`;
+  }
+
+  // Caso 3: formato local venezolano "04XX..." → quitar 0 y añadir +58
+  if (digits.startsWith("0")) {
+    return `+58${digits.slice(1)}`;
+  }
+
+  // Caso 4: solo dígitos sin prefijo → asumir Venezuela
   return `+58${digits}`;
 }
 
@@ -34,7 +62,7 @@ export async function sendWhatsAppMessage(
     return;
   }
 
-  const to = `whatsapp:${normalizeVEPhone(toPhone)}`;
+  const to = `whatsapp:${normalizePhone(toPhone)}`;
 
   try {
     // Importación dinámica para que Twilio no afecte el bundle del cliente
