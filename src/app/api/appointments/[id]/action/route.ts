@@ -38,6 +38,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const startStr = startTime.toLocaleTimeString("es-VE", {
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: "America/Caracas",
     });
 
     if (action === "cancel") {

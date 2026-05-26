@@ -97,24 +97,29 @@ export async function POST(req: NextRequest) {
 
     if (updateError) throw updateError;
 
+    const TZ = "America/Caracas";
     const oldStartTime = new Date(appointment.startTime);
     const oldDateStr = oldStartTime.toLocaleDateString("es-VE", {
       weekday: "short",
       day: "numeric",
       month: "short",
+      timeZone: TZ,
     });
     const oldTimeStr = oldStartTime.toLocaleTimeString("es-VE", {
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: TZ,
     });
     const newDateStr = newStart.toLocaleDateString("es-VE", {
       weekday: "long",
       day: "numeric",
       month: "long",
+      timeZone: TZ,
     });
     const newTimeStr = newStart.toLocaleTimeString("es-VE", {
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: TZ,
     });
 
     const newManageUrl = `${APP_URL}/cita/${newToken}`;

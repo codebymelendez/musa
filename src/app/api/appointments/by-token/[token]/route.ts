@@ -105,15 +105,18 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const client = Array.isArray(appointment.client) ? appointment.client[0] : appointment.client;
   const service = Array.isArray(appointment.service) ? appointment.service[0] : appointment.service;
 
+  const TZ = "America/Caracas";
   const startTime = new Date(appointment.startTime);
   const dateStr = startTime.toLocaleDateString("es-VE", {
     weekday: "long",
     day: "numeric",
     month: "long",
+    timeZone: TZ,
   });
   const startStr = startTime.toLocaleTimeString("es-VE", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: TZ,
   });
 
   // WhatsApp de cancelación a la clienta (async)

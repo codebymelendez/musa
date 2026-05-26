@@ -193,8 +193,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Error al crear cita" }, { status: 500 });
     }
 
-    const startStr = start.toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" });
-    const dateStr = start.toLocaleDateString("es-VE", { weekday: "long", day: "numeric", month: "long" });
+    const TZ = "America/Caracas";
+    const startStr = start.toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit", timeZone: TZ });
+    const dateStr  = start.toLocaleDateString ("es-VE", { weekday: "long", day: "numeric", month: "long", timeZone: TZ });
 
     // Email de confirmación
     if (clientEmail) {
@@ -218,9 +219,10 @@ export async function POST(req: NextRequest, { params }: Params) {
       }
     }
 
-    // WhatsApp de confirmación (async, nunca bloquea la respuesta)
+    // WhatsApp de confirmación — awaited para que Vercel no mate la promesa antes
+    // de que Twilio complete la llamada a su API.
     if (client.phone) {
-      sendWhatsAppMessage(
+      await sendWhatsAppMessage(
         client.phone,
         buildBookingConfirmationMsg({
           clientName,
@@ -230,7 +232,7 @@ export async function POST(req: NextRequest, { params }: Params) {
           startStr,
           rescheduleToken,
         })
-      ).catch(() => {});
+      );
     }
 
     // Notificaciones (Async)

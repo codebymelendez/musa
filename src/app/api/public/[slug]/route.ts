@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
-import { generateTimeSlots, dayRange } from "@/lib/utils";
+import { generateTimeSlots, VE_UTC_OFFSET_H } from "@/lib/utils";
 import { ProfessionalSettings } from "@/types";
 import { getBlocksInRange } from "@/lib/availability";
+
+/** Rango UTC que cubre un día completo en Venezuela (UTC-4).
+ *  Para "2026-05-26": start = T04:00Z, end = T03:59:59.999Z del día siguiente. */
+function veDayRange(dateParam: string): { start: Date; end: Date } {
+  const start = new Date(`${dateParam}T00:00:00.000Z`);
+  start.setUTCHours(VE_UTC_OFFSET_H, 0, 0, 0); // medianoche Venezuela = 04:00 UTC
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
+  return { start, end };
+}
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -60,8 +69,8 @@ export async function GET(req: NextRequest, { params }: Params) {
     // Slots disponibles
     let slots = null;
     if (dateParam && serviceId) {
-      const selectedDate = new Date(dateParam);
-      const { start, end } = dayRange(selectedDate);
+      const selectedDate = new Date(dateParam); // YYYY-MM-DD → UTC midnight (uso solo para generateTimeSlots)
+      const { start, end } = veDayRange(dateParam); // rango Venezuela correcto
 
       const services = user.services || [];
       const selectedService = services.find((s: any) => s.id === serviceId);

@@ -63,14 +63,17 @@ export async function GET(req: NextRequest) {
     if (!client?.phone) continue;
 
     const start = new Date(appt.startTime);
+    const TZ = "America/Caracas";
     const dateStr = start.toLocaleDateString("es-VE", {
       weekday: "long",
       day: "numeric",
       month: "long",
+      timeZone: TZ,
     });
     const startStr = start.toLocaleTimeString("es-VE", {
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: TZ,
     });
 
     try {

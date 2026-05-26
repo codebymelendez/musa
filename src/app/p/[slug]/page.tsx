@@ -166,7 +166,13 @@ export default function PublicBookingPage() {
       setSlotsLoading(true);
       setSelectedSlot(null);
       try {
-        const dateStr = selectedDate.toISOString().split("T")[0];
+        // Usar componentes locales para evitar que toISOString() cambie el día
+        // cuando el dispositivo está en UTC-4 y es después de las 8 PM (= UTC +1 día)
+        const dateStr = [
+          selectedDate.getFullYear(),
+          String(selectedDate.getMonth() + 1).padStart(2, "0"),
+          String(selectedDate.getDate()).padStart(2, "0"),
+        ].join("-");
         const res = await fetch(
           `/api/public/${slug}?date=${dateStr}&serviceId=${selectedService.id}`
         );

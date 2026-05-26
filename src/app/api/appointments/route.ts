@@ -26,11 +26,11 @@ export async function GET(req: NextRequest) {
   let endFilter: string;
 
   if (date) {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    startFilter = d.toISOString();
-    d.setHours(23, 59, 59, 999);
-    endFilter = d.toISOString();
+    // Venezuela = UTC-4 → medianoche local = 04:00 UTC del mismo día de calendario
+    const start = new Date(`${date}T04:00:00.000Z`); // medianoche Venezuela
+    const end   = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1); // fin del día Venezuela
+    startFilter = start.toISOString();
+    endFilter   = end.toISOString();
   } else if (from && to) {
     startFilter = new Date(from).toISOString();
     endFilter = new Date(to).toISOString();
