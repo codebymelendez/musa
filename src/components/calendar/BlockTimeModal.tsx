@@ -108,7 +108,7 @@ export default function BlockTimeModal({ defaultDate, onClose, onCreated }: Prop
           </label>
           <div className="grid grid-cols-3 gap-2">
             {(Object.entries(BLOCK_TYPE_LABELS) as [BlockType, { label: string; icon: string }][]).map(
-              ([type, { label, icon }]) => (
+              ([type, { label }]) => (
                 <button
                   key={type}
                   type="button"

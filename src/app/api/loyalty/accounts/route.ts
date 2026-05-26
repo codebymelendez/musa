@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const search = searchParams.get("search")?.trim();
 
-  let query = supabase
+  const query = supabase
     .from("ClientLoyaltyAccount")
     .select(`
       id, clientId, totalPoints, lifetimePoints, qrToken, createdAt, updatedAt,

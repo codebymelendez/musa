@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { createClient } from "@/lib/supabase-server";
 import { createAdminClient } from "@/lib/supabase-admin";
 
 export async function GET(req: NextRequest) {
@@ -54,7 +53,7 @@ export async function GET(req: NextRequest) {
       .map(({ name, count }) => ({ serviceName: name, count }));
 
     // ── Total de clientas ─────────────────────────────────────────────────────
-    const { count: totalClients, error: clientCountError } = await adminSupabase
+    const { count: totalClients } = await adminSupabase
       .from('Client')
       .select('*', { count: 'exact', head: true })
       .eq('userId', session.userId);
@@ -71,7 +70,7 @@ export async function GET(req: NextRequest) {
     const startOfYear = new Date(year, 0, 1).toISOString();
     const endOfYear = new Date(year, 11, 31, 23, 59, 59, 999).toISOString();
 
-    const { data: yearPayments, error: yearRevenueError } = await adminSupabase
+    const { data: yearPayments } = await adminSupabase
       .from('Payment')
       .select('amount, appointment:Appointment(startTime, status, userId)')
       .eq('isPaid', true)

@@ -6,7 +6,6 @@ import Link from "next/link";
 
 export default function ClientLoginPage() {
   const router = useRouter();
-  const [step, setStep] = useState<"phone" | "name">("phone");
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);

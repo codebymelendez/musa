@@ -77,7 +77,7 @@ export default function ClientModalForm({ client, onClose, onSaved }: Props) {
       }
 
       onSaved();
-    } catch (err) {
+    } catch {
       setError("Error de conexión. Intenta de nuevo.");
     } finally {
       setLoading(false);

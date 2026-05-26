@@ -227,7 +227,7 @@ function buildClientRescheduleEmail({
           </table>
         </td></tr>
         <tr><td style="padding:20px 40px;background:#faf5ff;text-align:center">
-          <p style="margin:0;color:#9ca3af;font-size:12px">© 2025 Musa</p>
+          <p style="margin:0;color:#9ca3af;font-size:12px">© 2026 Musa</p>
         </td></tr>
       </table>
     </td></tr>
@@ -278,7 +278,7 @@ function buildStaffRescheduleEmail({
           <p style="margin:0;color:#9ca3af;font-size:13px">Tu agenda se ha actualizado automáticamente.</p>
         </td></tr>
         <tr><td style="padding:20px 40px;background:#faf5ff;text-align:center">
-          <p style="margin:0;color:#9ca3af;font-size:12px">© 2025 Musa</p>
+          <p style="margin:0;color:#9ca3af;font-size:12px">© 2026 Musa</p>
         </td></tr>
       </table>
     </td></tr>

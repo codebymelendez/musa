@@ -26,8 +26,9 @@ export async function middleware(req: NextRequest) {
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
-    pathname.startsWith("/p/") ||   // booking público - siempre accesible
-    pathname.startsWith("/cita/") || // portal cliente self-service - siempre accesible
+    pathname.startsWith("/p/") ||           // booking público - siempre accesible
+    pathname.startsWith("/cita/") ||         // portal cliente self-service - siempre accesible
+    pathname.startsWith("/auth/") ||         // rutas de auth (callback, select-role)
     pathname.includes(".") // archivos estáticos (.ico, .png, etc.)
   ) {
     return NextResponse.next();

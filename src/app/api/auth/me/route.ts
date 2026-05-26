@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
       email: user.email,
       slug: user.slug,
       role: user.role,
+      appRole: user.appRole ?? "professional",
       serviceType: user.serviceType,
       bio: user.bio,
       avatarUrl: user.avatarUrl,

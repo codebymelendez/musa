@@ -42,45 +42,40 @@ export async function GET(req: NextRequest) {
   // Verificar si el perfil ya existe en la tabla User
   const { data: profile } = await admin
     .from("User")
-    .select("onboardingDone")
+    .select("onboardingDone, appRole")
     .eq("id", authUser.id)
     .single();
 
-  // Usuario nuevo via OAuth (Google) — crear perfil mínimo para que el onboarding pueda actualizarlo
+  // Usuario nuevo via OAuth (Google) — redirigir a selección de rol
   if (!profile) {
-    const rawName =
-      (authUser.user_metadata?.full_name as string | undefined) ??
-      (authUser.user_metadata?.name as string | undefined) ??
-      authUser.email?.split("@")[0] ??
-      "Usuario";
+    // Guardar metadata de Google en los claims de Supabase Auth para uso posterior
+    await admin.auth.admin.updateUserById(authUser.id, {
+      user_metadata: {
+        ...(authUser.user_metadata ?? {}),
+        pending_role_selection: true,
+      },
+    }).catch(() => {}); // no bloquear si falla
 
-    const slug =
-      rawName
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[̀-ͯ]/g, "")
-        .replace(/[^a-z0-9]/g, "-")
-        .replace(/-+/g, "-")
-        .replace(/^-|-$/g, "") +
-      "-" +
-      Math.random().toString(36).substring(2, 7);
-
-    const { error: insertError } = await admin.from("User").insert({
-      id: authUser.id,
-      email: authUser.email ?? null,
-      name: rawName,
-      slug,
-      avatarUrl: (authUser.user_metadata?.avatar_url as string | undefined) ?? null,
-      onboardingDone: false,
-      updatedAt: new Date().toISOString(),
+    const selectRoleUrl = new URL("/auth/select-role", origin);
+    const finalRes = NextResponse.redirect(selectRoleUrl);
+    response.headers.forEach((value, key) => {
+      if (key.toLowerCase() === "set-cookie") {
+        finalRes.headers.append("set-cookie", value);
+      }
     });
-
-    if (insertError) {
-      console.error("[auth/callback] Error creando perfil OAuth:", insertError);
-    }
+    return finalRes;
   }
 
-  const destination = profile?.onboardingDone ? "/home" : "/onboarding";
+  // Usuario existente — redirigir según su rol
+  const isClient = profile.appRole === "client";
+  let destination: string;
+
+  if (isClient) {
+    destination = "/client";
+  } else {
+    destination = profile.onboardingDone ? "/home" : "/onboarding";
+  }
+
   const finalResponse = NextResponse.redirect(new URL(destination, origin));
 
   // Copiar las cookies de sesión que Supabase seteó en `response` a `finalResponse`

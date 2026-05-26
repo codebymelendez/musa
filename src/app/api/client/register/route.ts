@@ -8,7 +8,7 @@ const schema = z.object({
   phone: z.string().min(7),
   name: z.string().min(2),
   email: z.string().email().optional().or(z.literal("")),
-  city: z.string().optional(),
+  birthday: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
     }
 
-    const { phone, name, email } = parsed.data;
+    const { phone, name, email, birthday } = parsed.data;
     const admin = createAdminClient();
 
     // Check if client already exists globally to avoid duplicated phone numbers if needed
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       .limit(1)
       .maybeSingle();
 
-    let clientName = name;
+    const clientName = name;
 
     if (existingClient) {
       // Update existing if we found one
@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
           name,
           phone,
           email: email || null,
+          birthday: birthday || null,
         });
 
       if (insertError) {

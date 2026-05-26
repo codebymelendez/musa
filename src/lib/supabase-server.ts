@@ -19,7 +19,7 @@ export async function createClient(req?: NextRequest, res?: NextResponse) {
           } else {
             try {
               cookieStore.set({ name, value, ...options });
-            } catch (error) {
+            } catch {
               // Silently fail if called in a place where cookies cannot be set
             }
           }

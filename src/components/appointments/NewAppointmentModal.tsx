@@ -5,7 +5,7 @@ import { useServices } from "@/hooks/useServices";
 import { useClients } from "@/hooks/useClients";
 import { useAppointments } from "@/hooks/useAppointments";
 import { formatCurrency } from "@/lib/utils";
-import { XMarkIcon, ExclamationCircleIcon, UserIcon, ClockIcon, CheckIcon } from "@heroicons/react/24/outline";
+import { XMarkIcon, CheckIcon } from "@heroicons/react/24/outline";
 
 interface Props {
   onClose: () => void;
@@ -17,7 +17,6 @@ export default function NewAppointmentModal({ onClose, onCreated }: Props) {
   const { clients, fetchClients, createClient } = useClients();
   const { createAppointment } = useAppointments();
 
-  const [step, setStep] = useState<"service" | "datetime" | "client">("service");
   const [selectedServiceId, setSelectedServiceId] = useState("");
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0]

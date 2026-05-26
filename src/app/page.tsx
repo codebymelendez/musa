@@ -39,7 +39,7 @@ async function getPublicPromotions(): Promise<PublicPromotion[]> {
       .order("createdAt", { ascending: false })
       .limit(8);
 
-    return (data ?? []).map((p: any) => ({
+    return (data ?? []).map((p) => ({
       ...p,
       business: Array.isArray(p.business) ? p.business[0] : p.business,
       owner: Array.isArray(p.owner) ? p.owner[0] : p.owner,
@@ -208,6 +208,30 @@ export default function HomePage() {
             </span>
           </Link>
           <nav className="flex items-center gap-1.5 md:gap-2">
+            {/* Instagram — solo visible en desktop para no saturar el header móvil */}
+            <a
+              href="https://www.instagram.com/getmusa.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Musa en Instagram"
+              className="hidden md:flex items-center justify-center w-8 h-8 text-on-surface-muted hover:text-primary transition-colors"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="w-[17px] h-[17px]"
+                aria-hidden="true"
+              >
+                <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+                <circle cx="12" cy="12" r="4" />
+                <circle cx="17.5" cy="6.5" r="0.8" fill="currentColor" stroke="none" />
+              </svg>
+            </a>
             {/* Bug 7: visible en todos los tamaños con tipografía responsiva */}
             <Link
               href="/client"
@@ -602,6 +626,30 @@ export default function HomePage() {
               <Link href="/login" className="font-ui text-[12px] text-on-surface-muted hover:text-on-surface transition-colors">
                 Para profesionales
               </Link>
+              {/* Instagram */}
+              <a
+                href="https://www.instagram.com/getmusa.app"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Musa en Instagram"
+                className="text-on-surface-muted hover:text-primary transition-colors"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="w-[15px] h-[15px]"
+                  aria-hidden="true"
+                >
+                  <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+                  <circle cx="12" cy="12" r="4" />
+                  <circle cx="17.5" cy="6.5" r="0.8" fill="currentColor" stroke="none" />
+                </svg>
+              </a>
             </div>
             <p className="font-ui text-[11px] text-on-surface-subtle">
               © {new Date().getFullYear()} Musa ·{" "}

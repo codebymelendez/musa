@@ -31,7 +31,7 @@ const today = () => new Date().toISOString().split("T")[0];
 
 export const useAppStore = create<AppState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       // ── Auth ────────────────────────────────────────────────────────────────
       user: null,
       isHydrated: false,

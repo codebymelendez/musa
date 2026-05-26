@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -13,7 +15,13 @@ interface Appointment {
   oldStartTime?: string;
   service: { name: string; durationMin: number; price: number; currency: string };
   client: { name: string; email?: string };
-  user: { name: string; slug: string; whatsapp?: string };
+  user: {
+    name: string;
+    slug: string;
+    whatsapp?: string;
+    avatarUrl?: string;
+    business?: { name: string | null; city: string | null } | null;
+  };
 }
 
 interface Slot {
@@ -22,7 +30,7 @@ interface Slot {
   isCurrent: boolean;
 }
 
-type View = "loading" | "main" | "reschedule" | "cancelled" | "rescheduled" | "not-found" | "error";
+type View = "loading" | "main" | "reschedule" | "cancelled" | "rescheduled" | "not-found" | "error" | "expired";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -31,6 +39,14 @@ function fmtDate(iso: string) {
     weekday: "long",
     day: "numeric",
     month: "long",
+  });
+}
+
+function fmtDateShort(iso: string) {
+  return new Date(iso).toLocaleDateString("es-VE", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
   });
 }
 
@@ -55,17 +71,43 @@ function groupByDay(slots: Slot[]): Record<string, Slot[]> {
   return groups;
 }
 
-function statusLabel(status: string) {
-  switch (status) {
-    case "confirmed":
-      return { text: "Confirmada", color: "bg-green-100 text-green-700" };
-    case "reprogrammed":
-      return { text: "Reprogramada", color: "bg-violet-100 text-violet-700" };
-    case "pending":
-      return { text: "Pendiente", color: "bg-yellow-100 text-yellow-700" };
-    default:
-      return { text: status, color: "bg-gray-100 text-gray-600" };
-  }
+// Genera y descarga un archivo .ics para añadir al calendario
+function downloadICS(appointment: Appointment) {
+  const start = new Date(appointment.startTime);
+  const end = new Date(appointment.endTime);
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const toICSDate = (d: Date) =>
+    `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`;
+
+  const location = appointment.user.business?.city ?? "Venezuela";
+  const summary = `${appointment.service.name} con ${appointment.user.name}`;
+  const description = `Cita en MUSA – ${appointment.service.name} (${appointment.service.durationMin} min) con ${appointment.user.name}`;
+
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//MUSA//getmusa.app//ES",
+    "BEGIN:VEVENT",
+    `UID:${appointment.id}@getmusa.app`,
+    `DTSTART:${toICSDate(start)}`,
+    `DTEND:${toICSDate(end)}`,
+    `SUMMARY:${summary}`,
+    `DESCRIPTION:${description}`,
+    `LOCATION:${location}`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+
+  const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `cita-musa-${appointment.id.slice(0, 8)}.ics`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -90,6 +132,7 @@ export default function CitaPortalPage() {
     fetch(`/api/appointments/by-token/${token}`)
       .then((r) => {
         if (r.status === 404) { setView("not-found"); return null; }
+        if (r.status === 410) { setView("expired"); return null; }
         if (!r.ok) { setView("error"); return null; }
         return r.json();
       })
@@ -147,19 +190,15 @@ export default function CitaPortalPage() {
       alert("Error de conexión. Intenta de nuevo.");
     } finally {
       setSubmitting(false);
-      // Opcional: Redirigir después de 2 segundos para que vean el éxito
-      if (view === "rescheduled") {
-        setTimeout(() => router.push("/client"), 2500);
-      }
     }
   };
 
-  // El setView se hace en el try, pero para estar seguros de la redirección automática:
+  // Redirección automática tras reprogramar
   useEffect(() => {
     if (view === "rescheduled") {
       const timer = setTimeout(() => {
         router.push("/client");
-      }, 3000);
+      }, 3500);
       return () => clearTimeout(timer);
     }
   }, [view, router]);
@@ -188,178 +227,249 @@ export default function CitaPortalPage() {
 
   if (view === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#f9f4fc' }}>
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-t-transparent rounded-full animate-spin mx-auto mb-4" style={{ borderColor: '#764797', borderTopColor: 'transparent' }} />
-          <p className="text-gray-500 text-sm">Cargando tu cita...</p>
+      <Shell>
+        <div className="flex flex-col items-center justify-center py-16 gap-4">
+          <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          <p className="font-ui text-[13px] text-on-surface-muted">Cargando tu cita…</p>
         </div>
-      </div>
+      </Shell>
     );
   }
 
   if (view === "not-found") {
     return (
-      <PortalShell>
-        <div className="text-center py-12">
-          <div className="text-5xl mb-4">🔍</div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Cita no encontrada</h2>
-          <p className="text-gray-500 text-sm">
-            El link puede haber expirado o la cita fue reprogramada (lo que genera un link nuevo).
+      <Shell>
+        <div className="text-center py-12 space-y-3">
+          <div className="text-4xl">🔍</div>
+          <h2 className="font-display font-normal text-on-surface text-[22px]">Cita no encontrada</h2>
+          <p className="font-ui text-[13px] text-on-surface-muted max-w-xs mx-auto leading-relaxed">
+            El enlace puede haber expirado o la cita fue reprogramada (lo que genera un enlace nuevo).
           </p>
+          <Link href="/" className="inline-flex items-center gap-1.5 font-ui text-[13px] font-medium text-primary hover:underline mt-2">
+            Ir al inicio →
+          </Link>
         </div>
-      </PortalShell>
+      </Shell>
+    );
+  }
+
+  if (view === "expired") {
+    return (
+      <Shell>
+        <div className="text-center py-12 space-y-3">
+          <div className="text-4xl">⏰</div>
+          <h2 className="font-display font-normal text-on-surface text-[22px]">Enlace expirado</h2>
+          <p className="font-ui text-[13px] text-on-surface-muted max-w-xs mx-auto leading-relaxed">
+            Este enlace expiró 24 horas después de la cita. Para ver tu historial, accede a tu área de clientas.
+          </p>
+          <Link href="/client" className="inline-flex items-center gap-1.5 font-ui text-[13px] font-medium text-primary hover:underline mt-2">
+            Mis citas →
+          </Link>
+        </div>
+      </Shell>
     );
   }
 
   if (view === "error") {
     return (
-      <PortalShell>
-        <div className="text-center py-12">
-          <div className="text-5xl mb-4">⚠️</div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Error al cargar</h2>
-          <p className="text-gray-500 text-sm">Intenta recargar la página.</p>
+      <Shell>
+        <div className="text-center py-12 space-y-3">
+          <div className="text-4xl">⚠️</div>
+          <h2 className="font-display font-normal text-on-surface text-[22px]">Error al cargar</h2>
+          <p className="font-ui text-[13px] text-on-surface-muted">Intenta recargar la página.</p>
         </div>
-      </PortalShell>
+      </Shell>
     );
   }
 
   if (view === "cancelled") {
     return (
-      <PortalShell>
-        <div className="text-center py-8">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-3xl">❌</span>
-          </div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Cita cancelada</h2>
+      <Shell>
+        <div className="text-center py-8 space-y-5">
+          {/* Professional */}
           {appointment && (
-            <p className="text-gray-500 text-sm mb-6">
-              Tu cita de <strong>{appointment.service.name}</strong> fue cancelada.
-            </p>
+            <div className="flex flex-col items-center gap-3">
+              <ProfessionalAvatar
+                name={appointment.user.name}
+                avatarUrl={appointment.user.avatarUrl}
+                size={56}
+              />
+              <p className="font-ui font-medium text-[14px] text-on-surface">{appointment.user.name}</p>
+            </div>
           )}
+          <div className="w-14 h-14 bg-surface-sunken rounded-full flex items-center justify-center mx-auto border border-border-subtle">
+            <span className="text-2xl">❌</span>
+          </div>
+          <div>
+            <h2 className="font-display font-normal text-on-surface text-[24px] mb-1">Cita cancelada</h2>
+            {appointment && (
+              <p className="font-ui text-[13px] text-on-surface-muted">
+                Tu cita de <strong>{appointment.service.name}</strong> fue cancelada.
+              </p>
+            )}
+          </div>
           {appointment && (
-            <a
+            <Link
               href={`/p/${appointment.user.slug}`}
-              className="inline-block text-white px-6 py-3 rounded-full font-semibold text-sm transition-colors"
-              style={{ backgroundColor: '#764797' }}
+              className="inline-flex items-center gap-2 font-ui text-[14px] font-medium px-6 py-3 rounded-full bg-primary text-on-primary shadow-primary-sm hover:bg-primary-hover transition-colors"
             >
-              Reservar nueva cita
-            </a>
+              Reservar nueva cita →
+            </Link>
           )}
         </div>
-      </PortalShell>
+      </Shell>
     );
   }
 
   if (view === "rescheduled") {
     return (
-      <PortalShell>
-        <div className="text-center py-8">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-3xl">✅</span>
+      <Shell>
+        <div className="text-center py-8 space-y-5">
+          <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+            <span className="text-2xl">✅</span>
           </div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">¡Cita reprogramada!</h2>
-          {newAppointmentDate && (
-            <div className="rounded-2xl p-4 my-4 text-left" style={{ backgroundColor: '#f4eaf9' }}>
-              <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#764797' }}>Nueva fecha</p>
-              <p className="font-bold text-gray-800">{fmtDate(newAppointmentDate)}</p>
-              <p className="text-gray-600 text-sm">a las {fmtTime(newAppointmentDate)}</p>
-            </div>
-          )}
-          <p className="text-gray-500 text-sm mb-6">
-            Ambas partes recibieron una confirmación. ¡Gracias por avisar!
-          </p>
+          <div>
+            <h2 className="font-display font-normal text-on-surface text-[24px] mb-1">¡Cita reprogramada!</h2>
+            {newAppointmentDate && (
+              <div className="rounded-2xl p-4 my-4 text-left bg-surface-tinted border border-primary-border/30">
+                <p className="font-ui text-[11px] font-medium uppercase tracking-[0.08em] text-primary-muted mb-1">Nueva fecha</p>
+                <p className="font-ui font-medium text-[15px] text-on-surface">{fmtDate(newAppointmentDate)}</p>
+                <p className="font-ui text-[13px] text-on-surface-muted">a las {fmtTime(newAppointmentDate)}</p>
+              </div>
+            )}
+            <p className="font-ui text-[13px] text-on-surface-muted">
+              Ambas partes recibieron una confirmación. ¡Gracias por avisar!
+            </p>
+          </div>
           {newManageUrl && (
-            <a
+            <Link
               href={newManageUrl}
-              className="inline-block text-white px-6 py-3 rounded-full font-semibold text-sm transition-colors"
-              style={{ backgroundColor: '#764797' }}
+              className="inline-flex items-center gap-2 font-ui text-[14px] font-medium px-6 py-3 rounded-full bg-primary text-on-primary shadow-primary-sm hover:bg-primary-hover transition-colors"
             >
               Gestionar nueva cita →
-            </a>
+            </Link>
           )}
         </div>
-      </PortalShell>
+      </Shell>
     );
   }
 
   // ── Main view ───────────────────────────────────────────────────────────────
 
   if (view === "main" && appointment) {
-    const badge = statusLabel(appointment.status);
-    return (
-      <PortalShell>
-        <div>
-          {/* Appointment card */}
-          <div className="rounded-2xl p-5 text-white mb-4" style={{ background: 'linear-gradient(135deg, #764797 0%, #9060b2 100%)' }}>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'rgba(255,255,255,0.7)' }}>
-                Tu cita
-              </span>
-              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${badge.color}`}>
-                {badge.text}
-              </span>
-            </div>
-            <h2 className="text-xl font-bold mb-1">{appointment.service.name}</h2>
-            <p className="text-sm mb-3" style={{ color: 'rgba(255,255,255,0.7)' }}>con {appointment.user.name}</p>
-            <div className="rounded-xl px-4 py-3" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }}>
-              <p className="text-white font-semibold">{fmtDate(appointment.startTime)}</p>
-              <p className="text-sm" style={{ color: 'rgba(255,255,255,0.7)' }}>a las {fmtTime(appointment.startTime)}</p>
-            </div>
-            {appointment.oldStartTime && (
-              <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                Fecha anterior: {fmtDate(appointment.oldStartTime)} {fmtTime(appointment.oldStartTime)}
-              </p>
-            )}
-          </div>
+    const isPast = new Date(appointment.endTime) < new Date();
+    const canModify = !isPast && !["cancelled", "completed", "no_show"].includes(appointment.status);
+    const location = appointment.user.business?.city ?? null;
 
-          {/* Service details */}
-          <div className="bg-white rounded-2xl p-4 mb-4 border border-gray-100">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-500">Duración</span>
-              <span className="font-medium text-gray-800">{appointment.service.durationMin} min</span>
+    return (
+      <Shell>
+        <div className="space-y-4">
+          {/* Professional card */}
+          <div className="bg-surface-raised border border-border-subtle rounded-2xl p-5 space-y-4">
+            <div className="flex items-center gap-4">
+              <ProfessionalAvatar
+                name={appointment.user.name}
+                avatarUrl={appointment.user.avatarUrl}
+                size={52}
+              />
+              <div className="flex-1 min-w-0">
+                <p className="font-ui font-medium text-[15px] text-on-surface truncate">
+                  {appointment.user.name}
+                </p>
+                {(appointment.user.business?.name || location) && (
+                  <p className="font-ui text-[12px] text-on-surface-muted truncate">
+                    {appointment.user.business?.name ?? ""}
+                    {location && <span className="text-on-surface-subtle"> · {location}</span>}
+                  </p>
+                )}
+              </div>
+              <StatusBadge status={appointment.status} />
             </div>
-            <div className="flex items-center justify-between text-sm mt-2">
-              <span className="text-gray-500">Precio</span>
-              <span className="font-medium text-gray-800">
-                {appointment.service.currency} {appointment.service.price.toFixed(0)}
-              </span>
+
+            {/* Divider */}
+            <div className="h-px bg-border-subtle" />
+
+            {/* Appointment details */}
+            <div className="space-y-3">
+              <DetailRow icon="✂️" label="Servicio" value={appointment.service.name} />
+              <DetailRow
+                icon="📅"
+                label="Fecha"
+                value={`${fmtDate(appointment.startTime)}, ${fmtTime(appointment.startTime)}`}
+              />
+              <DetailRow icon="⏱️" label="Duración" value={`${appointment.service.durationMin} min`} />
+              <DetailRow
+                icon="💵"
+                label="Precio"
+                value={`${appointment.service.currency} ${appointment.service.price.toFixed(0)}`}
+              />
+              {location && (
+                <DetailRow icon="📍" label="Ubicación" value={location} />
+              )}
             </div>
           </div>
 
           {/* Action buttons */}
-          <div className="space-y-3">
-            <button
-              onClick={handleOpenReschedule}
-              className="w-full text-white font-semibold py-3.5 rounded-2xl transition-colors"
-              style={{ backgroundColor: '#764797' }}
-            >
-              📅 Cambiar fecha
-            </button>
-            <button
-              onClick={() => setShowCancelConfirm(true)}
-              className="w-full bg-white hover:bg-gray-50 text-red-500 font-semibold py-3.5 rounded-2xl border border-red-100 transition-colors"
-            >
-              Cancelar cita
-            </button>
-            {appointment.user.whatsapp && (
-              <a
-                href={`https://wa.me/${appointment.user.whatsapp.replace(/\D/g, "")}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-gray-700 font-semibold py-3.5 rounded-2xl border border-gray-200 transition-colors"
+          {canModify && (
+            <div className="space-y-2.5">
+              <button
+                onClick={() => downloadICS(appointment)}
+                className="w-full h-11 bg-surface-raised border border-border-subtle rounded-full font-ui font-medium text-[14px] text-on-surface hover:bg-surface-container-high transition-colors flex items-center justify-center gap-2"
               >
-                <span>💬</span> Contactar por WhatsApp
-              </a>
-            )}
-          </div>
+                🗓️ Agregar al calendario
+              </button>
+              <button
+                onClick={handleOpenReschedule}
+                className="w-full h-11 bg-surface-raised border border-border-subtle rounded-full font-ui font-medium text-[14px] text-on-surface hover:bg-surface-container-high transition-colors"
+              >
+                📅 Cambiar fecha
+              </button>
+              <button
+                onClick={() => setShowCancelConfirm(true)}
+                className="w-full h-11 bg-surface-raised border border-error/20 rounded-full font-ui font-medium text-[14px] text-error hover:bg-error-surface/40 transition-colors"
+              >
+                Cancelar cita
+              </button>
+              {appointment.user.whatsapp && (
+                <a
+                  href={`https://wa.me/${appointment.user.whatsapp.replace(/\D/g, "")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full h-11 bg-[#25D366]/10 border border-[#25D366]/20 rounded-full font-ui font-medium text-[14px] text-[#25D366] hover:bg-[#25D366]/20 transition-colors flex items-center justify-center gap-2"
+                >
+                  <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+                  </svg>
+                  Contactar por WhatsApp
+                </a>
+              )}
+            </div>
+          )}
+
+          {/* Past appointment — only offer rebooking */}
+          {!canModify && appointment.status !== "cancelled" && (
+            <div className="space-y-2.5">
+              {canModify === false && (
+                <div className="text-center py-3">
+                  <p className="font-ui text-[13px] text-on-surface-subtle">Esta cita ya no se puede modificar.</p>
+                </div>
+              )}
+              <Link
+                href={`/p/${appointment.user.slug}`}
+                className="w-full h-11 bg-primary rounded-full font-ui font-medium text-[14px] text-on-primary flex items-center justify-center gap-2 shadow-primary-sm hover:bg-primary-hover transition-colors"
+              >
+                Reservar nueva cita →
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* Cancel confirmation modal */}
         {showCancelConfirm && (
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
-            <div className="bg-white rounded-3xl p-6 w-full max-w-sm">
-              <h3 className="text-lg font-bold text-gray-800 mb-2">¿Cancelar cita?</h3>
-              <p className="text-gray-500 text-sm mb-6">
+            <div className="bg-surface-raised border border-border-subtle rounded-3xl p-6 w-full max-w-sm shadow-xl">
+              <h3 className="font-display font-normal text-on-surface text-[20px] mb-2">¿Cancelar cita?</h3>
+              <p className="font-ui text-[13px] text-on-surface-muted mb-6 leading-relaxed">
                 Se notificará a <strong>{appointment.user.name}</strong> y el hueco quedará libre.
                 Esta acción no se puede deshacer.
               </p>
@@ -367,13 +477,13 @@ export default function CitaPortalPage() {
                 <button
                   onClick={handleCancel}
                   disabled={submitting}
-                  className="w-full bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-semibold py-3 rounded-2xl transition-colors"
+                  className="w-full h-11 bg-error/90 hover:bg-error text-white font-ui font-medium text-[14px] rounded-full transition-colors disabled:opacity-50"
                 >
-                  {submitting ? "Cancelando..." : "Sí, cancelar cita"}
+                  {submitting ? "Cancelando…" : "Sí, cancelar cita"}
                 </button>
                 <button
                   onClick={() => setShowCancelConfirm(false)}
-                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 rounded-2xl transition-colors"
+                  className="w-full h-11 bg-surface-container text-on-surface font-ui font-medium text-[14px] rounded-full hover:bg-surface-container-high transition-colors"
                 >
                   Volver
                 </button>
@@ -381,7 +491,7 @@ export default function CitaPortalPage() {
             </div>
           </div>
         )}
-      </PortalShell>
+      </Shell>
     );
   }
 
@@ -392,42 +502,41 @@ export default function CitaPortalPage() {
     const days = Object.keys(grouped);
 
     return (
-      <PortalShell>
+      <Shell>
         <div>
           <button
             onClick={() => setView("main")}
-            className="flex items-center gap-1.5 text-sm font-medium mb-4"
-            style={{ color: '#764797' }}
+            className="flex items-center gap-1.5 font-ui text-[13px] font-medium text-primary mb-5"
           >
             ← Volver
           </button>
 
-          <h2 className="text-xl font-bold text-gray-800 mb-1">Elige nueva fecha</h2>
-          <p className="text-gray-500 text-sm mb-5">
+          <h2 className="font-display font-normal text-on-surface text-[22px] mb-1">Elige nueva fecha</h2>
+          <p className="font-ui text-[13px] text-on-surface-muted mb-5">
             Selecciona un hueco disponible en los próximos 14 días.
           </p>
 
           {loadingSlots && (
-            <div className="text-center py-10">
-              <div className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin mx-auto mb-3" style={{ borderColor: '#764797', borderTopColor: 'transparent' }} />
-              <p className="text-gray-400 text-sm">Buscando huecos disponibles...</p>
+            <div className="text-center py-10 space-y-3">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="font-ui text-[13px] text-on-surface-muted">Buscando huecos disponibles…</p>
             </div>
           )}
 
           {!loadingSlots && days.length === 0 && (
-            <div className="text-center py-10">
-              <div className="text-4xl mb-3">😕</div>
-              <p className="text-gray-600 font-medium mb-1">Sin huecos disponibles</p>
-              <p className="text-gray-400 text-sm">
-                No hay espacios libres en los próximos 14 días. Contacta directamente a{" "}
-                {appointment?.user.name}.
+            <div className="text-center py-10 space-y-3">
+              <div className="text-4xl">😕</div>
+              <p className="font-ui font-medium text-on-surface text-[14px]">Sin huecos disponibles</p>
+              <p className="font-ui text-[13px] text-on-surface-muted max-w-xs mx-auto">
+                No hay espacios libres en los próximos 14 días.
+                {appointment?.user.whatsapp && " Contacta directamente a " + appointment.user.name + "."}
               </p>
               {appointment?.user.whatsapp && (
                 <a
                   href={`https://wa.me/${appointment.user.whatsapp.replace(/\D/g, "")}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-block mt-4 bg-green-500 text-white px-5 py-2.5 rounded-full text-sm font-semibold"
+                  className="inline-flex items-center gap-1.5 font-ui text-[13px] font-medium text-[#25D366]"
                 >
                   💬 WhatsApp
                 </a>
@@ -439,51 +548,36 @@ export default function CitaPortalPage() {
             <div className="space-y-5 pb-32">
               {days.map((day) => (
                 <div key={day}>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                  <p className="font-ui text-[11px] font-medium uppercase tracking-[0.08em] text-on-surface-subtle mb-2">
                     {day}
                   </p>
                   <div className="grid grid-cols-3 gap-2">
-                    {grouped[day].map((slot) => (
-                      <button
-                        key={slot.time}
-                        onClick={() => slot.isAvailable && !slot.isCurrent && setSelectedSlot(slot.time)}
-                        disabled={!slot.isAvailable || slot.isCurrent}
-                        style={slot.isCurrent
-                          ? { backgroundColor: '#f4eaf9', color: '#764797', borderColor: '#c89ee0' }
-                          : selectedSlot === slot.time
-                            ? { backgroundColor: '#764797', color: '#ffffff', borderColor: '#764797' }
-                            : !slot.isAvailable
-                              ? { backgroundColor: '#fff1f1', color: '#f8aaaa', borderColor: '#fecaca' }
-                              : {}}
-                        className={`relative py-3.5 rounded-2xl text-sm font-bold transition-all border flex flex-col items-center justify-center gap-1 group ${
-                          slot.isCurrent
-                            ? "cursor-not-allowed shadow-none"
-                            : !slot.isAvailable
-                              ? "cursor-not-allowed"
-                              : selectedSlot === slot.time
-                                ? "shadow-lg scale-105 z-10"
-                                : "bg-white text-gray-700 border-gray-100 hover:scale-[1.02]"
-                        }`}
-                      >
-                        <span className="flex items-center gap-1.5">
-                          {slot.isCurrent ? (
-                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#764797' }} />
-                          ) : !slot.isAvailable ? (
-                            <span className="w-1.5 h-1.5 rounded-full bg-red-300" />
-                          ) : (
-                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: selectedSlot === slot.time ? '#ffffff' : '#22c55e' }} />
-                          )}
-                          {fmtTime(slot.time)}
-                        </span>
-                        {slot.isCurrent ? (
-                          <span className="text-[9px] uppercase tracking-tighter font-black">Tu cita</span>
-                        ) : !slot.isAvailable ? (
-                          <span className="text-[9px] uppercase tracking-tighter opacity-50">Ocupado</span>
-                        ) : (
-                          <span className="text-[9px] uppercase tracking-tighter opacity-0 group-hover:opacity-60 transition-opacity" style={{ color: '#764797' }}>Libre</span>
-                        )}
-                      </button>
-                    ))}
+                    {grouped[day].map((slot) => {
+                      const isSel = selectedSlot === slot.time;
+                      const isCur = slot.isCurrent;
+                      const isUnavail = !slot.isAvailable;
+                      return (
+                        <button
+                          key={slot.time}
+                          onClick={() => slot.isAvailable && !isCur && setSelectedSlot(slot.time)}
+                          disabled={isUnavail || isCur}
+                          className={`py-3.5 rounded-2xl text-[13px] font-medium transition-all border flex flex-col items-center gap-1 ${
+                            isCur
+                              ? "border-primary/30 bg-primary/5 text-primary cursor-not-allowed"
+                              : isSel
+                                ? "border-primary bg-primary text-on-primary shadow-primary-sm scale-105"
+                                : isUnavail
+                                  ? "border-border-subtle bg-surface-sunken text-on-surface-subtle cursor-not-allowed"
+                                  : "border-border-subtle bg-surface-raised text-on-surface hover:border-primary/40 hover:scale-[1.02]"
+                          }`}
+                        >
+                          <span>{fmtTime(slot.time)}</span>
+                          <span className="text-[9px] uppercase tracking-wider opacity-60">
+                            {isCur ? "Tu cita" : isUnavail ? "Ocupado" : "Libre"}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
@@ -492,96 +586,153 @@ export default function CitaPortalPage() {
 
           {/* Fixed confirm bar */}
           {selectedSlot && (
-            <div className="fixed bottom-[70px] left-0 right-0 bg-white/95 backdrop-blur-md border-t border-violet-100 p-4 z-[60] shadow-[0_-8px_30px_rgb(0,0,0,0.04)]">
-
+            <div className="fixed bottom-[68px] left-0 right-0 bg-surface-raised/95 backdrop-blur-md border-t border-border-subtle p-4 z-[60]">
               <div className="max-w-sm mx-auto">
-                <p className="text-center text-sm text-gray-500 mb-3">
+                <p className="font-ui text-[13px] text-on-surface-muted text-center mb-3">
                   Nueva cita:{" "}
-                  <strong className="text-gray-800">
-                    {fmtDate(selectedSlot)} a las {fmtTime(selectedSlot)}
+                  <strong className="text-on-surface">
+                    {fmtDateShort(selectedSlot)} a las {fmtTime(selectedSlot)}
                   </strong>
                 </p>
                 <button
                   onClick={handleConfirmReschedule}
                   disabled={submitting || !appointment || selectedSlot === appointment.startTime}
-                  className="w-full disabled:opacity-50 text-white font-semibold py-3.5 rounded-2xl transition-colors"
-                  style={{ backgroundColor: '#764797' }}
+                  className="w-full h-11 bg-primary text-on-primary font-ui font-medium text-[14px] rounded-full shadow-primary-sm transition-colors hover:bg-primary-hover disabled:opacity-50"
                 >
-                  {submitting 
-                    ? "Confirmando..." 
-                    : selectedSlot === appointment?.startTime 
-                      ? "Selecciona otro horario" 
+                  {submitting
+                    ? "Confirmando…"
+                    : selectedSlot === appointment?.startTime
+                      ? "Selecciona otro horario"
                       : "✅ Confirmar nueva fecha"}
                 </button>
               </div>
             </div>
           )}
         </div>
-      </PortalShell>
+      </Shell>
     );
   }
 
   return null;
 }
 
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function ProfessionalAvatar({
+  name,
+  avatarUrl,
+  size = 48,
+}: {
+  name: string;
+  avatarUrl?: string;
+  size?: number;
+}) {
+  return (
+    <div
+      className="rounded-2xl overflow-hidden flex-shrink-0 bg-surface-container border border-border-subtle relative"
+      style={{ width: size, height: size }}
+    >
+      {avatarUrl ? (
+        <Image
+          src={avatarUrl}
+          alt={name}
+          fill
+          sizes={`${size}px`}
+          className="object-cover"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-lg font-medium text-on-surface-muted">
+          {name.charAt(0).toUpperCase()}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DetailRow({ icon, label, value }: { icon: string; label: string; value: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="text-[16px] flex-shrink-0 mt-0.5">{icon}</span>
+      <div className="flex-1 min-w-0">
+        <p className="font-ui text-[11px] text-on-surface-subtle uppercase tracking-[0.06em] mb-0.5">{label}</p>
+        <p className="font-ui text-[14px] text-on-surface leading-snug">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const labels: Record<string, { text: string; cls: string }> = {
+    confirmed:    { text: "Confirmada",    cls: "bg-green-100 text-green-700" },
+    reprogrammed: { text: "Reprogramada",  cls: "bg-violet-100 text-violet-700" },
+    pending:      { text: "Pendiente",     cls: "bg-yellow-100 text-yellow-700" },
+    cancelled:    { text: "Cancelada",     cls: "bg-red-100 text-red-600" },
+    completed:    { text: "Completada",    cls: "bg-surface-container text-on-surface-variant" },
+  };
+  const meta = labels[status] ?? { text: status, cls: "bg-surface-container text-on-surface-muted" };
+  return (
+    <span className={`font-ui text-[11px] font-medium px-2.5 py-1 rounded-full flex-shrink-0 ${meta.cls}`}>
+      {meta.text}
+    </span>
+  );
+}
+
 // ── Layout shell ──────────────────────────────────────────────────────────────
 
-function PortalShell({ children }: { children: React.ReactNode }) {
+function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen pb-20" style={{ backgroundColor: '#f9f4fc' }}>
+    <div className="min-h-screen bg-background font-ui antialiased pb-24">
       {/* Header */}
-      <div className="px-4 py-5" style={{ background: 'linear-gradient(135deg, #764797 0%, #9060b2 100%)' }}>
+      <header className="glass-nav border-b border-border-subtle px-5 py-4">
         <div className="max-w-sm mx-auto flex items-center justify-between">
-          <a href="/" className="flex items-center gap-1.5 hover:text-white transition-colors text-sm" style={{ color: 'rgba(255,255,255,0.65)' }}>
+          <Link
+            href="/"
+            className="flex items-center gap-1.5 font-ui text-[13px] text-on-surface-muted hover:text-on-surface transition-colors"
+          >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
             </svg>
             Inicio
-          </a>
+          </Link>
           <div className="text-center">
-            <h1 className="text-white text-lg font-bold tracking-tight">Musa ✨</h1>
-            <p className="text-xs" style={{ color: 'rgba(255,255,255,0.65)' }}>Gestiona tu cita</p>
+            <p className="font-display font-normal text-on-surface text-[17px]" style={{ letterSpacing: "-0.01em" }}>
+              Musa
+            </p>
+            <p className="font-ui text-[10px] text-on-surface-subtle -mt-0.5">Gestiona tu cita</p>
           </div>
-          <a href="/client/login" className="hover:text-white transition-colors text-xs font-medium" style={{ color: 'rgba(255,255,255,0.65)' }}>
+          <Link
+            href="/client"
+            className="font-ui text-[13px] text-on-surface-muted hover:text-on-surface transition-colors"
+          >
             Mi cuenta
-          </a>
+          </Link>
         </div>
-      </div>
+      </header>
 
       {/* Content */}
-      <div className="max-w-sm mx-auto px-4 py-6">{children}</div>
+      <main className="max-w-sm mx-auto px-4 py-6">{children}</main>
 
       {/* Footer nav */}
-      <div className="fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-xl border-t border-violet-100 px-4 py-3 flex justify-around z-[70]">
-        <a href="/" className="flex flex-col items-center gap-0.5 text-gray-400 transition-colors" style={{ '--hover-color': '#764797' } as React.CSSProperties}
-           onMouseEnter={e => (e.currentTarget.style.color='#764797')} onMouseLeave={e => (e.currentTarget.style.color='')}>
+      <nav className="fixed bottom-0 left-0 w-full bg-surface-raised/90 backdrop-blur-xl border-t border-border-subtle px-4 py-3 flex justify-around z-[70]">
+        <Link href="/" className="flex flex-col items-center gap-0.5 text-on-surface-subtle hover:text-primary transition-colors">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
           </svg>
-          <span className="text-[10px] font-bold uppercase tracking-wide">Inicio</span>
-        </a>
-        <a href="/explore" className="flex flex-col items-center gap-0.5 text-gray-400 transition-colors"
-           onMouseEnter={e => (e.currentTarget.style.color='#764797')} onMouseLeave={e => (e.currentTarget.style.color='')}>
+          <span className="font-ui text-[10px] font-medium uppercase tracking-wide">Inicio</span>
+        </Link>
+        <Link href="/explore" className="flex flex-col items-center gap-0.5 text-on-surface-subtle hover:text-primary transition-colors">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
-          <span className="text-[10px] font-bold uppercase tracking-wide">Explorar</span>
-        </a>
-        <a href="/client" className="flex flex-col items-center gap-0.5 text-gray-400 transition-colors"
-           onMouseEnter={e => (e.currentTarget.style.color='#764797')} onMouseLeave={e => (e.currentTarget.style.color='')}>
+          <span className="font-ui text-[10px] font-medium uppercase tracking-wide">Explorar</span>
+        </Link>
+        <Link href="/client" className="flex flex-col items-center gap-0.5 text-primary">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
-          <span className="text-[10px] font-bold uppercase tracking-wide">Mis Citas</span>
-        </a>
-        <a href="/" className="flex flex-col items-center gap-0.5 text-gray-400 transition-colors"
-           onMouseEnter={e => (e.currentTarget.style.color='#764797')} onMouseLeave={e => (e.currentTarget.style.color='')}>
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-          <span className="text-[10px] font-bold uppercase tracking-wide">Salir</span>
-        </a>
-      </div>
+          <span className="font-ui text-[10px] font-medium uppercase tracking-wide">Mis Citas</span>
+        </Link>
+      </nav>
     </div>
   );
 }

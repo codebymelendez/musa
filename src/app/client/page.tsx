@@ -1,11 +1,13 @@
 "use client";
 
-import { CalendarDaysIcon, MagnifyingGlassIcon, TagIcon, QrCodeIcon, ArrowPathIcon, PencilSquareIcon, HomeIcon, ArrowRightOnRectangleIcon, StarIcon, Cog6ToothIcon, UserMinusIcon } from "@heroicons/react/24/outline";
+import { CalendarDaysIcon, MagnifyingGlassIcon, TagIcon, QrCodeIcon, ArrowPathIcon, PencilSquareIcon, HomeIcon, ArrowRightOnRectangleIcon, StarIcon } from "@heroicons/react/24/outline";
 
 import { useEffect, useState, lazy, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { formatTimeES } from "@/lib/utils";
+import GoogleSignInButton from "@/components/GoogleSignInButton";
+import MusaLogo from "@/components/brand/MusaLogo";
 
 const QRDisplay = lazy(() => import("@/components/loyalty/QRDisplay"));
 
@@ -138,64 +140,9 @@ export default function ClientPortalPage() {
     setPast([]);
   };
 
-  // ── No autenticado ─────────────────────────────────────────────────────────
+  // ── No autenticado — acceso inline (Google + form) ────────────────────────
   if (!token) {
-    return (
-      <div className="min-h-screen bg-background font-body antialiased">
-        {/* Header */}
-        <header className="sticky top-0 z-40 glass-nav border-b border-border-subtle px-5 py-3 flex items-center gap-3">
-          <Link href="/" className="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
-          </Link>
-          <h1 className="font-headline text-lg font-medium text-on-surface">Área de clientas</h1>
-        </header>
-
-        <main className="px-6 pt-12 pb-16 max-w-sm mx-auto space-y-8 text-center">
-          <div className="space-y-3">
-            <div className="text-5xl">💅</div>
-            <h2 className="font-headline font-cormorant font-normal text-3xl text-on-surface" suppressHydrationWarning>
-              {clientName ? `¡Hola, ${clientName}!` : "Tu espacio de belleza"}
-            </h2>
-            <p className="text-sm text-on-surface-variant leading-relaxed">
-              Accede a tus citas, historial de visitas y ofertas exclusivas de tus profesionales favoritas.
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            <Link
-              href="/client/login"
-              className="flex items-center justify-center gap-2 w-full h-14 bg-primary text-on-primary font-medium rounded-full shadow-primary-sm hover:scale-[1.02] transition-transform"
-            >
-              <CalendarDaysIcon className="w-5 h-5" />
-              Ver mis citas
-            </Link>
-            <Link
-              href="/client/register"
-              className="flex items-center justify-center gap-2 w-full h-14 bg-surface border border-outline-variant/30 text-on-surface font-headline font-medium rounded-full hover:bg-surface-container transition-colors"
-            >
-              Crear perfil de clienta
-            </Link>
-          </div>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-outline-variant/30" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-background px-3 text-xs text-on-surface-variant">o descubre profesionales</span>
-            </div>
-          </div>
-
-          <Link
-            href="/explore"
-            className="flex items-center justify-center gap-2 text-sm font-medium text-primary hover:underline"
-          >
-            <MagnifyingGlassIcon className="w-4 h-4" />
-            Explorar profesionales cerca
-          </Link>
-        </main>
-      </div>
-    );
+    return <ClientAccessView onSuccess={(t, n) => { setToken(t); setClientName(n); }} />;
   }
 
   // ── Autenticado ────────────────────────────────────────────────────────────
@@ -532,6 +479,172 @@ export default function ClientPortalPage() {
           <span className="font-headline text-[10px] font-medium tracking-wide uppercase">Salir</span>
         </button>
       </nav>
+    </div>
+  );
+}
+
+// ── Pantalla de acceso inline (sin redirect) ──────────────────────────────────
+function ClientAccessView({
+  onSuccess,
+}: {
+  onSuccess: (token: string, name: string) => void;
+}) {
+  const [phone, setPhone] = useState("");
+  const [name, setName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/client/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, name }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "No pudimos verificar tu identidad");
+        return;
+      }
+      localStorage.setItem("musa_client_token", data.token);
+      localStorage.setItem("musa_client_name", data.clientName);
+      onSuccess(data.token, data.clientName);
+    } catch {
+      setError("Error de conexión. Intenta de nuevo.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-cream-100 font-ui antialiased flex flex-col items-center justify-center px-5 py-12 relative">
+      {/* Dot grid subtle */}
+      <div
+        className="absolute inset-0 opacity-[0.03] pointer-events-none"
+        style={{
+          backgroundImage: "radial-gradient(circle at 1px 1px, #1A0E0B 1px, transparent 0)",
+          backgroundSize: "24px 24px",
+        }}
+      />
+
+      <main className="relative w-full max-w-[380px] space-y-7 z-10">
+        {/* Brand */}
+        <header className="space-y-4">
+          <Link
+            href="/"
+            className="flex items-center gap-1.5 font-ui text-[13px] text-on-surface-subtle hover:text-on-surface-muted transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+            </svg>
+            Inicio
+          </Link>
+          <div className="text-center space-y-2">
+            <div className="flex justify-center">
+              <MusaLogo variant="combo" size="md" />
+            </div>
+            <p className="font-display font-normal italic text-on-surface text-[22px]" style={{ letterSpacing: "-0.01em" }}>
+              Tus citas, aquí.
+            </p>
+            <p className="font-ui text-[14px] text-on-surface-muted">
+              Accede a tus reservas y gestiona tus citas.
+            </p>
+          </div>
+        </header>
+
+        {/* Card */}
+        <section className="bg-surface-raised border border-border-subtle rounded-2xl p-7 shadow-md space-y-5">
+          {error && (
+            <div className="bg-error-surface border border-error/20 rounded-lg px-4 py-3">
+              <p className="font-ui text-[13px] text-error leading-snug">{error}</p>
+            </div>
+          )}
+
+          {/* Google */}
+          <GoogleSignInButton
+            label="Continuar con Google"
+            defaultRole="client"
+            onError={(msg) => setError(msg)}
+          />
+
+          {/* Separador */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-border-subtle" />
+            <span className="font-ui text-[11px] text-on-surface-subtle">o con tu teléfono</span>
+            <div className="flex-1 h-px bg-border-subtle" />
+          </div>
+
+          {/* Form teléfono + nombre */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <label htmlFor="ca-phone" className="musa-sublabel">Teléfono *</label>
+              <input
+                id="ca-phone"
+                className="w-full h-11 px-3.5 bg-surface-sunken border border-border rounded-md font-ui text-[15px] text-on-surface placeholder:text-on-surface-subtle outline-none transition-all focus:border-border-focus focus:bg-surface-raised focus:shadow-[0_0_0_3px_rgba(181,89,62,0.10)]"
+                type="tel"
+                placeholder="+58 424 000 0000"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                required
+                autoComplete="tel"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="ca-name" className="musa-sublabel">Tu nombre *</label>
+              <input
+                id="ca-name"
+                className="w-full h-11 px-3.5 bg-surface-sunken border border-border rounded-md font-ui text-[15px] text-on-surface placeholder:text-on-surface-subtle outline-none transition-all focus:border-border-focus focus:bg-surface-raised focus:shadow-[0_0_0_3px_rgba(181,89,62,0.10)]"
+                type="text"
+                placeholder="Como te conocemos"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                autoComplete="name"
+              />
+              <p className="font-ui text-[11px] text-on-surface-subtle px-0.5">
+                Tu nombre se usa para confirmar tu identidad, sin contraseña.
+              </p>
+            </div>
+            <button
+              type="submit"
+              disabled={!phone || !name || loading}
+              className="w-full h-11 bg-primary text-on-primary font-ui font-medium text-[14px] rounded-full flex items-center justify-center gap-2 shadow-primary-sm hover:bg-primary-hover transition-all active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <div className="w-4 h-4 border border-on-primary border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <CalendarDaysIcon className="w-4 h-4" />
+                  Ver mis citas
+                </>
+              )}
+            </button>
+          </form>
+        </section>
+
+        {/* Crear perfil */}
+        <p className="text-center font-ui text-[13px] text-on-surface-muted">
+          ¿Primera vez?{" "}
+          <Link href="/client/register" className="text-primary hover:underline font-medium">
+            Crea tu perfil
+          </Link>
+          {" "}para guardar tus datos.
+        </p>
+
+        {/* Explorar */}
+        <div className="text-center">
+          <Link
+            href="/explore"
+            className="inline-flex items-center gap-1.5 font-ui text-[13px] text-on-surface-subtle hover:text-on-surface transition-colors"
+          >
+            <MagnifyingGlassIcon className="w-3.5 h-3.5" />
+            Explorar profesionales
+          </Link>
+        </div>
+      </main>
     </div>
   );
 }

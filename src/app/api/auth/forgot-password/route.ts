@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
                 </tr>
                 <tr>
                   <td style="padding:24px 40px;background:#faf5ff;border-top:1px solid #ede9fe;text-align:center">
-                    <p style="margin:0;color:#9ca3af;font-size:12px">© 2025 Musa. Todos los derechos reservados.</p>
+                    <p style="margin:0;color:#9ca3af;font-size:12px">© 2026 Musa. Todos los derechos reservados.</p>
                   </td>
                 </tr>
               </table>
