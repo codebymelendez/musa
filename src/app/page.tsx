@@ -144,7 +144,7 @@ async function getFeaturedBusinesses(): Promise<FeaturedUser[]> {
       .order("createdAt", { ascending: false })
       .limit(50);
 
-    return (users ?? [])
+    const list = (users ?? [])
       .filter((u) => {
         const svcs = Array.isArray(u.services) ? u.services : [];
         return svcs.some((s: { isActive: boolean; price: number }) => s.isActive && s.price > 0);
@@ -154,6 +154,19 @@ async function getFeaturedBusinesses(): Promise<FeaturedUser[]> {
         business: Array.isArray(u.business) ? u.business[0] : u.business,
       }))
       .slice(0, 8);
+
+    // AurisGlam siempre en primer lugar
+    const aurisIdx = list.findIndex(
+      (u) =>
+        u.slug?.toLowerCase().includes("aurisglam") ||
+        u.name?.toLowerCase().includes("aurisglam"),
+    );
+    if (aurisIdx > 0) {
+      const [auris] = list.splice(aurisIdx, 1);
+      list.unshift(auris);
+    }
+
+    return list;
   } catch {
     return [];
   }
