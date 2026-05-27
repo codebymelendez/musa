@@ -9,6 +9,8 @@ import { Service } from "@/types";
 import { usePushSubscription } from "@/hooks/usePushSubscription";
 import PromotionBanner from "@/components/PromotionBanner";
 import MusaLogo from "@/components/brand/MusaLogo";
+import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
+import { createClient } from "@/lib/supabase-browser";
 import {
   ArrowLeftIcon,
   ShareIcon,
@@ -17,8 +19,12 @@ import {
   ArrowRightIcon,
   BellAlertIcon,
   CheckCircleIcon,
+  UserCircleIcon,
+  DevicePhoneMobileIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "@/lib/cn";
+
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
 
 interface PublicProfile {
   name: string;
@@ -52,7 +58,8 @@ interface Promotion {
   validUntil: string;
 }
 
-type BookingStep = "service" | "datetime" | "contact" | "confirmed";
+// service → datetime → identity → confirmed
+type BookingStep = "service" | "datetime" | "identity" | "confirmed";
 
 const DAYS_ES   = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const MONTHS_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -69,24 +76,31 @@ export default function PublicBookingPage() {
   const params = useParams();
   const slug   = params.slug as string;
 
-  const [data, setData]             = useState<PublicData | null>(null);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState<string | null>(null);
-  const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [data,        setData]       = useState<PublicData | null>(null);
+  const [loading,     setLoading]    = useState(true);
+  const [error,       setError]      = useState<string | null>(null);
+  const [promotions,  setPromotions] = useState<Promotion[]>([]);
 
-  const [step, setStep]                       = useState<BookingStep>("service");
+  const [step,            setStep]            = useState<BookingStep>("service");
   const [selectedService, setSelectedService] = useState<Service | null>(null);
-  const [selectedDate, setSelectedDate]       = useState<Date>(new Date());
-  const [selectedSlot, setSelectedSlot]       = useState<TimeSlot | null>(null);
-  const [slotsLoading, setSlotsLoading]       = useState(false);
-  const [slots, setSlots]                     = useState<TimeSlot[]>([]);
+  const [selectedDate,    setSelectedDate]    = useState<Date>(new Date());
+  const [selectedSlot,    setSelectedSlot]    = useState<TimeSlot | null>(null);
+  const [slotsLoading,    setSlotsLoading]    = useState(false);
+  const [slots,           setSlots]           = useState<TimeSlot[]>([]);
 
-  const [clientName,  setClientName]  = useState("");
-  const [clientPhone, setClientPhone] = useState("");
-  const [clientEmail, setClientEmail] = useState("");
-  const [wantsNotifications, setWantsNotifications] = useState(false);
-  const [booking, setBooking]         = useState(false);
-  const [confirmed, setConfirmed]     = useState<{
+  // Datos de identidad (usados en el paso 3)
+  const [clientName,          setClientName]          = useState("");
+  const [clientPhone,         setClientPhone]         = useState("");
+  const [clientEmail,         setClientEmail]         = useState("");
+  const [wantsNotifications,  setWantsNotifications]  = useState(false);
+
+  // Estado del flujo de Google en el booking
+  const [googleAuthed,    setGoogleAuthed]    = useState(false);
+  const [googleLoading,   setGoogleLoading]   = useState(false);
+  const [identityError,   setIdentityError]   = useState<string | null>(null);
+
+  const [booking,    setBooking]    = useState(false);
+  const [confirmed,  setConfirmed]  = useState<{
     appointmentId: string;
     clientId: string;
     serviceName: string;
@@ -101,31 +115,24 @@ export default function PublicBookingPage() {
 
   const next14Days = getNext14Days();
 
-  // Bug 5: Web Share API con fallback a clipboard
+  // Web Share API con fallback a clipboard
   const handleShare = useCallback(async () => {
-    const url = `${window.location.origin}/p/${slug}`;
+    const url  = `${window.location.origin}/p/${slug}`;
     const name = data?.professional.name ?? "esta profesional";
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
-        await navigator.share({
-          title: name,
-          text: `Reserva una cita con ${name} en Musa`,
-          url,
-        });
-      } catch {
-        // El usuario canceló el diálogo — no se requiere acción
-      }
+        await navigator.share({ title: name, text: `Reserva una cita con ${name} en Musa`, url });
+      } catch { /* cancelado */ }
     } else {
       try {
         await navigator.clipboard.writeText(url);
         setShareCopied(true);
         setTimeout(() => setShareCopied(false), 2000);
-      } catch {
-        // Navegador muy antiguo, ignorar
-      }
+      } catch { /* ignorar */ }
     }
   }, [slug, data]);
 
+  // Pre-rellenar datos de visitas anteriores
   useEffect(() => {
     const savedName  = localStorage.getItem(`musa_name_${slug}`);
     const savedPhone = localStorage.getItem(`musa_phone_${slug}`);
@@ -133,6 +140,7 @@ export default function PublicBookingPage() {
     if (savedPhone) setClientPhone(savedPhone);
   }, [slug]);
 
+  // Cargar datos del perfil + promos
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -160,23 +168,20 @@ export default function PublicBookingPage() {
     fetchProfile();
   }, [slug]);
 
+  // Cargar slots al cambiar de fecha/servicio
   useEffect(() => {
     if (!selectedService || step !== "datetime") return;
     const fetchSlots = async () => {
       setSlotsLoading(true);
       setSelectedSlot(null);
       try {
-        // Usar componentes locales para evitar que toISOString() cambie el día
-        // cuando el dispositivo está en UTC-4 y es después de las 8 PM (= UTC +1 día)
         const dateStr = [
           selectedDate.getFullYear(),
           String(selectedDate.getMonth() + 1).padStart(2, "0"),
           String(selectedDate.getDate()).padStart(2, "0"),
         ].join("-");
-        const res = await fetch(
-          `/api/public/${slug}?date=${dateStr}&serviceId=${selectedService.id}`
-        );
-        const d = await res.json();
+        const res = await fetch(`/api/public/${slug}?date=${dateStr}&serviceId=${selectedService.id}`);
+        const d   = await res.json();
         setSlots(d.slots ?? []);
       } catch {
         setSlots([]);
@@ -187,14 +192,15 @@ export default function PublicBookingPage() {
     fetchSlots();
   }, [selectedService, selectedDate, step, slug]);
 
+  // Confirmar la reserva
   const handleBook = useCallback(async () => {
     if (!selectedService || !selectedSlot || !clientName || !clientPhone) return;
     setBooking(true);
     try {
       const res = await fetch(`/api/public/${slug}/book`, {
-        method: "POST",
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body:    JSON.stringify({
           serviceId:         selectedService.id,
           startTime:         selectedSlot.datetime,
           clientName,
@@ -225,7 +231,56 @@ export default function PublicBookingPage() {
     }
   }, [selectedService, selectedSlot, clientName, clientPhone, clientEmail, wantsNotifications, slug]);
 
-  /* ── Loading — skeleton layout ─────────────────────────────────────── */
+  // ── Google auth inline (para el paso de identidad) ────────────────────────
+  const handleGoogleAuth = useCallback(async (credentialResponse: { credential?: string }) => {
+    if (!credentialResponse.credential) return;
+    setGoogleLoading(true);
+    setIdentityError(null);
+    try {
+      const supabase = createClient();
+      const { data: authData, error: authError } = await supabase.auth.signInWithIdToken({
+        provider: "google",
+        token:    credentialResponse.credential,
+      });
+
+      if (authError || !authData.session) {
+        setIdentityError("No se pudo iniciar sesión con Google. Intenta de nuevo.");
+        return;
+      }
+
+      // Nombre desde Google
+      const googleName = authData.session.user.user_metadata?.full_name
+        || authData.session.user.user_metadata?.name
+        || authData.session.user.email?.split("@")[0]
+        || "";
+
+      if (googleName && !clientName) setClientName(googleName);
+
+      // Intentar obtener perfil para ver si tiene teléfono
+      try {
+        const profileRes = await fetch("/api/auth/me");
+        if (profileRes.ok) {
+          const profile = await profileRes.json();
+          if (profile.phone && !clientPhone) setClientPhone(profile.phone);
+        } else if (profileRes.status === 404) {
+          // Usuario nuevo → crear perfil como client (sin redirección)
+          await fetch("/api/auth/google-profile", {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify({ role: "client" }),
+          });
+        }
+      } catch { /* profile fetch failed — not blocking */ }
+
+      setGoogleAuthed(true);
+    } catch {
+      setIdentityError("Error al autenticar. Intenta de nuevo.");
+    } finally {
+      setGoogleLoading(false);
+    }
+  }, [clientName, clientPhone]);
+
+  /* ── Loading ─────────────────────────────────────────────────────────── */
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -253,15 +308,12 @@ export default function PublicBookingPage() {
     );
   }
 
-  /* ── Error ──────────────────────────────────────────────────────────── */
+  /* ── Error ───────────────────────────────────────────────────────────── */
   if (error || !data) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-3 p-6">
         <div className="musa-rule w-[60px] mb-2" />
-        <p
-          className="font-display font-normal text-on-surface text-center"
-          style={{ fontSize: "28px" }}
-        >
+        <p className="font-display font-normal text-on-surface text-center" style={{ fontSize: "28px" }}>
           {error ?? "No encontrado."}
         </p>
         <p className="font-ui text-[14px] text-on-surface-muted text-center max-w-xs leading-relaxed">
@@ -282,27 +334,13 @@ export default function PublicBookingPage() {
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <header className="fixed top-0 w-full z-40 glass-nav border-b border-border-subtle">
         <div className="max-w-2xl mx-auto px-5 h-14 flex items-center justify-between gap-3">
-
-          {/* Izquierda: botón volver + avatar + nombre */}
           <div className="flex items-center gap-2.5 min-w-0">
-            {/* Bug 6: botón Volver → home */}
-            <Link
-              href="/"
-              aria-label="Volver al inicio"
-              className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-muted hover:bg-surface-sunken transition-colors flex-shrink-0"
-            >
+            <Link href="/" aria-label="Volver al inicio" className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-muted hover:bg-surface-sunken transition-colors flex-shrink-0">
               <ArrowLeftIcon className="w-4 h-4" />
             </Link>
-
             <div className="w-9 h-9 rounded-full bg-rose-50 overflow-hidden relative flex-shrink-0">
               {professional.avatarUrl ? (
-                <Image
-                  src={professional.avatarUrl}
-                  alt={professional.name}
-                  fill
-                  sizes="36px"
-                  className="object-cover"
-                />
+                <Image src={professional.avatarUrl} alt={professional.name} fill sizes="36px" className="object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center font-ui font-medium text-[13px] text-sienna-700">
                   {professional.name[0]}
@@ -310,31 +348,21 @@ export default function PublicBookingPage() {
               )}
             </div>
             <div className="min-w-0">
-              <h1 className="font-ui font-medium text-[14px] text-on-surface leading-tight truncate">
-                {professional.name}
-              </h1>
+              <h1 className="font-ui font-medium text-[14px] text-on-surface leading-tight truncate">{professional.name}</h1>
               {professional.serviceType && (
-                <p className="font-ui text-[11px] text-primary capitalize">
-                  {professional.serviceType}
-                </p>
+                <p className="font-ui text-[11px] text-primary capitalize">{professional.serviceType}</p>
               )}
             </div>
           </div>
 
-          {/* Derecha: compartir + logo → home */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            {/* Bug 5: Web Share API con fallback clipboard */}
             <div className="relative">
               <button
                 onClick={handleShare}
                 className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-muted hover:bg-surface-sunken transition-colors"
                 aria-label="Compartir perfil"
               >
-                {shareCopied ? (
-                  <CheckIcon className="w-5 h-5 text-success" />
-                ) : (
-                  <ShareIcon className="w-5 h-5" />
-                )}
+                {shareCopied ? <CheckIcon className="w-5 h-5 text-success" /> : <ShareIcon className="w-5 h-5" />}
               </button>
               {shareCopied && (
                 <span className="absolute -bottom-7 right-0 text-[10px] font-ui font-medium text-success bg-success-surface border border-success/20 px-2 py-0.5 rounded-full whitespace-nowrap">
@@ -343,7 +371,6 @@ export default function PublicBookingPage() {
               )}
             </div>
             <span className="w-px h-4 bg-border-subtle" aria-hidden="true" />
-            {/* Bug 6: logo navega al home */}
             <Link href="/" aria-label="Ir al inicio">
               <MusaLogo variant="monogram" size="xs" className="opacity-55 hover:opacity-100 transition-opacity" />
             </Link>
@@ -353,7 +380,7 @@ export default function PublicBookingPage() {
 
       <main className="pt-20 pb-36 px-5 max-w-2xl mx-auto space-y-7 min-h-[calc(100dvh-80px)]">
 
-        {/* Returning client banner */}
+        {/* Bienvenida de vuelta */}
         {isReturningClient && step === "service" && (
           <div className="bg-primary-surface border border-primary-border rounded-xl px-4 py-3 flex items-center gap-3">
             <CheckCircleIcon className="w-5 h-5 text-primary flex-shrink-0" />
@@ -363,7 +390,7 @@ export default function PublicBookingPage() {
           </div>
         )}
 
-        {/* Promotions */}
+        {/* Promociones */}
         {promotions.length > 0 && step === "service" && (
           <PromotionBanner
             promotions={promotions}
@@ -373,63 +400,35 @@ export default function PublicBookingPage() {
 
         {/* Hero */}
         <section>
-          <h2
-            className="font-display font-normal text-on-surface leading-tight"
-            style={{ fontSize: "32px", letterSpacing: "-0.02em" }}
-          >
+          <h2 className="font-display font-normal text-on-surface leading-tight" style={{ fontSize: "32px", letterSpacing: "-0.02em" }}>
             Reservar cita
           </h2>
           {professional.bio && (
-            <p className="font-ui text-[14px] text-on-surface-muted mt-2 leading-relaxed max-w-md">
-              {professional.bio}
-            </p>
+            <p className="font-ui text-[14px] text-on-surface-muted mt-2 leading-relaxed max-w-md">{professional.bio}</p>
           )}
         </section>
 
-        {/* ── STEP 1: Servicio ────────────────────────────────────────── */}
+        {/* ── PASO 1: Servicio ─────────────────────────────────────────── */}
         {step === "service" && (
           <section className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-ui font-medium text-[16px] text-on-surface">
-                Seleccionar servicio
-              </h3>
+              <h3 className="font-ui font-medium text-[16px] text-on-surface">Seleccionar servicio</h3>
               <span className="musa-sublabel">01 / 03</span>
             </div>
-
             <div className="space-y-3">
               {services.map((s) => {
                 const isSelected = selectedService?.id === s.id;
                 const svc = s as unknown as Service;
                 return (
-                  <div
-                    key={s.id}
-                    className={cn(
-                      "rounded-xl border transition-all duration-[160ms]",
-                      isSelected
-                        ? "bg-primary-surface border-primary shadow-primary-sm"
-                        : "bg-surface-raised border-border-subtle"
-                    )}
-                  >
-                    {/* Info del servicio — tap para seleccionar */}
-                    <button
-                      type="button"
-                      onClick={() => setSelectedService(svc)}
-                      className="w-full text-left p-4"
-                    >
+                  <div key={s.id} className={cn("rounded-xl border transition-all duration-[160ms]", isSelected ? "bg-primary-surface border-primary shadow-primary-sm" : "bg-surface-raised border-border-subtle")}>
+                    <button type="button" onClick={() => setSelectedService(svc)} className="w-full text-left p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
-                          <p
-                            className={cn(
-                              "font-ui font-medium text-[15px] leading-tight",
-                              isSelected ? "text-primary" : "text-on-surface"
-                            )}
-                          >
+                          <p className={cn("font-ui font-medium text-[15px] leading-tight", isSelected ? "text-primary" : "text-on-surface")}>
                             {s.name}
                           </p>
                           {s.description && (
-                            <p className="font-ui text-[12px] text-on-surface-muted mt-1 leading-relaxed">
-                              {s.description}
-                            </p>
+                            <p className="font-ui text-[12px] text-on-surface-muted mt-1 leading-relaxed">{s.description}</p>
                           )}
                           <div className="flex items-center gap-3 mt-2">
                             <span className="flex items-center gap-1 text-on-surface-subtle">
@@ -437,39 +436,26 @@ export default function PublicBookingPage() {
                               <span className="font-mono-num text-[12px]">{s.durationMin}</span>
                               <span className="font-ui text-[12px]">min</span>
                             </span>
-                            <span className="font-mono-num text-[14px] text-primary">
-                              {formatCurrency(s.price, s.currency)}
-                            </span>
+                            <span className="font-mono-num text-[14px] text-primary">{formatCurrency(s.price, s.currency)}</span>
                           </div>
                         </div>
-                        <div
-                          className={cn(
-                            "w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center mt-0.5 transition-colors",
-                            isSelected ? "bg-primary border-primary" : "border-border"
-                          )}
-                        >
+                        <div className={cn("w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center mt-0.5 transition-colors", isSelected ? "bg-primary border-primary" : "border-border")}>
                           {isSelected && <CheckIcon className="w-3 h-3 text-white" />}
                         </div>
                       </div>
                     </button>
-
-                    {/* CTA "Reservar" — visible siempre para acción directa */}
                     <div className="px-4 pb-4">
                       <button
                         type="button"
-                        onClick={() => {
-                          setSelectedService(svc);
-                          setStep("datetime");
-                        }}
+                        onClick={() => { setSelectedService(svc); setStep("datetime"); }}
                         className={cn(
                           "w-full h-10 rounded-xl font-ui font-medium text-[13px] flex items-center justify-center gap-2 transition-all duration-[160ms]",
                           isSelected
                             ? "bg-primary text-on-primary shadow-primary-sm"
-                            : "bg-surface-sunken text-on-surface hover:bg-primary-surface hover:text-primary border border-border hover:border-primary-border"
+                            : "bg-surface-sunken text-on-surface hover:bg-primary-surface hover:text-primary border border-border hover:border-primary-border",
                         )}
                       >
-                        Reservar
-                        <ArrowRightIcon className="w-3.5 h-3.5" />
+                        Reservar <ArrowRightIcon className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
@@ -479,23 +465,20 @@ export default function PublicBookingPage() {
           </section>
         )}
 
-        {/* ── STEP 2: Fecha y hora ──────────────────────────────────── */}
+        {/* ── PASO 2: Fecha y hora ────────────────────────────────────── */}
         {step === "datetime" && (
           <section className="space-y-5">
             <div className="flex items-center justify-between">
-              <h3 className="font-ui font-medium text-[16px] text-on-surface">
-                Fecha y hora
-              </h3>
+              <h3 className="font-ui font-medium text-[16px] text-on-surface">Fecha y hora</h3>
               <span className="musa-sublabel">02 / 03</span>
             </div>
 
-            {/* Day picker */}
+            {/* Selector de día */}
             <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
               {next14Days.map((day, i) => {
                 const isSelected = day.toDateString() === selectedDate.toDateString();
                 const isToday    = i === 0;
                 const isWorkday  = data.settings.workDays.includes(day.getDay());
-
                 return (
                   <button
                     key={i}
@@ -508,27 +491,20 @@ export default function PublicBookingPage() {
                         ? "bg-primary text-on-primary shadow-primary-sm"
                         : isWorkday
                         ? "bg-surface-raised border border-border text-on-surface hover:border-primary-border"
-                        : "bg-surface-sunken text-on-surface-subtle opacity-40 cursor-not-allowed"
+                        : "bg-surface-sunken text-on-surface-subtle opacity-40 cursor-not-allowed",
                     )}
                   >
                     <span className="font-ui text-[10px] font-medium uppercase tracking-[0.08em]">
                       {isToday ? "Hoy" : DAYS_ES[day.getDay()]}
                     </span>
-                    <span
-                      className="font-display font-normal leading-none"
-                      style={{ fontSize: "20px" }}
-                    >
-                      {day.getDate()}
-                    </span>
-                    <span className="font-ui text-[10px]">
-                      {MONTHS_ES[day.getMonth()]}
-                    </span>
+                    <span className="font-display font-normal leading-none" style={{ fontSize: "20px" }}>{day.getDate()}</span>
+                    <span className="font-ui text-[10px]">{MONTHS_ES[day.getMonth()]}</span>
                   </button>
                 );
               })}
             </div>
 
-            {/* Time slots */}
+            {/* Slots de hora */}
             {slotsLoading ? (
               <div className="grid grid-cols-3 gap-2">
                 {[...Array(6)].map((_, i) => (
@@ -537,19 +513,13 @@ export default function PublicBookingPage() {
               </div>
             ) : slots.length === 0 ? (
               <div className="py-10 text-center">
-                <p className="font-ui text-[13px] text-on-surface-muted">
-                  No hay horarios disponibles para este día.
-                </p>
+                <p className="font-ui text-[13px] text-on-surface-muted">No hay horarios disponibles para este día.</p>
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-2">
                 {slots.map((slot) => {
-                  const displayTime = new Date(slot.datetime).toLocaleTimeString("es-VE", {
-                    hour:   "2-digit",
-                    minute: "2-digit",
-                    hour12: true,
-                  });
-                  const isSelected = selectedSlot?.datetime === slot.datetime;
+                  const displayTime = new Date(slot.datetime).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit", hour12: true });
+                  const isSelected  = selectedSlot?.datetime === slot.datetime;
                   return (
                     <button
                       key={slot.datetime}
@@ -562,7 +532,7 @@ export default function PublicBookingPage() {
                           ? "bg-surface-sunken text-on-surface-subtle opacity-40 cursor-not-allowed"
                           : isSelected
                           ? "bg-primary text-on-primary shadow-primary-sm"
-                          : "bg-surface-raised border border-border text-on-surface hover:border-primary-border hover:text-primary"
+                          : "bg-surface-raised border border-border text-on-surface hover:border-primary-border hover:text-primary",
                       )}
                     >
                       {displayTime}
@@ -574,163 +544,222 @@ export default function PublicBookingPage() {
           </section>
         )}
 
-        {/* ── STEP 3: Contacto ──────────────────────────────────────── */}
-        {step === "contact" && (
+        {/* ── PASO 3: Identidad ────────────────────────────────────────── */}
+        {step === "identity" && (
           <section className="space-y-5">
             <div className="flex items-center justify-between">
-              <h3 className="font-ui font-medium text-[16px] text-on-surface">
-                Tus datos
-              </h3>
+              <h3 className="font-ui font-medium text-[16px] text-on-surface">¿Cómo quieres identificarte?</h3>
               <span className="musa-sublabel">03 / 03</span>
             </div>
 
-            {/* Booking summary */}
+            {/* Resumen de la reserva */}
             <div className="bg-primary-surface border border-primary-border rounded-xl p-4 space-y-1">
-              <p className="font-ui font-medium text-[14px] text-primary">
-                {selectedService?.name}
-              </p>
+              <p className="font-ui font-medium text-[14px] text-primary">{selectedService?.name}</p>
               <p className="font-ui text-[13px] text-on-surface-muted">
-                {selectedDate.toLocaleDateString("es-VE", {
-                  weekday: "long",
-                  day:     "numeric",
-                  month:   "long",
-                })}{" "}
+                {selectedDate.toLocaleDateString("es-VE", { weekday: "long", day: "numeric", month: "long" })}{" "}
                 · {selectedSlot ? formatTimeES(selectedSlot.datetime) : ""}
                 {" · "}
-                <span className="font-mono-num">
-                  {formatCurrency(selectedService?.price ?? 0, selectedService?.currency)}
-                </span>
+                <span className="font-mono-num">{formatCurrency(selectedService?.price ?? 0, selectedService?.currency)}</span>
               </p>
             </div>
 
-            {/* Inputs */}
+            {/* Error */}
+            {identityError && (
+              <div className="bg-error-surface border border-error/20 rounded-xl px-4 py-3">
+                <p className="font-ui text-[13px] text-error">{identityError}</p>
+              </div>
+            )}
+
+            {/* ── OPCIÓN A: Google ── */}
             <div className="space-y-3">
-              <input
-                className="musa-input"
-                placeholder="Nombre completo *"
-                type="text"
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-                autoComplete="name"
-                required
-              />
-              <input
-                className="musa-input"
-                placeholder="Teléfono *"
-                type="tel"
-                value={clientPhone}
-                onChange={(e) => setClientPhone(e.target.value)}
-                autoComplete="tel"
-                required
-              />
+              <div className="flex items-center gap-2">
+                <UserCircleIcon className="w-4 h-4 text-on-surface-subtle" />
+                <p className="font-ui text-[12px] font-semibold uppercase tracking-[0.08em] text-on-surface-subtle">
+                  Opción recomendada
+                </p>
+              </div>
 
-              {/* Notifications opt-in */}
-              <button
-                type="button"
-                onClick={() => setWantsNotifications((v) => !v)}
-                className="w-full flex items-start gap-3 text-left group"
-              >
-                <div
-                  className={cn(
-                    "mt-0.5 w-5 h-5 rounded flex items-center justify-center flex-shrink-0 border-2 transition-colors",
-                    wantsNotifications
-                      ? "bg-primary border-primary"
-                      : "border-border group-hover:border-primary-border"
+              {!googleAuthed ? (
+                <div className="space-y-2">
+                  {GOOGLE_CLIENT_ID ? (
+                    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+                      <div
+                        className={cn(
+                          "w-full flex justify-center [&>div]:w-full [&>div>div]:!w-full [&>div>div>div]:!w-full",
+                          googleLoading && "opacity-60 pointer-events-none",
+                        )}
+                      >
+                        <GoogleLogin
+                          onSuccess={handleGoogleAuth}
+                          onError={() => setIdentityError("Error al iniciar sesión con Google.")}
+                          useOneTap={false}
+                          theme="outline"
+                          size="large"
+                          text="continue_with"
+                          shape="pill"
+                          width="100%"
+                        />
+                      </div>
+                    </GoogleOAuthProvider>
+                  ) : (
+                    <p className="font-ui text-[12px] text-on-surface-subtle text-center py-2">
+                      Google no configurado. Usa tu teléfono abajo.
+                    </p>
                   )}
-                >
-                  {wantsNotifications && <CheckIcon className="w-3 h-3 text-white" />}
+                  {googleLoading && (
+                    <div className="flex justify-center">
+                      <div className="w-4 h-4 border border-primary border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <p className="font-ui text-[13px] font-medium text-on-surface">
-                    Quiero recibir recordatorios y ofertas
-                  </p>
-                  <p className="font-ui text-[12px] text-on-surface-muted mt-0.5 leading-snug">
-                    Te avisaremos de confirmaciones y promos exclusivas de {professional.name}.
-                  </p>
+              ) : (
+                /* Google autenticado: muestra nombre + pide teléfono si falta */
+                <div className="bg-success-surface border border-success/20 rounded-xl px-4 py-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <CheckCircleIcon className="w-4 h-4 text-success flex-shrink-0" />
+                    <p className="font-ui text-[13px] font-medium text-on-surface">
+                      Autenticada como <strong>{clientName}</strong>
+                    </p>
+                  </div>
+                  {!clientPhone && (
+                    <>
+                      <p className="font-ui text-[12px] text-on-surface-muted">
+                        Solo necesitamos tu número para enviarte la confirmación por WhatsApp.
+                      </p>
+                      <input
+                        className="musa-input"
+                        placeholder="Teléfono *"
+                        type="tel"
+                        value={clientPhone}
+                        onChange={(e) => setClientPhone(e.target.value)}
+                        autoFocus
+                        autoComplete="tel"
+                      />
+                    </>
+                  )}
                 </div>
-              </button>
-
-              {wantsNotifications && (
-                <input
-                  className="musa-input"
-                  placeholder="Email (para confirmaciones)"
-                  type="email"
-                  value={clientEmail}
-                  onChange={(e) => setClientEmail(e.target.value)}
-                  autoComplete="email"
-                />
               )}
             </div>
+
+            {/* Divisor */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-border-subtle" />
+              <span className="font-ui text-[11px] text-on-surface-subtle">o con tu número</span>
+              <div className="flex-1 h-px bg-border-subtle" />
+            </div>
+
+            {/* ── OPCIÓN B: Teléfono + Nombre ── */}
+            {!googleAuthed && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <DevicePhoneMobileIcon className="w-4 h-4 text-on-surface-subtle" />
+                  <p className="font-ui text-[12px] font-semibold uppercase tracking-[0.08em] text-on-surface-subtle">
+                    Continuar con mi número
+                  </p>
+                </div>
+
+                <input
+                  className="musa-input"
+                  placeholder="Nombre completo *"
+                  type="text"
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  autoComplete="name"
+                />
+                <input
+                  className="musa-input"
+                  placeholder="Teléfono *"
+                  type="tel"
+                  value={clientPhone}
+                  onChange={(e) => setClientPhone(e.target.value)}
+                  autoComplete="tel"
+                />
+
+                {/* Opt-in de notificaciones */}
+                <button
+                  type="button"
+                  onClick={() => setWantsNotifications((v) => !v)}
+                  className="w-full flex items-start gap-3 text-left group"
+                >
+                  <div className={cn("mt-0.5 w-5 h-5 rounded flex items-center justify-center flex-shrink-0 border-2 transition-colors", wantsNotifications ? "bg-primary border-primary" : "border-border group-hover:border-primary-border")}>
+                    {wantsNotifications && <CheckIcon className="w-3 h-3 text-white" />}
+                  </div>
+                  <div>
+                    <p className="font-ui text-[13px] font-medium text-on-surface">Quiero recibir recordatorios y ofertas</p>
+                    <p className="font-ui text-[12px] text-on-surface-muted mt-0.5 leading-snug">
+                      Te avisaremos de confirmaciones y promos exclusivas de {professional.name}.
+                    </p>
+                  </div>
+                </button>
+
+                {wantsNotifications && (
+                  <input
+                    className="musa-input"
+                    placeholder="Email (para confirmaciones)"
+                    type="email"
+                    value={clientEmail}
+                    onChange={(e) => setClientEmail(e.target.value)}
+                    autoComplete="email"
+                  />
+                )}
+              </div>
+            )}
+
+            {/* ── OPCIÓN C: Email (link discreto) ── */}
+            <p className="text-center pt-1">
+              <Link
+                href={`/login?redirect=/p/${slug}`}
+                className="font-ui text-[12px] text-on-surface-subtle hover:text-on-surface transition-colors underline underline-offset-2"
+              >
+                ¿Ya tienes cuenta? Inicia sesión con email
+              </Link>
+            </p>
           </section>
         )}
 
-        {/* ── CONFIRMED ─────────────────────────────────────────────── */}
+        {/* ── CONFIRMADO ─────────────────────────────────────────────── */}
         {step === "confirmed" && confirmed && (
           <div className="fixed inset-0 z-[100] bg-espresso-900/60 backdrop-blur-sm flex items-center justify-center p-5">
             <div className="bg-background border border-border-subtle rounded-2xl shadow-xl max-w-sm w-full p-8 text-center space-y-6">
-
-              {/* Success mark */}
               <div className="w-14 h-14 rounded-full bg-success-surface flex items-center justify-center mx-auto">
                 <CheckCircleIcon className="w-7 h-7 text-success" />
               </div>
-
-              {/* Confirmation heading — emotional moment, font-light italic */}
               <div className="space-y-2">
-                <h2
-                  className="font-display font-light italic text-on-surface"
-                  style={{ fontSize: "30px", letterSpacing: "-0.01em" }}
-                >
+                <h2 className="font-display font-light italic text-on-surface" style={{ fontSize: "30px", letterSpacing: "-0.01em" }}>
                   Reserva confirmada.
                 </h2>
                 <p className="font-ui text-[14px] text-on-surface-muted leading-relaxed">
                   {professional.name} te espera el{" "}
-                  {new Date(confirmed.startTime).toLocaleDateString("es-VE", {
-                    day:   "numeric",
-                    month: "long",
-                  })}{" "}
+                  {new Date(confirmed.startTime).toLocaleDateString("es-VE", { day: "numeric", month: "long" })}{" "}
                   a las {formatTimeES(confirmed.startTime)}.
                 </p>
               </div>
-
-              {/* Summary */}
               <div className="bg-surface-sunken rounded-xl p-4 text-left space-y-1">
                 <span className="musa-sublabel block">Servicio</span>
-                <p className="font-ui font-medium text-[15px] text-on-surface">
-                  {confirmed.serviceName}
-                </p>
+                <p className="font-ui font-medium text-[15px] text-on-surface">{confirmed.serviceName}</p>
               </div>
-
-              {/* Push opt-in */}
               {wantsNotifications && !pushSubscribed && (
                 <button
                   onClick={activatePush}
                   disabled={pushLoading}
                   className="w-full h-11 bg-primary-surface border border-primary-border text-primary font-ui font-medium text-[13px] rounded-full flex items-center justify-center gap-2 hover:bg-primary hover:text-on-primary transition-colors disabled:opacity-60"
                 >
-                  {pushLoading ? (
-                    <div className="w-4 h-4 border border-current border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <BellAlertIcon className="w-4 h-4" />
-                  )}
+                  {pushLoading
+                    ? <div className="w-4 h-4 border border-current border-t-transparent rounded-full animate-spin" />
+                    : <BellAlertIcon className="w-4 h-4" />}
                   {pushLoading ? "Activando…" : "Activar notificaciones"}
                 </button>
               )}
-
               {pushSubscribed && (
                 <p className="font-ui text-[12px] text-success flex items-center justify-center gap-1.5">
-                  <CheckCircleIcon className="w-4 h-4" />
-                  Notificaciones activadas
+                  <CheckCircleIcon className="w-4 h-4" /> Notificaciones activadas
                 </p>
               )}
-
               <div className="space-y-2 pt-2">
                 {confirmed.whatsapp && (
                   <a
-                    href={`https://wa.me/${confirmed.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(
-                      `Hola ${professional.name}, acabo de reservar una cita para ${confirmed.serviceName}. ¡Nos vemos pronto!`
-                    )}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href={`https://wa.me/${confirmed.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(`Hola ${professional.name}, acabo de reservar una cita para ${confirmed.serviceName}. ¡Nos vemos pronto!`)}`}
+                    target="_blank" rel="noopener noreferrer"
                     className="w-full h-12 bg-[#25D366] text-white font-ui font-medium text-[14px] rounded-full flex items-center justify-center gap-2.5 shadow-md hover:opacity-90 transition-opacity"
                   >
                     <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
@@ -745,10 +774,10 @@ export default function PublicBookingPage() {
                     setStep("service");
                     setSelectedService(null);
                     setSelectedSlot(null);
-                    setClientPhone("");
-                    setClientEmail("");
-                    setWantsNotifications(false);
+                    setGoogleAuthed(false);
                     setConfirmed(null);
+                    setWantsNotifications(false);
+                    setClientEmail("");
                   }}
                   className="w-full h-12 bg-surface-sunken text-on-surface-muted font-ui font-medium text-[14px] rounded-full hover:bg-surface-raised transition-colors"
                 >
@@ -760,7 +789,7 @@ export default function PublicBookingPage() {
         )}
       </main>
 
-      {/* ── Bottom action bar ────────────────────────────────────────── */}
+      {/* ── Barra de acción inferior ──────────────────────────────────── */}
       {step !== "confirmed" && (
         <div className="fixed bottom-0 left-0 w-full glass-nav border-t border-border-subtle z-50 px-5 pb-[max(1.5rem,env(safe-area-inset-bottom,1.5rem))] pt-4">
           <div className="max-w-2xl mx-auto flex items-center justify-between gap-4">
@@ -769,19 +798,15 @@ export default function PublicBookingPage() {
                 <button
                   onClick={() => {
                     if (step === "datetime") setStep("service");
-                    else if (step === "contact") setStep("datetime");
+                    else if (step === "identity") { setStep("datetime"); setGoogleAuthed(false); setIdentityError(null); }
                   }}
                   className="flex items-center gap-1.5 font-ui text-[13px] font-medium text-on-surface-muted hover:text-on-surface transition-colors"
                 >
-                  <ArrowLeftIcon className="w-4 h-4" />
-                  Volver
+                  <ArrowLeftIcon className="w-4 h-4" /> Volver
                 </button>
               )}
               {selectedService && step !== "service" && (
-                <p
-                  className="font-display font-normal text-on-surface mt-1"
-                  style={{ fontSize: "22px", letterSpacing: "-0.02em" }}
-                >
+                <p className="font-display font-normal text-on-surface mt-1" style={{ fontSize: "22px", letterSpacing: "-0.02em" }}>
                   {formatCurrency(selectedService.price, selectedService.currency)}
                 </p>
               )}
@@ -789,15 +814,15 @@ export default function PublicBookingPage() {
 
             <button
               disabled={
-                (step === "service"  && !selectedService) ||
-                (step === "datetime" && !selectedSlot)    ||
-                (step === "contact"  && (!clientName || !clientPhone)) ||
+                (step === "service"   && !selectedService) ||
+                (step === "datetime"  && !selectedSlot)    ||
+                (step === "identity"  && (!clientName || !clientPhone)) ||
                 booking
               }
               onClick={() => {
                 if (step === "service"  && selectedService) setStep("datetime");
-                else if (step === "datetime" && selectedSlot) setStep("contact");
-                else if (step === "contact") handleBook();
+                else if (step === "datetime" && selectedSlot) setStep("identity");
+                else if (step === "identity") handleBook();
               }}
               className="flex-1 max-w-[280px] h-12 bg-primary text-on-primary font-ui font-medium text-[14px] rounded-full shadow-primary-sm hover:bg-primary-hover transition-all active:scale-[0.97] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -808,7 +833,7 @@ export default function PublicBookingPage() {
                   {step === "service"
                     ? "Elegir fecha y hora"
                     : step === "datetime"
-                    ? "Mis datos"
+                    ? "Identificarme"
                     : "Reservar ahora"}
                   <ArrowRightIcon className="w-4 h-4" />
                 </>

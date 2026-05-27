@@ -1,12 +1,13 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { ArrowRightIcon } from "@heroicons/react/24/outline";
+import Image from "next/image";
+import { ArrowRightIcon, MapPinIcon, ScissorsIcon } from "@heroicons/react/24/outline";
 import MusaLogo from "@/components/brand/MusaLogo";
 import HomeSearch from "@/components/HomeSearch";
 import IOSInstallHint from "@/components/IOSInstallHint";
 import { createAdminClient } from "@/lib/supabase-admin";
 
-// ISR: revalidar promos cada 60s (stale-while-revalidate)
+// ISR: revalidar cada 60s
 export const revalidate = 60;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -20,12 +21,33 @@ interface PublicPromotion {
   owner: { name: string; slug: string } | null;
 }
 
-// ── Data fetching (server-side) ───────────────────────────────────────────────
+interface FeaturedUser {
+  id: string;
+  name: string;
+  slug: string;
+  avatarUrl: string | null;
+  bio: string | null;
+  serviceType: string | null;
+  business: { name: string; city: string | null } | null;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const SERVICE_TYPE_LABEL: Record<string, string> = {
+  hair:   "Cabello",
+  nails:  "Uñas",
+  brows:  "Cejas",
+  lashes: "Pestañas",
+  makeup: "Maquillaje",
+  other:  "Belleza",
+};
+
+// ── Data fetching ─────────────────────────────────────────────────────────────
 
 async function getPublicPromotions(): Promise<PublicPromotion[]> {
   try {
     const admin = createAdminClient();
-    const now = new Date().toISOString();
+    const now   = new Date().toISOString();
     const { data } = await admin
       .from("Promotion")
       .select(`
@@ -42,8 +64,96 @@ async function getPublicPromotions(): Promise<PublicPromotion[]> {
     return (data ?? []).map((p) => ({
       ...p,
       business: Array.isArray(p.business) ? p.business[0] : p.business,
-      owner: Array.isArray(p.owner) ? p.owner[0] : p.owner,
+      owner:    Array.isArray(p.owner)    ? p.owner[0]    : p.owner,
     }));
+  } catch {
+    return [];
+  }
+}
+
+/** Top 8 profesionales por citas completadas en los últimos 30 días.
+ *  Fallback: las más recientemente registradas si hay menos de 3. */
+async function getFeaturedProfessionals(): Promise<FeaturedUser[]> {
+  try {
+    const admin          = createAdminClient();
+    const thirtyDaysAgo  = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: appointments } = await admin
+      .from("Appointment")
+      .select("userId")
+      .eq("status", "completed")
+      .gte("startTime", thirtyDaysAgo)
+      .limit(1000);
+
+    const countMap: Record<string, number> = {};
+    for (const apt of appointments ?? []) {
+      countMap[apt.userId] = (countMap[apt.userId] || 0) + 1;
+    }
+
+    const topIds = Object.entries(countMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([id]) => id);
+
+    // Fallback si hay pocos resultados
+    if (topIds.length < 3) {
+      const { data: recent } = await admin
+        .from("User")
+        .select("id, name, slug, avatarUrl, bio, serviceType, business:Business(name, city)")
+        .eq("role", "OWNER")
+        .order("createdAt", { ascending: false })
+        .limit(8);
+      return (recent ?? []).map((u) => ({
+        ...u,
+        business: Array.isArray(u.business) ? u.business[0] : u.business,
+      }));
+    }
+
+    const { data: users } = await admin
+      .from("User")
+      .select("id, name, slug, avatarUrl, bio, serviceType, business:Business(name, city)")
+      .in("id", topIds);
+
+    return (users ?? [])
+      .map((u) => ({
+        ...u,
+        business:  Array.isArray(u.business) ? u.business[0] : u.business,
+        sortOrder: topIds.indexOf(u.id),
+      }))
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+  } catch {
+    return [];
+  }
+}
+
+/** Profesionales con foto + bio + al menos un servicio con precio (perfil completo). */
+async function getFeaturedBusinesses(): Promise<FeaturedUser[]> {
+  try {
+    const admin = createAdminClient();
+
+    const { data: users } = await admin
+      .from("User")
+      .select(`
+        id, name, slug, avatarUrl, bio, serviceType,
+        business:Business(name, city),
+        services:Service(isActive, price)
+      `)
+      .eq("role", "OWNER")
+      .not("avatarUrl", "is", null)
+      .not("bio", "is", null)
+      .order("createdAt", { ascending: false })
+      .limit(50);
+
+    return (users ?? [])
+      .filter((u) => {
+        const svcs = Array.isArray(u.services) ? u.services : [];
+        return svcs.some((s: { isActive: boolean; price: number }) => s.isActive && s.price > 0);
+      })
+      .map((u) => ({
+        ...u,
+        business: Array.isArray(u.business) ? u.business[0] : u.business,
+      }))
+      .slice(0, 8);
   } catch {
     return [];
   }
@@ -52,27 +162,15 @@ async function getPublicPromotions(): Promise<PublicPromotion[]> {
 // ── Static data ───────────────────────────────────────────────────────────────
 
 const STATS = [
-  { value: "500+",    label: "profesionales activas"  },
-  { value: "15,000+", label: "reservas completadas"   },
-  { value: "4+",      label: "ciudades en Venezuela"  },
+  { value: "500+",    label: "profesionales activas" },
+  { value: "15,000+", label: "reservas completadas"  },
+  { value: "4+",      label: "ciudades en Venezuela" },
 ];
 
 const STEPS = [
-  {
-    n:     "01",
-    title: "Busca",
-    desc:  "Encuentra tu profesional por servicio, ciudad o nombre del estudio.",
-  },
-  {
-    n:     "02",
-    title: "Elige",
-    desc:  "Selecciona la fecha y hora disponible directamente desde su perfil.",
-  },
-  {
-    n:     "03",
-    title: "Reserva",
-    desc:  "Confirma en segundos. Activa notificaciones y recibe recordatorios automáticos.",
-  },
+  { n: "01", title: "Busca",  desc: "Encuentra tu profesional por servicio, ciudad o nombre del estudio."          },
+  { n: "02", title: "Elige",  desc: "Selecciona la fecha y hora disponible directamente desde su perfil."          },
+  { n: "03", title: "Reserva", desc: "Confirma en segundos. Activa notificaciones y recibe recordatorios automáticos." },
 ];
 
 const PREVIEW_APTS = [
@@ -81,7 +179,7 @@ const PREVIEW_APTS = [
   { time: "16:00", name: "Camila T.",    service: "Extensiones Clásicas",    confirmed: false, isNext: false },
 ];
 
-// ── Sub-components (server) ───────────────────────────────────────────────────
+// ── Sub-components ────────────────────────────────────────────────────────────
 
 async function PromoList() {
   const promotions = await getPublicPromotions();
@@ -91,26 +189,16 @@ async function PromoList() {
       <div className="py-14">
         <div className="mx-auto mb-8" style={{ width: "80px" }}>
           <div className="h-px bg-primary" style={{ opacity: 0.26 }} />
-          <div
-            className="h-[0.5px] mt-[3px]"
-            style={{ width: "55%", background: "#C4996A", opacity: 0.18 }}
-          />
+          <div className="h-[0.5px] mt-[3px]" style={{ width: "55%", background: "#C4996A", opacity: 0.18 }} />
         </div>
         <div className="text-center max-w-xs mx-auto">
-          <p
-            className="font-display font-light italic text-on-surface mb-3"
-            style={{ fontSize: "26px", letterSpacing: "-0.01em" }}
-          >
+          <p className="font-display font-light italic text-on-surface mb-3" style={{ fontSize: "26px", letterSpacing: "-0.01em" }}>
             Sin ofertas esta semana.
           </p>
           <p className="font-ui text-[14px] text-on-surface-muted leading-relaxed mb-8">
-            Cuando una profesional publique un descuento,
-            lo encontrarás aquí.
+            Cuando una profesional publique un descuento, lo encontrarás aquí.
           </p>
-          <Link
-            href="/explore"
-            className="inline-flex items-center gap-2 font-ui text-[13px] font-medium px-5 py-2.5 rounded-full border border-border hover:border-primary-border hover:text-primary hover:bg-primary-surface transition-all duration-150"
-          >
+          <Link href="/explore" className="inline-flex items-center gap-2 font-ui text-[13px] font-medium px-5 py-2.5 rounded-full border border-border hover:border-primary-border hover:text-primary hover:bg-primary-surface transition-all duration-150">
             Ver profesionales
             <ArrowRightIcon className="w-3.5 h-3.5" />
           </Link>
@@ -122,39 +210,25 @@ async function PromoList() {
   return (
     <div>
       {promotions.map((promo) => (
-        <Link
-          key={promo.id}
-          href={promo.owner ? `/p/${promo.owner.slug}` : "/explore"}
-          className="group block"
-        >
+        <Link key={promo.id} href={promo.owner ? `/p/${promo.owner.slug}` : "/explore"} className="group block">
           <div className="py-5 border-t border-border-subtle flex items-center gap-5 md:gap-8 -mx-3 px-3 rounded-lg hover:bg-surface-tinted/50 transition-colors duration-200">
             <div className="flex-shrink-0 w-[72px] text-right">
-              <span
-                className="font-display font-normal text-primary"
-                style={{ fontSize: "34px", lineHeight: "1" }}
-              >
+              <span className="font-display font-normal text-primary" style={{ fontSize: "34px", lineHeight: "1" }}>
                 -{promo.discount}%
               </span>
             </div>
             <div className="hidden sm:block w-px h-9 bg-border-subtle flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="font-ui font-medium text-[14px] md:text-[15px] text-on-surface mb-0.5 truncate">
-                {promo.title}
-              </p>
+              <p className="font-ui font-medium text-[14px] md:text-[15px] text-on-surface mb-0.5 truncate">{promo.title}</p>
               <p className="font-ui text-[12px] text-on-surface-muted truncate">
                 {promo.owner?.name ?? promo.business?.name}
-                {promo.business?.city && (
-                  <span className="text-on-surface-subtle"> · {promo.business.city}</span>
-                )}
+                {promo.business?.city && <span className="text-on-surface-subtle"> · {promo.business.city}</span>}
               </p>
             </div>
             <div className="flex-shrink-0 flex flex-col items-end gap-2">
               <span className="font-mono-num text-[11px] text-on-surface-subtle whitespace-nowrap">
                 hasta{" "}
-                {new Date(promo.validUntil).toLocaleDateString("es-VE", {
-                  day: "numeric",
-                  month: "short",
-                })}
+                {new Date(promo.validUntil).toLocaleDateString("es-VE", { day: "numeric", month: "short" })}
               </span>
               <ArrowRightIcon className="w-4 h-4 text-on-surface-subtle group-hover:text-primary group-hover:translate-x-0.5 transition-all duration-150" />
             </div>
@@ -170,10 +244,7 @@ function PromoSkeleton() {
   return (
     <div>
       {[1, 2, 3].map((i) => (
-        <div
-          key={i}
-          className="py-5 border-t border-border-subtle flex items-center gap-5 md:gap-8"
-        >
+        <div key={i} className="py-5 border-t border-border-subtle flex items-center gap-5 md:gap-8">
           <div className="w-16 h-9 rounded bg-surface-sunken animate-pulse flex-shrink-0" />
           <div className="hidden sm:block w-px h-7 bg-border-subtle flex-shrink-0" />
           <div className="flex-1 space-y-2">
@@ -188,6 +259,152 @@ function PromoSkeleton() {
   );
 }
 
+/** Card de profesional/negocio para las filas de destacados */
+function FeaturedCard({ user }: { user: FeaturedUser }) {
+  const specialtyLabel = user.serviceType
+    ? (SERVICE_TYPE_LABEL[user.serviceType] ?? user.serviceType)
+    : null;
+  const city = (user.business as { city?: string | null } | null)?.city ?? null;
+  const href = `/p/${user.slug}`;
+
+  return (
+    <Link href={href} className="group flex-shrink-0 w-40 md:w-44 block">
+      {/* Foto */}
+      <div className="relative h-28 rounded-t-xl overflow-hidden bg-[#EDE5DF]">
+        {user.avatarUrl ? (
+          <Image
+            src={user.avatarUrl}
+            alt={user.name}
+            fill
+            className="object-cover group-hover:scale-[1.04] transition-transform duration-300"
+            sizes="176px"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <span
+              className="font-display font-normal italic text-[56px] leading-none"
+              style={{ color: "#C4996A", opacity: 0.4 }}
+            >
+              {user.name[0]}
+            </span>
+          </div>
+        )}
+        {/* Gradient overlay */}
+        <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#1A0E0B]/30 to-transparent pointer-events-none" />
+      </div>
+
+      {/* Texto */}
+      <div
+        className="rounded-b-xl border border-t-0 border-border-subtle px-3 py-3 space-y-0.5 group-hover:border-primary-border transition-colors duration-200"
+        style={{ background: "rgba(250,246,242,0.95)" }}
+      >
+        <p className="font-ui font-semibold text-[13px] text-on-surface truncate leading-tight">{user.name}</p>
+        {specialtyLabel && (
+          <p className="font-ui text-[11px] text-primary capitalize">{specialtyLabel}</p>
+        )}
+        {city && (
+          <p className="flex items-center gap-1 font-ui text-[11px] text-on-surface-subtle">
+            <MapPinIcon className="w-3 h-3 flex-shrink-0" />
+            <span className="truncate">{city}</span>
+          </p>
+        )}
+        <div className="pt-1.5">
+          <span className="inline-flex items-center gap-1 font-ui text-[11px] font-medium text-primary group-hover:gap-1.5 transition-all">
+            Ver agenda
+            <ArrowRightIcon className="w-3 h-3" />
+          </span>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+/** Fila horizontal con scroll de cards */
+async function FeaturedProfessionalsRow() {
+  const users = await getFeaturedProfessionals();
+  if (users.length === 0) return null;
+
+  return (
+    <section className="py-8 md:py-10">
+      <div className="max-w-6xl mx-auto">
+        <div className="px-5 md:px-8 flex items-end justify-between mb-5">
+          <div>
+            <p className="musa-sublabel text-on-surface-subtle mb-1.5">Destacadas</p>
+            <h2 className="font-display font-normal italic text-on-surface" style={{ fontSize: "28px", letterSpacing: "-0.015em" }}>
+              Profesionales recomendadas.
+            </h2>
+          </div>
+          <Link
+            href="/explore"
+            className="inline-flex items-center gap-1 font-ui text-[12px] font-medium text-on-surface-muted hover:text-on-surface transition-colors self-end"
+          >
+            Ver todas
+            <ArrowRightIcon className="w-3 h-3" />
+          </Link>
+        </div>
+
+        {/* Scroll horizontal */}
+        <div className="flex gap-3 overflow-x-auto px-5 md:px-8 pb-3 hide-scrollbar">
+          {users.map((u) => (
+            <FeaturedCard key={u.id} user={u} />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+async function FeaturedBusinessesRow() {
+  const users = await getFeaturedBusinesses();
+  if (users.length === 0) return null;
+
+  return (
+    <section className="pb-8 md:pb-10">
+      <div className="max-w-6xl mx-auto">
+        <div className="px-5 md:px-8 flex items-end justify-between mb-5">
+          <div>
+            <p className="musa-sublabel text-on-surface-subtle mb-1.5">Perfiles completos</p>
+            <h2 className="font-display font-normal italic text-on-surface" style={{ fontSize: "28px", letterSpacing: "-0.015em" }}>
+              Negocios destacados.
+            </h2>
+          </div>
+          <Link
+            href="/explore"
+            className="inline-flex items-center gap-1 font-ui text-[12px] font-medium text-on-surface-muted hover:text-on-surface transition-colors self-end"
+          >
+            Ver todos
+            <ArrowRightIcon className="w-3 h-3" />
+          </Link>
+        </div>
+
+        <div className="flex gap-3 overflow-x-auto px-5 md:px-8 pb-3 hide-scrollbar">
+          {users.map((u) => (
+            <FeaturedCard key={u.id} user={u} />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FeaturedRowSkeleton({ title }: { title: string }) {
+  return (
+    <section className="py-8 md:py-10">
+      <div className="max-w-6xl mx-auto px-5 md:px-8">
+        <div className="h-[18px] w-52 rounded bg-surface-sunken animate-pulse mb-5" />
+        <div className="flex gap-3 overflow-hidden">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="flex-shrink-0 w-40">
+              <div className="h-28 rounded-t-xl bg-surface-sunken animate-pulse" />
+              <div className="h-20 rounded-b-xl bg-surface-sunken/60 animate-pulse mt-0.5" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
@@ -198,17 +415,10 @@ export default function HomePage() {
       <header className="fixed top-0 w-full z-40 glass-nav border-b border-border-subtle">
         <div className="max-w-6xl mx-auto px-5 md:px-8 h-16 flex items-center justify-between gap-3">
           <Link href="/" className="flex-shrink-0">
-            {/* Mobile: solo monograma para ahorrar espacio */}
-            <span className="md:hidden">
-              <MusaLogo variant="monogram" size="sm" />
-            </span>
-            {/* Desktop: combo completo */}
-            <span className="hidden md:inline-flex">
-              <MusaLogo variant="combo" size="md" />
-            </span>
+            <span className="md:hidden"><MusaLogo variant="monogram" size="sm" /></span>
+            <span className="hidden md:inline-flex"><MusaLogo variant="combo" size="md" /></span>
           </Link>
           <nav className="flex items-center gap-1.5 md:gap-2">
-            {/* Instagram — solo visible en desktop para no saturar el header móvil */}
             <a
               href="https://www.instagram.com/getmusa.app"
               target="_blank"
@@ -216,33 +426,16 @@ export default function HomePage() {
               aria-label="Musa en Instagram"
               className="hidden md:flex items-center justify-center w-8 h-8 text-on-surface-muted hover:text-primary transition-colors"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="w-[17px] h-[17px]"
-                aria-hidden="true"
-              >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]" aria-hidden="true">
                 <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
                 <circle cx="12" cy="12" r="4" />
                 <circle cx="17.5" cy="6.5" r="0.8" fill="currentColor" stroke="none" />
               </svg>
             </a>
-            {/* Bug 7: visible en todos los tamaños con tipografía responsiva */}
-            <Link
-              href="/client"
-              className="font-ui text-[12px] sm:text-[13px] font-medium text-on-surface-muted hover:text-on-surface transition-colors px-2.5 sm:px-3 md:px-4 py-2 whitespace-nowrap"
-            >
+            <Link href="/client" className="font-ui text-[12px] sm:text-[13px] font-medium text-on-surface-muted hover:text-on-surface transition-colors px-2.5 sm:px-3 md:px-4 py-2 whitespace-nowrap">
               Mis citas
             </Link>
-            <Link
-              href="/login"
-              className="font-ui text-[12px] sm:text-[13px] font-medium bg-on-surface text-surface px-3 sm:px-4 md:px-5 py-2 sm:py-2.5 rounded-full hover:opacity-85 transition-opacity whitespace-nowrap"
-            >
+            <Link href="/login" className="font-ui text-[12px] sm:text-[13px] font-medium bg-on-surface text-surface px-3 sm:px-4 md:px-5 py-2 sm:py-2.5 rounded-full hover:opacity-85 transition-opacity whitespace-nowrap">
               <span className="sm:hidden">Profesionales</span>
               <span className="hidden sm:inline">Para profesionales</span>
             </Link>
@@ -257,24 +450,14 @@ export default function HomePage() {
           <div className="max-w-6xl mx-auto px-5 md:px-8 py-14 md:py-20 lg:py-24 relative">
             <div className="grid md:grid-cols-[1fr_340px] lg:grid-cols-[1fr_380px] gap-10 lg:gap-14 items-start">
 
-              {/* ─ Left ────────────────────────────────────────────────── */}
+              {/* Izquierda */}
               <div className="max-w-[520px]">
-                <p className="musa-sublabel text-on-surface-subtle mb-7">
-                  Belleza profesional · Venezuela
-                </p>
+                <p className="musa-sublabel text-on-surface-subtle mb-7">Belleza profesional · Venezuela</p>
 
-                <h1
-                  className="font-display leading-[0.92]"
-                  style={{ letterSpacing: "-0.025em", fontSize: "clamp(42px, 6.5vw, 72px)" }}
-                >
+                <h1 className="font-display leading-[0.92]" style={{ letterSpacing: "-0.025em", fontSize: "clamp(42px, 6.5vw, 72px)" }}>
                   <span className="block text-on-surface font-normal">Tu próxima cita</span>
                   <span className="block text-on-surface font-normal">con la profesional</span>
-                  <em
-                    className="block font-light italic text-primary"
-                    style={{ marginTop: "0.06em" }}
-                  >
-                    que mereces.
-                  </em>
+                  <em className="block font-light italic text-primary" style={{ marginTop: "0.06em" }}>que mereces.</em>
                 </h1>
 
                 <div className="my-7 flex flex-col gap-[3px]">
@@ -283,31 +466,22 @@ export default function HomePage() {
                 </div>
 
                 <p className="font-ui text-[15px] text-on-surface-muted leading-relaxed max-w-[320px]">
-                  Las mejores profesionales de belleza,
-                  disponibles cuando tú decides.
+                  Las mejores profesionales de belleza, disponibles cuando tú decides.
                 </p>
 
-                {/* Search form (client component — interactive) */}
+                {/* Buscador con 3 filtros */}
                 <HomeSearch />
               </div>
 
-              {/* ─ Right: editorial agenda preview ─────────────────────── */}
+              {/* Derecha: preview de agenda */}
               <div className="hidden md:block self-stretch">
                 <div
                   className="relative h-full min-h-[460px] rounded-2xl overflow-hidden flex flex-col justify-between p-7"
                   style={{ background: "#1A0E0B" }}
                 >
-                  <span
-                    aria-hidden="true"
-                    className="absolute -right-6 -top-10 font-display select-none pointer-events-none leading-none font-normal italic"
-                    style={{ fontSize: "300px", color: "#C4996A", opacity: 0.055, letterSpacing: "-0.04em" }}
-                  >
-                    M
-                  </span>
+                  <span aria-hidden="true" className="absolute -right-6 -top-10 font-display select-none pointer-events-none leading-none font-normal italic" style={{ fontSize: "300px", color: "#C4996A", opacity: 0.055, letterSpacing: "-0.04em" }}>M</span>
 
-                  <p className="musa-sublabel relative z-10" style={{ color: "#5A4035" }}>
-                    Tu agenda hoy
-                  </p>
+                  <p className="musa-sublabel relative z-10" style={{ color: "#5A4035" }}>Tu agenda hoy</p>
 
                   <div className="space-y-3 relative z-10">
                     {PREVIEW_APTS.map((apt, i) => (
@@ -315,53 +489,22 @@ export default function HomePage() {
                         key={i}
                         className="rounded-xl px-4 py-3"
                         style={{
-                          background: apt.isNext
-                            ? "rgba(255,255,255,0.075)"
-                            : "rgba(255,255,255,0.035)",
-                          borderLeft: `2px solid ${
-                            apt.isNext
-                              ? "rgba(181,89,62,0.65)"
-                              : apt.confirmed
-                              ? "rgba(181,89,62,0.28)"
-                              : "rgba(139,112,96,0.18)"
-                          }`,
+                          background: apt.isNext ? "rgba(255,255,255,0.075)" : "rgba(255,255,255,0.035)",
+                          borderLeft: `2px solid ${apt.isNext ? "rgba(181,89,62,0.65)" : apt.confirmed ? "rgba(181,89,62,0.28)" : "rgba(139,112,96,0.18)"}`,
                         }}
                       >
                         {apt.isNext && (
                           <div className="flex items-center gap-1.5 mb-1.5">
-                            <div
-                              className="w-[5px] h-[5px] rounded-full flex-shrink-0"
-                              style={{ background: "#B5593E", opacity: 0.75 }}
-                            />
-                            <span
-                              className="font-ui text-[9px] font-medium uppercase tracking-[0.12em]"
-                              style={{ color: "#7A5A50" }}
-                            >
-                              Próxima
-                            </span>
+                            <div className="w-[5px] h-[5px] rounded-full flex-shrink-0" style={{ background: "#B5593E", opacity: 0.75 }} />
+                            <span className="font-ui text-[9px] font-medium uppercase tracking-[0.12em]" style={{ color: "#7A5A50" }}>Próxima</span>
                           </div>
                         )}
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
-                            <p
-                              className="font-ui font-medium text-[13px] leading-tight truncate"
-                              style={{ color: apt.isNext ? "#F8F0E8" : "#C4B0A8" }}
-                            >
-                              {apt.name}
-                            </p>
-                            <p
-                              className="font-ui text-[11px] mt-[3px] truncate"
-                              style={{ color: "#5A4035" }}
-                            >
-                              {apt.service}
-                            </p>
+                            <p className="font-ui font-medium text-[13px] leading-tight truncate" style={{ color: apt.isNext ? "#F8F0E8" : "#C4B0A8" }}>{apt.name}</p>
+                            <p className="font-ui text-[11px] mt-[3px] truncate" style={{ color: "#5A4035" }}>{apt.service}</p>
                           </div>
-                          <span
-                            className="font-mono-num text-[12px] flex-shrink-0 pt-0.5"
-                            style={{ color: apt.isNext ? "#C4996A" : "#4A3028" }}
-                          >
-                            {apt.time}
-                          </span>
+                          <span className="font-mono-num text-[12px] flex-shrink-0 pt-0.5" style={{ color: apt.isNext ? "#C4996A" : "#4A3028" }}>{apt.time}</span>
                         </div>
                       </div>
                     ))}
@@ -375,10 +518,19 @@ export default function HomePage() {
                   </div>
                 </div>
               </div>
-
             </div>
           </div>
         </section>
+
+        {/* ── Fila 1: Profesionales recomendadas ───────────────────────── */}
+        <Suspense fallback={<FeaturedRowSkeleton title="Profesionales recomendadas" />}>
+          <FeaturedProfessionalsRow />
+        </Suspense>
+
+        {/* ── Fila 2: Negocios destacados ──────────────────────────────── */}
+        <Suspense fallback={<FeaturedRowSkeleton title="Negocios destacados" />}>
+          <FeaturedBusinessesRow />
+        </Suspense>
 
         {/* ── Promotions ───────────────────────────────────────────────── */}
         <section className="py-14 md:py-20">
@@ -386,22 +538,15 @@ export default function HomePage() {
             <div className="flex items-end justify-between mb-8">
               <div>
                 <p className="musa-sublabel text-on-surface-subtle mb-2">Ofertas</p>
-                <h2
-                  className="font-display font-normal italic text-on-surface leading-none"
-                  style={{ fontSize: "38px", letterSpacing: "-0.015em" }}
-                >
+                <h2 className="font-display font-normal italic text-on-surface leading-none" style={{ fontSize: "38px", letterSpacing: "-0.015em" }}>
                   Esta semana.
                 </h2>
               </div>
-              <Link
-                href="/explore"
-                className="inline-flex items-center gap-1 font-ui text-[13px] font-medium text-on-surface-muted hover:text-on-surface transition-colors self-end"
-              >
+              <Link href="/explore" className="inline-flex items-center gap-1 font-ui text-[13px] font-medium text-on-surface-muted hover:text-on-surface transition-colors self-end">
                 Ver todo
                 <ArrowRightIcon className="w-3 h-3" />
               </Link>
             </div>
-
             <Suspense fallback={<PromoSkeleton />}>
               <PromoList />
             </Suspense>
@@ -414,32 +559,15 @@ export default function HomePage() {
             <div className="grid md:grid-cols-2 gap-3 md:gap-4">
 
               <Link href="/client" className="group block">
-                <div
-                  className="relative overflow-hidden rounded-2xl p-8 md:p-10 transition-all duration-300 hover:shadow-lg"
-                  style={{
-                    background: "rgba(237,229,223,0.80)",
-                    minHeight: "300px",
-                    border: "1px solid rgba(181,89,62,0.10)",
-                  }}
-                >
-                  <div
-                    className="absolute top-6 right-6 w-[52px] h-[52px] pointer-events-none"
-                    style={{
-                      borderTop:   "1.5px solid rgba(181,89,62,0.30)",
-                      borderRight: "1.5px solid rgba(181,89,62,0.30)",
-                    }}
-                  />
+                <div className="relative overflow-hidden rounded-2xl p-8 md:p-10 transition-all duration-300 hover:shadow-lg" style={{ background: "rgba(237,229,223,0.80)", minHeight: "300px", border: "1px solid rgba(181,89,62,0.10)" }}>
+                  <div className="absolute top-6 right-6 w-[52px] h-[52px] pointer-events-none" style={{ borderTop: "1.5px solid rgba(181,89,62,0.30)", borderRight: "1.5px solid rgba(181,89,62,0.30)" }} />
                   <div className="relative">
                     <p className="musa-sublabel text-on-surface-subtle mb-6">Para clientas</p>
-                    <h3
-                      className="font-display font-normal italic text-on-surface leading-[1.06]"
-                      style={{ fontSize: "clamp(28px, 4vw, 40px)", letterSpacing: "-0.015em" }}
-                    >
+                    <h3 className="font-display font-normal italic text-on-surface leading-[1.06]" style={{ fontSize: "clamp(28px, 4vw, 40px)", letterSpacing: "-0.015em" }}>
                       Reserva con<br />las mejores.
                     </h3>
                     <p className="font-ui text-[14px] text-on-surface-muted mt-4 mb-8 leading-relaxed max-w-[260px]">
-                      Encuentra profesionales de belleza en tu ciudad
-                      y gestiona tus citas desde un solo lugar.
+                      Encuentra profesionales de belleza en tu ciudad y gestiona tus citas desde un solo lugar.
                     </p>
                     <span className="inline-flex items-center gap-2 font-ui text-[13px] font-medium text-primary">
                       Ver mis citas
@@ -450,45 +578,17 @@ export default function HomePage() {
               </Link>
 
               <Link href="/login" className="group block">
-                <div
-                  className="relative overflow-hidden rounded-2xl p-8 md:p-10 transition-all duration-300 hover:shadow-xl"
-                  style={{ background: "#1A0E0B", minHeight: "300px" }}
-                >
-                  <div
-                    className="absolute top-6 right-6 w-[52px] h-[52px] pointer-events-none"
-                    style={{
-                      borderTop:   "1.5px solid rgba(196,153,106,0.28)",
-                      borderRight: "1.5px solid rgba(196,153,106,0.28)",
-                    }}
-                  />
+                <div className="relative overflow-hidden rounded-2xl p-8 md:p-10 transition-all duration-300 hover:shadow-xl" style={{ background: "#1A0E0B", minHeight: "300px" }}>
+                  <div className="absolute top-6 right-6 w-[52px] h-[52px] pointer-events-none" style={{ borderTop: "1.5px solid rgba(196,153,106,0.28)", borderRight: "1.5px solid rgba(196,153,106,0.28)" }} />
                   <div className="relative">
-                    <p className="musa-sublabel mb-6" style={{ color: "#6B5040" }}>
-                      Para profesionales
-                    </p>
-                    <h3
-                      className="font-display font-normal italic leading-[1.06]"
-                      style={{
-                        fontSize: "clamp(30px, 4.5vw, 44px)",
-                        letterSpacing: "-0.015em",
-                        color: "#F2EBE0",
-                      }}
-                    >
+                    <p className="musa-sublabel mb-6" style={{ color: "#6B5040" }}>Para profesionales</p>
+                    <h3 className="font-display font-normal italic leading-[1.06]" style={{ fontSize: "clamp(30px, 4.5vw, 44px)", letterSpacing: "-0.015em", color: "#F2EBE0" }}>
                       Tu negocio,<br />en otro nivel.
                     </h3>
-                    <p
-                      className="font-ui text-[14px] mt-4 mb-8 leading-relaxed max-w-[260px]"
-                      style={{ color: "#8B7060" }}
-                    >
-                      Agenda digital, gestión de clientas y estadísticas.
-                      Todo lo que tu negocio necesita para crecer.
+                    <p className="font-ui text-[14px] mt-4 mb-8 leading-relaxed max-w-[260px]" style={{ color: "#8B7060" }}>
+                      Agenda digital, gestión de clientas y estadísticas. Todo lo que tu negocio necesita para crecer.
                     </p>
-                    <span
-                      className="inline-flex items-center gap-2 font-ui text-[13px] font-medium px-4 py-2 rounded-full"
-                      style={{
-                        border: "1px solid rgba(196,153,106,0.32)",
-                        color: "#C4996A",
-                      }}
-                    >
+                    <span className="inline-flex items-center gap-2 font-ui text-[13px] font-medium px-4 py-2 rounded-full" style={{ border: "1px solid rgba(196,153,106,0.32)", color: "#C4996A" }}>
                       Empezar gratis
                       <ArrowRightIcon className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform duration-200" />
                     </span>
@@ -506,10 +606,7 @@ export default function HomePage() {
               <div className="grid grid-cols-3 divide-x divide-border-subtle">
                 {STATS.map(({ value, label }) => (
                   <div key={label} className="text-center px-4 md:px-10">
-                    <p
-                      className="font-display font-normal text-on-surface leading-none"
-                      style={{ fontSize: "clamp(32px, 5.5vw, 60px)", letterSpacing: "-0.03em" }}
-                    >
+                    <p className="font-display font-normal text-on-surface leading-none" style={{ fontSize: "clamp(32px, 5.5vw, 60px)", letterSpacing: "-0.03em" }}>
                       {value}
                     </p>
                     <p className="font-ui text-[11px] md:text-[12px] text-on-surface-muted mt-2.5 leading-snug max-w-[90px] mx-auto">
@@ -526,22 +623,14 @@ export default function HomePage() {
         <section className="py-10 md:py-14">
           <div className="max-w-6xl mx-auto px-5 md:px-8">
             <p className="musa-sublabel text-on-surface-subtle mb-3">Proceso</p>
-            <h2
-              className="font-display font-normal italic text-on-surface mb-12 md:mb-14"
-              style={{ fontSize: "36px", letterSpacing: "-0.015em" }}
-            >
+            <h2 className="font-display font-normal italic text-on-surface mb-12 md:mb-14" style={{ fontSize: "36px", letterSpacing: "-0.015em" }}>
               Así de simple.
             </h2>
             <div className="grid md:grid-cols-3 gap-10 md:gap-12">
               {STEPS.map(({ n, title, desc }) => (
                 <div key={n}>
                   <p className="font-mono-num text-[11px] text-on-surface-subtle mb-4">{n}</p>
-                  <h3
-                    className="font-display font-normal text-on-surface mb-2.5"
-                    style={{ fontSize: "22px", lineHeight: "1.1" }}
-                  >
-                    {title}
-                  </h3>
+                  <h3 className="font-display font-normal text-on-surface mb-2.5" style={{ fontSize: "22px", lineHeight: "1.1" }}>{title}</h3>
                   <p className="font-ui text-[14px] text-on-surface-muted leading-relaxed">{desc}</p>
                 </div>
               ))}
@@ -552,52 +641,21 @@ export default function HomePage() {
         {/* ── Professional CTA ─────────────────────────────────────────── */}
         <section className="pb-14 md:pb-20">
           <div className="max-w-6xl mx-auto px-5 md:px-8">
-            <div
-              className="relative overflow-hidden rounded-2xl px-8 py-12 md:px-14 md:py-14"
-              style={{ background: "#1A0E0B" }}
-            >
-              <span
-                aria-hidden="true"
-                className="absolute -right-10 -top-16 font-display select-none pointer-events-none leading-none font-normal italic"
-                style={{ fontSize: "440px", color: "#C4996A", opacity: 0.045, letterSpacing: "-0.04em" }}
-              >
-                M
-              </span>
+            <div className="relative overflow-hidden rounded-2xl px-8 py-12 md:px-14 md:py-14" style={{ background: "#1A0E0B" }}>
+              <span aria-hidden="true" className="absolute -right-10 -top-16 font-display select-none pointer-events-none leading-none font-normal italic" style={{ fontSize: "440px", color: "#C4996A", opacity: 0.045, letterSpacing: "-0.04em" }}>M</span>
               <div className="relative max-w-lg">
-                <p className="musa-sublabel mb-6" style={{ color: "#6B5040" }}>
-                  Para profesionales de belleza
-                </p>
-                <h2
-                  className="font-display font-normal italic leading-[1.06] mb-5"
-                  style={{
-                    fontSize: "clamp(28px, 4.5vw, 46px)",
-                    letterSpacing: "-0.015em",
-                    color: "#F2EBE0",
-                  }}
-                >
-                  Tu marca. Tu agenda.
-                  <br />Tu negocio.
+                <p className="musa-sublabel mb-6" style={{ color: "#6B5040" }}>Para profesionales de belleza</p>
+                <h2 className="font-display font-normal italic leading-[1.06] mb-5" style={{ fontSize: "clamp(28px, 4.5vw, 46px)", letterSpacing: "-0.015em", color: "#F2EBE0" }}>
+                  Tu marca. Tu agenda.<br />Tu negocio.
                 </h2>
-                <p
-                  className="font-ui text-[14px] leading-relaxed mb-8 max-w-[340px]"
-                  style={{ color: "#8B7060" }}
-                >
-                  Agenda digital, perfil público, gestión de clientas,
-                  recordatorios automáticos y estadísticas. Todo pensado
-                  para el negocio de belleza.
+                <p className="font-ui text-[14px] leading-relaxed mb-8 max-w-[340px]" style={{ color: "#8B7060" }}>
+                  Agenda digital, perfil público, gestión de clientas, recordatorios automáticos y estadísticas.
                 </p>
                 <div className="flex flex-wrap items-center gap-3">
-                  <Link
-                    href="/login"
-                    className="font-ui text-[14px] font-medium px-7 py-3 rounded-full bg-primary text-on-primary transition-opacity hover:opacity-90 shadow-primary-sm"
-                  >
+                  <Link href="/login" className="font-ui text-[14px] font-medium px-7 py-3 rounded-full bg-primary text-on-primary transition-opacity hover:opacity-90 shadow-primary-sm">
                     Empezar gratis
                   </Link>
-                  <Link
-                    href="/login"
-                    className="inline-flex items-center gap-1.5 font-ui text-[14px] font-medium px-4 py-3 transition-opacity hover:opacity-60"
-                    style={{ color: "#8B7060" }}
-                  >
+                  <Link href="/login" className="inline-flex items-center gap-1.5 font-ui text-[14px] font-medium px-4 py-3 transition-opacity hover:opacity-60" style={{ color: "#8B7060" }}>
                     Ya tengo cuenta
                     <ArrowRightIcon className="w-3.5 h-3.5" />
                   </Link>
@@ -607,44 +665,18 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── iOS install hint (solo Safari iPhone/iPad, se puede descartar) ── */}
         <IOSInstallHint />
 
         {/* ── Footer ─────────────────────────────────────────────────── */}
         <footer className="border-t border-border-subtle py-8">
           <div className="max-w-6xl mx-auto px-5 md:px-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <Link href="/">
-              <MusaLogo variant="wordmark" size="sm" />
-            </Link>
+            <Link href="/"><MusaLogo variant="wordmark" size="sm" /></Link>
             <div className="flex items-center gap-5">
-              <Link href="/explore" className="font-ui text-[12px] text-on-surface-muted hover:text-on-surface transition-colors">
-                Explorar
-              </Link>
-              <Link href="/client" className="font-ui text-[12px] text-on-surface-muted hover:text-on-surface transition-colors">
-                Mis citas
-              </Link>
-              <Link href="/login" className="font-ui text-[12px] text-on-surface-muted hover:text-on-surface transition-colors">
-                Para profesionales
-              </Link>
-              {/* Instagram */}
-              <a
-                href="https://www.instagram.com/getmusa.app"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Musa en Instagram"
-                className="text-on-surface-muted hover:text-primary transition-colors"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="w-[15px] h-[15px]"
-                  aria-hidden="true"
-                >
+              <Link href="/explore"  className="font-ui text-[12px] text-on-surface-muted hover:text-on-surface transition-colors">Explorar</Link>
+              <Link href="/client"   className="font-ui text-[12px] text-on-surface-muted hover:text-on-surface transition-colors">Mis citas</Link>
+              <Link href="/login"    className="font-ui text-[12px] text-on-surface-muted hover:text-on-surface transition-colors">Para profesionales</Link>
+              <a href="https://www.instagram.com/getmusa.app" target="_blank" rel="noopener noreferrer" aria-label="Musa en Instagram" className="text-on-surface-muted hover:text-primary transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-[15px] h-[15px]" aria-hidden="true">
                   <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
                   <circle cx="12" cy="12" r="4" />
                   <circle cx="17.5" cy="6.5" r="0.8" fill="currentColor" stroke="none" />
@@ -653,12 +685,7 @@ export default function HomePage() {
             </div>
             <p className="font-ui text-[11px] text-on-surface-subtle">
               © {new Date().getFullYear()} Musa ·{" "}
-              <a
-                href="https://codebymelendez.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-on-surface-muted transition-colors"
-              >
+              <a href="https://codebymelendez.com" target="_blank" rel="noopener noreferrer" className="hover:text-on-surface-muted transition-colors">
                 codebymelendez.com
               </a>
             </p>

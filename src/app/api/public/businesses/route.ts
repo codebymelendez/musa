@@ -3,28 +3,31 @@ import { createAdminClient } from "@/lib/supabase-admin";
 
 // Maps category keys to their Spanish labels for text search matching
 const CATEGORY_LABELS: Record<string, string> = {
-  nails: "uñas",
-  hair: "cabello",
-  brows: "cejas pestañas",
+  nails:  "uñas",
+  hair:   "cabello",
+  brows:  "cejas pestañas",
+  lashes: "pestañas",
   makeup: "maquillaje",
-  other: "belleza",
+  other:  "belleza",
 };
 
 function normalize(str: string): string {
-  return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return str.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
-  const q = searchParams.get("q")?.trim();
-  const city = searchParams.get("city")?.trim();
+  const q        = searchParams.get("q")?.trim();
+  const city     = searchParams.get("city")?.trim();
   const category = searchParams.get("category")?.trim();
+  const service  = searchParams.get("service")?.trim();   // nombre de servicio específico
+  const date     = searchParams.get("date")?.trim();      // YYYY-MM-DD → filtrar por día de semana
 
   try {
     const supabase = createAdminClient();
 
     let query = supabase
-      .from('Business')
+      .from("Business")
       .select(`
         *,
         users:User(
@@ -35,42 +38,45 @@ export async function GET(request: NextRequest) {
           serviceType,
           role,
           onboardingDone,
-          services:Service(isActive)
+          services:Service(isActive, name, category, price),
+          settings:ProfessionalSettings(workDays, bookingEnabled)
         )
       `)
-      .order('createdAt', { ascending: false })
+      .order("createdAt", { ascending: false })
       .limit(50);
 
-    // City filter at DB level (case-insensitive)
+    // Filtro de ciudad a nivel DB (case-insensitive)
     if (city) {
-      query = query.ilike('city', `%${city}%`);
+      query = query.ilike("city", `%${city}%`);
     }
 
-    // Category filter at DB level only when Business.category is likely set
-    // (for legacy records where Business.category is null, we fall back to client-side below)
+    // Filtro de categoría a nivel DB
     if (category) {
-      query = query.eq('category', category);
+      query = query.eq("category", category);
     }
 
     const { data: businesses, error } = await query;
 
     if (error) {
-      console.error("[public businesses GET query error]", error);
+      console.error("[public businesses GET]", error);
       return NextResponse.json({ businesses: [] });
     }
 
     let filteredBusinesses = businesses || [];
 
-    // If category filter returned no results (likely because Business.category is null),
-    // re-fetch without category filter and apply client-side using User.serviceType
+    // Re-fetch sin categoría si no hubo resultados (registros legacy con Business.category null)
     if (category && filteredBusinesses.length === 0) {
       const { data: allForCategory } = await supabase
-        .from('Business')
+        .from("Business")
         .select(`
           *,
-          users:User(name, slug, avatarUrl, bio, serviceType, role, onboardingDone, services:Service(isActive))
+          users:User(
+            name, slug, avatarUrl, bio, serviceType, role, onboardingDone,
+            services:Service(isActive, name, category, price),
+            settings:ProfessionalSettings(workDays, bookingEnabled)
+          )
         `)
-        .order('createdAt', { ascending: false })
+        .order("createdAt", { ascending: false })
         .limit(50);
 
       filteredBusinesses = (allForCategory || []).filter((b: any) => {
@@ -78,35 +84,70 @@ export async function GET(request: NextRequest) {
         return b.category === category || owner?.serviceType === category;
       });
 
-      // Re-apply city filter if needed
       if (city) {
-        const normalizedCity = normalize(city);
+        const nCity = normalize(city);
         filteredBusinesses = filteredBusinesses.filter((b: any) =>
-          normalize(b.city || "").includes(normalizedCity)
+          normalize(b.city || "").includes(nCity)
         );
       }
     }
 
-    // Text search: name, owner name, bio, city, serviceType label — accent-insensitive
+    // ── Filtro por servicio específico ───────────────────────────────────
+    if (service) {
+      const nService = normalize(service);
+      filteredBusinesses = filteredBusinesses.filter((b: any) => {
+        const owner = Array.isArray(b.users) ? b.users[0] : b.users;
+        const svcs  = Array.isArray(owner?.services) ? owner.services : [];
+        return svcs.some(
+          (s: any) => s.isActive && normalize(s.name || "").includes(nService)
+        );
+      });
+    }
+
+    // ── Filtro por fecha (día de semana vs workDays) ──────────────────────
+    if (date) {
+      // date = "YYYY-MM-DD" → usamos T12:00 para evitar saltos de día por zona horaria
+      const dayOfWeek = new Date(date + "T12:00:00").getDay(); // 0=Dom … 6=Sáb
+      filteredBusinesses = filteredBusinesses.filter((b: any) => {
+        const owner    = Array.isArray(b.users) ? b.users[0] : b.users;
+        const settArr  = Array.isArray(owner?.settings) ? owner.settings : [owner?.settings];
+        const settings = settArr[0];
+        if (!settings?.workDays) return true; // sin configuración = incluir siempre
+        try {
+          const workDays: number[] =
+            typeof settings.workDays === "string"
+              ? JSON.parse(settings.workDays)
+              : settings.workDays;
+          return Array.isArray(workDays) && workDays.includes(dayOfWeek);
+        } catch {
+          return true;
+        }
+      });
+    }
+
+    // ── Búsqueda de texto libre ───────────────────────────────────────────
     if (q) {
       const searchQ = normalize(q);
       filteredBusinesses = filteredBusinesses.filter((b: any) => {
-        const owner = Array.isArray(b.users) ? b.users[0] : b.users;
-        const serviceKey = owner?.serviceType?.toLowerCase() || "";
+        const owner       = Array.isArray(b.users) ? b.users[0] : b.users;
+        const serviceKey  = owner?.serviceType?.toLowerCase() || "";
         const serviceLabels = CATEGORY_LABELS[serviceKey] || "";
+        const svcs        = Array.isArray(owner?.services) ? owner.services : [];
+        const svcNames    = svcs.map((s: any) => normalize(s.name || "")).join(" ");
         return (
           normalize(b.name || "").includes(searchQ) ||
           normalize(owner?.name || "").includes(searchQ) ||
           normalize(b.city || "").includes(searchQ) ||
           normalize(owner?.bio || "").includes(searchQ) ||
           serviceKey.includes(searchQ) ||
-          normalize(serviceLabels).includes(searchQ)
+          normalize(serviceLabels).includes(searchQ) ||
+          svcNames.includes(searchQ)
         );
       });
     }
 
     const result = filteredBusinesses.map((b: any) => {
-      const owner = Array.isArray(b.users) ? b.users[0] : b.users;
+      const owner      = Array.isArray(b.users) ? b.users[0] : b.users;
       const staffCount = Array.isArray(b.users) ? b.users.length : 1;
       return {
         id: b.id,
@@ -117,12 +158,13 @@ export async function GET(request: NextRequest) {
         address: b.address,
         staffCount,
         owner: {
-          name: owner?.name || "Desconocido",
-          slug: owner?.slug,
-          avatarUrl: owner?.avatarUrl,
-          bio: owner?.bio,
-          serviceType: owner?.serviceType,
-          servicesCount: owner?.services?.filter((s: any) => s.isActive).length || 0,
+          name:         owner?.name || "Desconocido",
+          slug:         owner?.slug,
+          avatarUrl:    owner?.avatarUrl,
+          bio:          owner?.bio,
+          serviceType:  owner?.serviceType,
+          servicesCount: (Array.isArray(owner?.services) ? owner.services : [])
+            .filter((s: any) => s.isActive).length,
         },
       };
     });

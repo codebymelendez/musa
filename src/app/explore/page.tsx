@@ -58,48 +58,60 @@ export default function ExplorePage() {
 
 function ExploreContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
+  const router       = useRouter();
 
-  const [query, setQuery]     = useState(searchParams.get("q") ?? "");
-  const [city, setCity]       = useState(searchParams.get("city") ?? "");
+  const [query,    setQuery]    = useState(searchParams.get("q")        ?? "");
+  const [city,     setCity]     = useState(searchParams.get("city")     ?? "");
   const [category, setCategory] = useState(searchParams.get("category") ?? "");
-  const [businesses, setBusinesses] = useState<BusinessCard[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [service,  setService]  = useState(searchParams.get("service")  ?? "");
+  const [date,     setDate]     = useState(searchParams.get("date")     ?? "");
+
+  const [businesses,       setBusinesses]       = useState<BusinessCard[]>([]);
+  const [loading,          setLoading]          = useState(true);
   const [detectingLocation, setDetectingLocation] = useState(false);
 
   const isFirstRender = useRef(true);
 
-  const fetchBusinesses = useCallback(async (q: string, c: string, cat: string) => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (q)   params.set("q", q);
-      if (c)   params.set("city", c);
-      if (cat) params.set("category", cat);
-      const res  = await fetch(`/api/public/businesses?${params}`);
-      const data = await res.json();
-      setBusinesses(data.businesses ?? []);
-    } catch {
-      setBusinesses([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetchBusinesses = useCallback(
+    async (q: string, c: string, cat: string, svc: string, dt: string) => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (q)   params.set("q",        q);
+        if (c)   params.set("city",     c);
+        if (cat) params.set("category", cat);
+        if (svc) params.set("service",  svc);
+        if (dt)  params.set("date",     dt);
+        const res  = await fetch(`/api/public/businesses?${params}`);
+        const data = await res.json();
+        setBusinesses(data.businesses ?? []);
+      } catch {
+        setBusinesses([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     const delay = isFirstRender.current ? 0 : 350;
     isFirstRender.current = false;
     const timer = setTimeout(() => {
-      fetchBusinesses(query, city, category);
+      fetchBusinesses(query, city, category, service, date);
+
       const params = new URLSearchParams();
-      if (query)    params.set("q", query);
-      if (city)     params.set("city", city);
+      if (query)    params.set("q",        query);
+      if (city)     params.set("city",     city);
       if (category) params.set("category", category);
+      if (service)  params.set("service",  service);
+      if (date)     params.set("date",     date);
       router.replace(`/explore${params.size ? `?${params}` : ""}`, { scroll: false });
     }, delay);
     return () => clearTimeout(timer);
-  }, [query, city, category]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [query, city, category, service, date]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Geolocalización automática si no hay ciudad
   useEffect(() => {
     if (searchParams.get("city") || city) return;
     if (!navigator.geolocation) return;
@@ -108,14 +120,14 @@ function ExploreContent() {
       async (pos) => {
         try {
           const { latitude, longitude } = pos.coords;
-          const res = await fetch(
+          const res  = await fetch(
             `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=es`,
-            { headers: { "User-Agent": "Musa/1.0" } }
+            { headers: { "User-Agent": "Musa/1.0" } },
           );
           const data = await res.json();
           const detected =
             data.address?.city ||
-            data.address?.town ||
+            data.address?.town  ||
             data.address?.municipality ||
             data.address?.village;
           if (detected) setCity(detected);
@@ -123,16 +135,24 @@ function ExploreContent() {
         finally  { setDetectingLocation(false); }
       },
       () => setDetectingLocation(false),
-      { timeout: 6000 }
+      { timeout: 6000 },
     );
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Chips de filtros activos
+  const activeFilters = [
+    service  && { label: service,  clear: () => setService("") },
+    date     && { label: new Date(date + "T12:00:00").toLocaleDateString("es-VE", { day: "numeric", month: "short" }), clear: () => setDate("") },
+  ].filter(Boolean) as { label: string; clear: () => void }[];
+
   return (
     <div className="min-h-screen bg-background font-ui text-on-surface antialiased flex flex-col">
-      {/* ── Header sticky ──────────────────────────────────────────────────── */}
+
+      {/* ── Header sticky ─────────────────────────────────────────── */}
       <header className="sticky top-0 z-40 glass-nav border-b border-border-subtle">
         <div className="px-4 pt-4 pb-3 max-w-2xl mx-auto space-y-3">
-          {/* Top row */}
+
+          {/* Fila superior */}
           <div className="flex items-center gap-3">
             <Link
               href="/"
@@ -141,35 +161,28 @@ function ExploreContent() {
             >
               <ArrowLeftIcon className="w-5 h-5" />
             </Link>
-            <h1 className="font-ui font-semibold text-[16px] text-on-surface">
-              Explorar
-            </h1>
+            <h1 className="font-ui font-semibold text-[16px] text-on-surface">Explorar</h1>
             {detectingLocation && (
               <span className="ml-auto flex items-center gap-1.5 font-ui text-[12px] text-on-surface-subtle">
                 <MapPinIcon className="w-3.5 h-3.5 animate-pulse" />
-                Detectando...
+                Detectando…
               </span>
             )}
           </div>
 
-          {/* Search row */}
+          {/* Fila de búsqueda */}
           <div className="flex gap-2">
             <div className="flex-1 flex items-center gap-2 bg-surface-raised border border-border rounded-md px-3 py-2.5 focus-within:border-border-focus transition-all">
               <MagnifyingGlassIcon className="w-4 h-4 text-on-surface-subtle flex-shrink-0" />
               <input
                 className="flex-1 bg-transparent outline-none font-ui text-[14px] text-on-surface placeholder:text-on-surface-subtle"
-                placeholder="Servicio, nombre..."
+                placeholder="Servicio, nombre…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 autoComplete="off"
               />
               {query && (
-                <button
-                  type="button"
-                  onClick={() => setQuery("")}
-                  className="text-on-surface-subtle hover:text-on-surface transition-colors"
-                  aria-label="Limpiar"
-                >
+                <button type="button" onClick={() => setQuery("")} className="text-on-surface-subtle hover:text-on-surface transition-colors" aria-label="Limpiar">
                   <XMarkIcon className="w-4 h-4" />
                 </button>
               )}
@@ -184,19 +197,14 @@ function ExploreContent() {
                 autoComplete="off"
               />
               {city && (
-                <button
-                  type="button"
-                  onClick={() => setCity("")}
-                  className="text-on-surface-subtle hover:text-on-surface transition-colors"
-                  aria-label="Limpiar ciudad"
-                >
+                <button type="button" onClick={() => setCity("")} className="text-on-surface-subtle hover:text-on-surface transition-colors" aria-label="Limpiar ciudad">
                   <XMarkIcon className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
           </div>
 
-          {/* Category pills */}
+          {/* Pills de categoría */}
           <div className="flex gap-2 overflow-x-auto pb-0.5 hide-scrollbar">
             {CATEGORIES.map(({ key, label }) => (
               <button
@@ -206,17 +214,43 @@ function ExploreContent() {
                   "flex-shrink-0 font-ui text-[12px] font-medium px-3 py-1.5 rounded-full border transition-all duration-150",
                   category === key
                     ? "bg-primary text-on-primary border-primary shadow-primary-sm"
-                    : "bg-transparent text-on-surface-muted border-border hover:border-primary/50 hover:text-on-surface"
+                    : "bg-transparent text-on-surface-muted border-border hover:border-primary/50 hover:text-on-surface",
                 )}
               >
                 {label}
               </button>
             ))}
           </div>
+
+          {/* Chips de filtros activos (servicio / fecha) */}
+          {activeFilters.length > 0 && (
+            <div className="flex gap-2 flex-wrap">
+              {activeFilters.map((f) => (
+                <button
+                  key={f.label}
+                  type="button"
+                  onClick={f.clear}
+                  className="flex items-center gap-1.5 font-ui text-[11px] font-medium px-2.5 py-1 bg-primary-surface border border-primary-border text-primary rounded-full hover:bg-primary hover:text-on-primary transition-all"
+                >
+                  {f.label}
+                  <XMarkIcon className="w-3 h-3" />
+                </button>
+              ))}
+              {activeFilters.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => { setService(""); setDate(""); }}
+                  className="font-ui text-[11px] text-on-surface-muted hover:text-on-surface transition-colors"
+                >
+                  Limpiar todo
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
-      {/* ── Results ──────────────────────────────────────────────────────────── */}
+      {/* ── Resultados ───────────────────────────────────────────────── */}
       <main className="flex-1 px-4 py-4 max-w-2xl mx-auto w-full">
         {!loading && (
           <p className="font-ui text-[12px] text-on-surface-subtle mb-4">
@@ -224,31 +258,27 @@ function ExploreContent() {
               ? "Sin resultados"
               : `${businesses.length} profesional${businesses.length !== 1 ? "es" : ""}`}
             {city ? ` en ${city}` : ""}
+            {service ? ` · ${service}` : ""}
           </p>
         )}
 
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="h-24 bg-stone-100 rounded-xl animate-pulse"
-              />
+              <div key={i} className="h-24 bg-stone-100 rounded-xl animate-pulse" />
             ))}
           </div>
         ) : businesses.length === 0 ? (
           <div className="text-center py-16 space-y-3">
             <MagnifyingGlassIcon className="w-10 h-10 text-on-surface-subtle mx-auto" />
             <div>
-              <p className="font-ui font-semibold text-[15px] text-on-surface">
-                Sin resultados
-              </p>
+              <p className="font-ui font-semibold text-[15px] text-on-surface">Sin resultados</p>
               <p className="font-ui text-[13px] text-on-surface-muted mt-1">
                 Intenta con otro servicio o ciudad.
               </p>
             </div>
             <button
-              onClick={() => { setQuery(""); setCity(""); setCategory(""); }}
+              onClick={() => { setQuery(""); setCity(""); setCategory(""); setService(""); setDate(""); }}
               className="font-ui text-[13px] font-semibold text-primary hover:underline underline-offset-2"
             >
               Ver todos los profesionales
@@ -257,11 +287,7 @@ function ExploreContent() {
         ) : (
           <div className="space-y-3">
             {businesses.map((biz) => (
-              <Link
-                key={biz.id}
-                href={`/p/${biz.owner.slug}`}
-                className="block group"
-              >
+              <Link key={biz.id} href={`/p/${biz.owner.slug}`} className="block group">
                 <div className="bg-surface-raised border border-border-subtle rounded-xl p-4 shadow-xs hover:shadow-md hover:border-primary-border transition-all duration-[160ms] group-active:scale-[0.99] flex items-start gap-4">
                   {/* Avatar */}
                   <div className="w-14 h-14 rounded-xl bg-rose-50 overflow-hidden relative flex-shrink-0">
@@ -287,9 +313,7 @@ function ExploreContent() {
                         <h3 className="font-ui font-semibold text-[15px] text-on-surface truncate leading-tight">
                           {biz.name}
                         </h3>
-                        <p className="font-ui text-[12px] text-on-surface-muted">
-                          {biz.owner.name}
-                        </p>
+                        <p className="font-ui text-[12px] text-on-surface-muted">{biz.owner.name}</p>
                       </div>
                       {biz.owner.serviceType && (
                         <span className="flex-shrink-0 font-ui text-[10px] font-semibold px-2 py-0.5 rounded-full bg-surface-sunken text-on-surface-muted capitalize">
