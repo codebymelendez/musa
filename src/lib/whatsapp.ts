@@ -63,7 +63,6 @@ export async function sendWhatsAppMessage(
   }
 
   const to = `whatsapp:${normalizePhone(toPhone)}`;
-  console.log(`[WhatsApp] from="${from}" to="${to}"`);
 
   try {
     // Importación dinámica para que Twilio no afecte el bundle del cliente
@@ -71,7 +70,6 @@ export async function sendWhatsAppMessage(
     const client = twilio(sid, token);
 
     await client.messages.create({ from, to, body: message });
-    console.log(`[WhatsApp] Mensaje enviado a ${to}`);
   } catch (err) {
     // Un fallo de WhatsApp NUNCA debe interrumpir el flujo principal
     console.error("[WhatsApp] Error al enviar mensaje:", err);
