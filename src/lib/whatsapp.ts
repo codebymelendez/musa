@@ -63,6 +63,7 @@ export async function sendWhatsAppMessage(
   }
 
   const to = `whatsapp:${normalizePhone(toPhone)}`;
+  console.log(`[WhatsApp] from="${from}" to="${to}"`);
 
   try {
     // Importación dinámica para que Twilio no afecte el bundle del cliente

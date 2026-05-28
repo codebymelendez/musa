@@ -423,7 +423,10 @@ function ClientAccessView({
     setWaError(null);
     setWaLoading(true);
 
-    const fullPhone = `${waDialCode}${waNumber.replace(/\D/g, "")}`;
+    // Quitar el 0 local de inicio si el usuario lo escribió con código de país seleccionado
+    const digits = waNumber.replace(/\D/g, "");
+    const nationalDigits = digits.startsWith("0") ? digits.slice(1) : digits;
+    const fullPhone = `${waDialCode}${nationalDigits}`;
 
     try {
       const res  = await fetch("/api/client/send-appointments", {

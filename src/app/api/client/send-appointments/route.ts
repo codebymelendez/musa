@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
   }
 
   const phone = normalizePhone(rawPhone);
+  console.log(`[send-appointments] raw="${rawPhone}" → normalized="${phone}" digits=${phone.replace(/\D/g, "").length}`);
   const admin = createAdminClient();
   const now = new Date();
 
@@ -76,6 +77,8 @@ export async function POST(req: NextRequest) {
     return d === digitsInput || d.endsWith(digitsInput) || digitsInput.endsWith(d);
   });
 
+  console.log(`[send-appointments] matched clients: ${matched.length} (searched ${(allClients ?? []).length} total)`);
+
   if (matched.length === 0) {
     return NextResponse.json({ sent: false, noAppointments: true });
   }
@@ -96,6 +99,8 @@ export async function POST(req: NextRequest) {
     .gte("startTime", now.toISOString())
     .order("startTime", { ascending: true })
     .limit(5);
+
+  console.log(`[send-appointments] appointments found: ${appointments?.length ?? 0}`);
 
   if (!appointments || appointments.length === 0) {
     return NextResponse.json({ sent: false, noAppointments: true });
@@ -128,6 +133,9 @@ export async function POST(req: NextRequest) {
     formatted.length === 1
       ? buildAppointmentLookupSingleMsg({ clientName, ...formatted[0] })
       : buildAppointmentLookupMultipleMsg({ clientName, appointments: formatted });
+
+  const from = process.env.TWILIO_WHATSAPP_FROM ?? "whatsapp:+14155238886 (DEFAULT SANDBOX)";
+  console.log(`[send-appointments] sending WhatsApp from="${from}" to="${phone}" appointments=${formatted.length}`);
 
   await sendWhatsAppMessage(phone, message);
 
