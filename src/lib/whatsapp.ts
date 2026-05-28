@@ -127,6 +127,59 @@ export function buildReminderMsg({
   );
 }
 
+export function buildAppointmentLookupSingleMsg({
+  clientName,
+  dateStr,
+  startStr,
+  professionalName,
+  serviceName,
+  rescheduleToken,
+}: {
+  clientName: string;
+  dateStr: string;
+  startStr: string;
+  professionalName: string;
+  serviceName: string;
+  rescheduleToken: string;
+}) {
+  return (
+    `¡Hola${clientName ? ` ${clientName}` : ""}! Aquí tienes el acceso a tu cita en MUSA 💅\n\n` +
+    `📅 ${dateStr} a las ${startStr}\n` +
+    `💇 Con: ${professionalName}\n` +
+    `✂️ Servicio: ${serviceName}\n\n` +
+    `Ver o cancelar tu cita:\n` +
+    `👉 ${APP_URL}/cita/${rescheduleToken}\n\n` +
+    `— Equipo MUSA`
+  );
+}
+
+export function buildAppointmentLookupMultipleMsg({
+  clientName,
+  appointments,
+}: {
+  clientName: string;
+  appointments: Array<{
+    dateStr: string;
+    startStr: string;
+    professionalName: string;
+    rescheduleToken: string;
+  }>;
+}) {
+  const ordinals = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"];
+  const lines = appointments
+    .map(
+      (appt, i) =>
+        `${ordinals[i] ?? `${i + 1}.`} ${appt.dateStr} · ${appt.startStr} · ${appt.professionalName}\n` +
+        `👉 ${APP_URL}/cita/${appt.rescheduleToken}`
+    )
+    .join("\n\n");
+  return (
+    `¡Hola${clientName ? ` ${clientName}` : ""}! Tienes ${appointments.length} citas próximas en MUSA 💅\n\n` +
+    lines +
+    `\n\n— Equipo MUSA`
+  );
+}
+
 export function buildCancellationMsg({
   clientName,
   professionalName,

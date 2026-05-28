@@ -390,36 +390,65 @@ export default function ClientPortalPage() {
   );
 }
 
-// ── Pantalla de acceso rediseñada (Tarea 4) ───────────────────────────────────
+// ── Códigos de marcado por país ───────────────────────────────────────────────
+const DIAL_CODES = [
+  { code: "+58", flag: "🇻🇪", label: "VE +58" },
+  { code: "+1",  flag: "🇺🇸", label: "US +1"  },
+  { code: "+34", flag: "🇪🇸", label: "ES +34" },
+  { code: "+57", flag: "🇨🇴", label: "CO +57" },
+  { code: "+52", flag: "🇲🇽", label: "MX +52" },
+  { code: "+54", flag: "🇦🇷", label: "AR +54" },
+  { code: "+56", flag: "🇨🇱", label: "CL +56" },
+  { code: "+51", flag: "🇵🇪", label: "PE +51" },
+];
+
+// ── Pantalla de acceso rediseñada ─────────────────────────────────────────────
 function ClientAccessView({
   onSuccess,
 }: {
   onSuccess: (token: string, name: string) => void;
 }) {
-  const [phone,   setPhone]   = useState("");
-  const [name,    setName]    = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState<string | null>(null);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Estado Zona 2 — enviar cita por WhatsApp
+  const [waDialCode, setWaDialCode] = useState("+58");
+  const [waNumber,   setWaNumber]   = useState("");
+  const [waLoading,  setWaLoading]  = useState(false);
+  const [waStatus,   setWaStatus]   = useState<"idle" | "sent" | "noAppointments" | "error">("idle");
+  const [waError,    setWaError]    = useState<string | null>(null);
+
+  const handleSendAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setLoading(true);
+    setWaStatus("idle");
+    setWaError(null);
+    setWaLoading(true);
+
+    const fullPhone = `${waDialCode}${waNumber.replace(/\D/g, "")}`;
+
     try {
-      const res  = await fetch("/api/client/verify", {
+      const res  = await fetch("/api/client/send-appointments", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ phone, name }),
+        body:    JSON.stringify({ phone: fullPhone }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "No pudimos verificar tu identidad"); return; }
-      localStorage.setItem("musa_client_token", data.token);
-      localStorage.setItem("musa_client_name",  data.clientName);
-      onSuccess(data.token, data.clientName);
+
+      if (res.status === 429) {
+        setWaStatus("error");
+        setWaError(data.error);
+      } else if (!res.ok) {
+        setWaStatus("error");
+        setWaError(data.error ?? "Error al procesar tu solicitud");
+      } else if (data.noAppointments) {
+        setWaStatus("noAppointments");
+      } else {
+        setWaStatus("sent");
+      }
     } catch {
-      setError("Error de conexión. Intenta de nuevo.");
+      setWaStatus("error");
+      setWaError("Error de conexión. Intenta de nuevo.");
     } finally {
-      setLoading(false);
+      setWaLoading(false);
     }
   };
 
@@ -474,15 +503,15 @@ function ClientAccessView({
 
         {/* Botones principales */}
         <div className="space-y-3">
-          {error && (
+          {loginError && (
             <div className="bg-error-surface border border-error/20 rounded-xl px-4 py-3">
-              <p className="font-ui text-[13px] text-error">{error}</p>
+              <p className="font-ui text-[13px] text-error">{loginError}</p>
             </div>
           )}
           <GoogleSignInButton
             label="Entrar con Google"
             defaultRole="client"
-            onError={(msg) => setError(msg)}
+            onError={(msg) => setLoginError(msg)}
           />
           <Link
             href="/client/register"
@@ -493,16 +522,14 @@ function ClientAccessView({
         </div>
       </section>
 
-      {/* ── ZONA 2: Acceso rápido sin cuenta ────────────────────────── */}
+      {/* ── ZONA 2: Ver cita sin cuenta ─────────────────────────────── */}
       <section className="px-5 py-8 max-w-md mx-auto">
-        {/* Separador con texto */}
+        {/* Separador */}
         <div className="flex items-center gap-4 mb-6">
           <div className="flex-1 h-px bg-border-subtle" />
-          <div className="text-center">
-            <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface-subtle">
-              ¿Reservaste sin crear cuenta?
-            </p>
-          </div>
+          <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface-subtle whitespace-nowrap">
+            ¿Reservaste sin crear cuenta?
+          </p>
           <div className="flex-1 h-px bg-border-subtle" />
         </div>
 
@@ -512,46 +539,93 @@ function ClientAccessView({
         >
           <div>
             <h2 className="font-display font-normal italic text-on-surface" style={{ fontSize: "22px", letterSpacing: "-0.01em" }}>
-              Consulta tu cita puntual
+              Recibe tu cita por WhatsApp
             </h2>
             <p className="font-ui text-[13px] text-on-surface-muted mt-1.5 leading-relaxed">
-              Introduce los datos con los que hiciste tu reserva para ver el detalle de tu cita.
+              Introduce el número con el que hiciste tu reserva y te enviaremos el link de acceso.
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <input
-              id="ca-phone"
-              className="w-full h-11 px-3.5 bg-surface-raised border border-border rounded-xl font-ui text-[15px] text-on-surface placeholder:text-on-surface-subtle outline-none transition-all focus:border-border-focus focus:shadow-[0_0_0_3px_rgba(181,89,62,0.10)]"
-              type="tel"
-              placeholder="Teléfono con el que reservaste"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              required
-              autoComplete="tel"
-            />
-            <input
-              id="ca-name"
-              className="w-full h-11 px-3.5 bg-surface-raised border border-border rounded-xl font-ui text-[15px] text-on-surface placeholder:text-on-surface-subtle outline-none transition-all focus:border-border-focus focus:shadow-[0_0_0_3px_rgba(181,89,62,0.10)]"
-              type="text"
-              placeholder="Nombre como te registraste"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              autoComplete="name"
-            />
+          {/* Feedback de estado */}
+          {waStatus === "sent" && (
+            <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+              <CheckIcon className="w-5 h-5 text-green-600 flex-shrink-0" />
+              <p className="font-ui text-[13px] text-green-700 font-medium">
+                Te hemos enviado tu cita por WhatsApp ✓
+              </p>
+            </div>
+          )}
+
+          {waStatus === "noAppointments" && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+              <p className="font-ui text-[13px] text-amber-700">
+                No encontramos citas con este número. Si reservaste con otro número, intenta con ese.
+              </p>
+            </div>
+          )}
+
+          {waStatus === "error" && waError && (
+            <div className="bg-error-surface border border-error/20 rounded-xl px-4 py-3">
+              <p className="font-ui text-[13px] text-error">{waError}</p>
+            </div>
+          )}
+
+          {waStatus !== "sent" && (
+            <form onSubmit={handleSendAppointment} className="space-y-3">
+              {/* Input de teléfono con selector de código de país */}
+              <div className="flex gap-2">
+                <select
+                  value={waDialCode}
+                  onChange={(e) => setWaDialCode(e.target.value)}
+                  className="h-11 px-2.5 bg-surface-raised border border-border rounded-xl font-ui text-[14px] text-on-surface outline-none transition-all focus:border-border-focus focus:shadow-[0_0_0_3px_rgba(181,89,62,0.10)] flex-shrink-0"
+                  style={{ width: "100px" }}
+                  aria-label="Código de país"
+                >
+                  {DIAL_CODES.map(({ code, flag, label }) => (
+                    <option key={code} value={code}>
+                      {flag} {label}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className="flex-1 h-11 px-3.5 bg-surface-raised border border-border rounded-xl font-ui text-[15px] text-on-surface placeholder:text-on-surface-subtle outline-none transition-all focus:border-border-focus focus:shadow-[0_0_0_3px_rgba(181,89,62,0.10)]"
+                  type="tel"
+                  placeholder="424 000 0000"
+                  value={waNumber}
+                  onChange={(e) => setWaNumber(e.target.value)}
+                  required
+                  autoComplete="tel-national"
+                  inputMode="tel"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={!waNumber.trim() || waLoading}
+                className="w-full h-11 bg-primary text-on-primary font-ui font-medium text-[14px] rounded-full flex items-center justify-center gap-2 shadow-primary-sm hover:bg-primary-hover transition-all active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {waLoading ? (
+                  <div className="w-4 h-4 border border-on-primary border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+                    </svg>
+                    Enviarme mi cita
+                  </>
+                )}
+              </button>
+            </form>
+          )}
+
+          {waStatus === "sent" && (
             <button
-              type="submit"
-              disabled={!phone || !name || loading}
-              className="w-full h-11 bg-primary text-on-primary font-ui font-medium text-[14px] rounded-full flex items-center justify-center gap-2 shadow-primary-sm hover:bg-primary-hover transition-all active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => { setWaStatus("idle"); setWaNumber(""); }}
+              className="w-full h-10 font-ui text-[13px] text-on-surface-muted hover:text-on-surface transition-colors"
             >
-              {loading ? (
-                <div className="w-4 h-4 border border-on-primary border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <><CalendarDaysIcon className="w-4 h-4" /> Ver mi cita</>
-              )}
+              Enviar a otro número
             </button>
-          </form>
+          )}
         </div>
       </section>
 
