@@ -44,6 +44,12 @@ export async function POST(req: NextRequest) {
     });
 
     if (authError) {
+      if (authError.message === "User already registered") {
+        return NextResponse.json(
+          { error: "Este correo ya tiene una cuenta. Por favor inicia sesión o recupera tu contraseña." },
+          { status: 400 }
+        );
+      }
       return NextResponse.json({ error: authError.message }, { status: 400 });
     }
 

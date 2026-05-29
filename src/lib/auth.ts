@@ -22,8 +22,8 @@ export async function getSession(req?: NextRequest, res?: NextResponse) {
   }
 }
 
-export async function signOut(res?: NextResponse) {
-  const supabase = await createClient(undefined, res);
+export async function signOut(req?: NextRequest, res?: NextResponse) {
+  const supabase = await createClient(req, res);
   await supabase.auth.signOut();
   
   // Forzar limpieza de cookies si el signOut de Supabase no fue suficiente

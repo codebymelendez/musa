@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase-admin";
+import { sendEmail } from "@/lib/email";
+import { welcomeClient } from "@/lib/emails/welcome-client";
 
 const schema = z.object({
   appRole: z.enum(["professional", "client"]),
@@ -89,6 +91,15 @@ export async function POST(req: NextRequest) {
   if (insertError) {
     console.error("[google-profile POST] Error creando perfil:", insertError);
     return NextResponse.json({ error: "Error al crear perfil" }, { status: 500 });
+  }
+
+  // Enviar email de bienvenida para clientas (fire-and-forget)
+  if (appRole === "client" && session.email) {
+    sendEmail({
+      to: session.email,
+      subject: "Bienvenida a MUSA ✨",
+      html: welcomeClient({ nombre: rawName }),
+    }).catch((err) => console.error("[welcome-client google email]", err));
   }
 
   // Limpiar el flag de pending_role_selection en Supabase Auth metadata

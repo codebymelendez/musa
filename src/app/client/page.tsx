@@ -76,6 +76,7 @@ export default function ClientPortalPage() {
   const [tab,               setTab]               = useState<"upcoming" | "past" | "loyalty">("upcoming");
   const [showQRFor,         setShowQRFor]         = useState<string | null>(null);
   const [enrolling,         setEnrolling]         = useState<string | null>(null);
+  const [supabaseUser,      setSupabaseUser]      = useState<{ id: string; name: string; email: string } | null>(null);
 
   useEffect(() => {
     const t = localStorage.getItem("musa_client_token");
@@ -83,23 +84,23 @@ export default function ClientPortalPage() {
     setToken(t);
     setClientName(n);
 
-    if (t) {
+    const loadData = (authHeader?: string) => {
+      const headers: HeadersInit = authHeader ? { Authorization: authHeader } : {};
       setLoading(true);
-      fetch("/api/client/bookings", { headers: { Authorization: `Bearer ${t}` } })
+      fetch("/api/client/bookings", { headers })
         .then((r) => r.json())
         .then((d) => {
           if (d.error) {
             setError(d.error);
-            localStorage.removeItem("musa_client_token");
-            setToken(null);
+            if (authHeader) { localStorage.removeItem("musa_client_token"); setToken(null); }
             return;
           }
           setUpcoming(d.upcoming ?? []);
-          setPast(d.past    ?? []);
+          setPast(d.past ?? []);
           if (d.clientName) setClientName(d.clientName);
         })
         .then(() =>
-          fetch("/api/client/loyalty", { headers: { Authorization: `Bearer ${t}` } })
+          fetch("/api/client/loyalty", { headers })
             .then((r) => r.json())
             .then((d) => {
               setLoyaltyAccounts(d.accounts ?? []);
@@ -109,6 +110,22 @@ export default function ClientPortalPage() {
         )
         .catch(() => setError("Error al cargar tus citas"))
         .finally(() => setLoading(false));
+    };
+
+    if (t) {
+      loadData(`Bearer ${t}`);
+    } else {
+      // Sin token local — comprobar sesión Supabase (Google sign-in como clienta)
+      fetch("/api/auth/me")
+        .then((r) => r.ok ? r.json() : null)
+        .then((user) => {
+          if (user?.appRole === "client") {
+            setSupabaseUser(user);
+            setClientName(user.name);
+            loadData(); // sin header — el servidor usa la cookie de Supabase
+          }
+        })
+        .catch(() => {});
     }
   }, []);
 
@@ -131,17 +148,15 @@ export default function ClientPortalPage() {
     finally  { setEnrolling(null); }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     localStorage.removeItem("musa_client_token");
     localStorage.removeItem("musa_client_name");
-    setToken(null);
-    setClientName(null);
-    setUpcoming([]);
-    setPast([]);
+    window.location.href = "/client";
   };
 
   // ── No autenticado ────────────────────────────────────────────────────────
-  if (!token) {
+  if (!token && !supabaseUser) {
     return <ClientAccessView onSuccess={(t, n) => { setToken(t); setClientName(n); }} />;
   }
 

@@ -78,12 +78,12 @@ export function useAuth() {
     [setUser, router]
   );
 
-  // Logout
+  // Logout — hard redirect so middleware re-evaluates cleared cookies
   const logout = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     clearUser();
-    router.push("/");
-  }, [clearUser, router]);
+    window.location.href = "/";
+  }, [clearUser]);
 
   return { user, isHydrated, login, register, logout, loadUser };
 }

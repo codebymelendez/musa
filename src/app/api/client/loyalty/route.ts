@@ -7,19 +7,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { getClientSession } from "@/lib/clientAuth";
+import { getSession } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
-  const session = await getClientSession(req.headers.get("authorization"));
-  if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const supabase = createAdminClient();
+  const authHeader = req.headers.get("authorization");
+
+  let clientQuery: { column: "phone" | "email"; value: string } | null = null;
+
+  if (authHeader) {
+    const clientSession = await getClientSession(authHeader);
+    if (!clientSession) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    clientQuery = { column: "phone", value: clientSession.clientPhone };
+  } else {
+    const supabaseSession = await getSession(req);
+    if (!supabaseSession?.email) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    clientQuery = { column: "email", value: supabaseSession.email };
+  }
 
   try {
-    const supabase = createAdminClient();
-
-    // Buscar el/los Client registros por teléfono
+    // Buscar el/los Client registros por teléfono o email
     const { data: clients } = await supabase
       .from("Client")
       .select("id, businessId")
-      .eq("phone", session.clientPhone);
+      .eq(clientQuery.column, clientQuery.value);
 
     if (!clients || clients.length === 0) {
       return NextResponse.json({ accounts: [], eligible: [] });
