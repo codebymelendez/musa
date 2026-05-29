@@ -14,9 +14,12 @@ export function welcomeClient({ nombre }: { nombre: string }): string {
 
           <!-- HEADER -->
           <tr>
-            <td style="background:#3C1F0E;padding:40px;text-align:center;">
-              <h1 style="margin:0;color:#ffffff;font-family:Georgia,serif;font-size:36px;font-weight:bold;letter-spacing:6px;">MUSA</h1>
-              <p style="margin:10px 0 0;color:#D4956A;font-family:Georgia,serif;font-size:14px;font-style:italic;">Tu belleza, tu agenda</p>
+            <td style="background:#3C1F0E;padding:44px 40px 36px;text-align:center;">
+              <img src="https://getmusa.app/brand/monogram-light.svg"
+                   alt="MUSA" width="56" height="45"
+                   style="display:block;margin:0 auto 18px;width:56px;height:45px;" />
+              <h1 style="margin:0;color:#F2EBE0;font-family:Georgia,serif;font-size:28px;font-weight:normal;letter-spacing:8px;">MUSA</h1>
+              <p style="margin:10px 0 0;color:#D4956A;font-family:Georgia,serif;font-size:13px;font-style:italic;">Tu belleza, tu agenda</p>
             </td>
           </tr>
 
