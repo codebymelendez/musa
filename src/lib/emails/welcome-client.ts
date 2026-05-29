@@ -5,7 +5,7 @@ export function welcomeClient({ nombre }: { nombre: string }): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>Bienvenida a MUSA</title>
-</head>
+</head> 
 <body style="margin:0;padding:0;background:#FAF7F4;font-family:Georgia,serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#FAF7F4;">
     <tr>
