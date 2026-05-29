@@ -50,7 +50,7 @@ export default function GoogleSignInButton({
           const profileRes = await fetch("/api/auth/google-profile", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ role: defaultRole }),
+            body: JSON.stringify({ appRole: defaultRole }),
           });
           if (!profileRes.ok) {
             onError?.("Error al crear tu perfil. Intenta de nuevo.");

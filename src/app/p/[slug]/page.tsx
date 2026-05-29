@@ -267,7 +267,7 @@ export default function PublicBookingPage() {
           await fetch("/api/auth/google-profile", {
             method:  "POST",
             headers: { "Content-Type": "application/json" },
-            body:    JSON.stringify({ role: "client" }),
+            body:    JSON.stringify({ appRole: "client" }),
           });
         }
       } catch { /* profile fetch failed — not blocking */ }
