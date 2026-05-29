@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
-import { useRouter } from "next/navigation";
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://getmusa.app";
@@ -19,7 +18,6 @@ export default function GoogleSignInButton({
   onError?: (msg: string) => void;
 }) {
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const handleSuccess = async (credentialResponse: { credential?: string }) => {
     if (!credentialResponse.credential) return;
@@ -57,29 +55,29 @@ export default function GoogleSignInButton({
             setLoading(false);
             return;
           }
-          router.push(defaultRole === "client" ? "/client" : "/onboarding");
+          // Hard redirect: fuerza recarga completa para que useEffect re-ejecute
+          // con la sesión ya creada (router.push no re-monta si ya estás en esa ruta)
+          window.location.href = defaultRole === "client" ? "/client" : "/onboarding";
           return;
         }
         // Sin defaultRole → pantalla de selección de rol
-        router.push("/auth/select-role");
+        window.location.href = "/auth/select-role";
         return;
       }
 
       if (res.ok) {
         const user = await res.json();
-        // Redirigir según appRole
-        if (user.appRole === "client") {
-          router.push("/client");
-        } else {
-          router.push(user.onboardingDone ? "/home" : "/onboarding");
-        }
+        // Hard redirect para garantizar remount y lectura fresca de cookies
+        window.location.href = user.appRole === "client"
+          ? "/client"
+          : user.onboardingDone ? "/home" : "/onboarding";
         return;
       }
 
       // Fallback: asumir profesional
-      router.push("/home");
+      window.location.href = "/home";
     } catch {
-      router.push("/home");
+      window.location.href = "/home";
     }
   };
 
