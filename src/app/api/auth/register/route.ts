@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase-server";
 import { createAdminClient } from "@/lib/supabase-admin";
+import { sendEmail } from "@/lib/email";
+import { welcomePro } from "@/lib/emails/welcome-pro";
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -84,6 +86,13 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Enviar email de bienvenida (fire-and-forget, nunca bloquea el registro)
+    sendEmail({
+      to: email,
+      subject: "Tu negocio en MUSA está listo para arrancar 🚀",
+      html: welcomePro({ nombre: name }),
+    }).catch((err) => console.error("[welcome-pro email]", err));
 
     const userData = {
       id: authData.user.id,

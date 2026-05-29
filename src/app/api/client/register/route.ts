@@ -3,6 +3,8 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { signClientToken } from "@/lib/clientAuth";
 import { randomUUID } from "crypto";
+import { sendEmail } from "@/lib/email";
+import { welcomeClient } from "@/lib/emails/welcome-client";
 
 const schema = z.object({
   phone: z.string().min(7),
@@ -59,6 +61,15 @@ export async function POST(req: NextRequest) {
       if (insertError) {
         console.error("[client register insert error]", insertError);
         return NextResponse.json({ error: "Error al registrarte" }, { status: 500 });
+      }
+
+      // Enviar email de bienvenida solo en el primer registro
+      if (email) {
+        sendEmail({
+          to: email,
+          subject: "Bienvenida a MUSA ✨",
+          html: welcomeClient({ nombre: name }),
+        }).catch((err) => console.error("[welcome-client email]", err));
       }
     }
 

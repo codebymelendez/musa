@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/store/useAppStore";
+import { ArrowRightIcon, RocketLaunchIcon, ArrowPathIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 
 const SERVICE_TYPES = [
   { value: "nails", label: "Uñas", icon: "✨" },
@@ -249,7 +250,7 @@ export default function Onboarding() {
               className="w-full h-14 bg-primary text-white font-bold rounded-full disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg"
             >
               Continuar
-              <span className="material-symbols-outlined">arrow_forward</span>
+              <ArrowRightIcon className="w-5 h-5" />
             </button>
           </div>
         )}
@@ -347,7 +348,7 @@ export default function Onboarding() {
                 className="flex-1 h-14 bg-primary text-white font-bold rounded-full flex items-center justify-center gap-2"
               >
                 Continuar
-                <span className="material-symbols-outlined">arrow_forward</span>
+                <ArrowRightIcon className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -399,13 +400,11 @@ export default function Onboarding() {
                 className="flex-1 h-14 bg-primary text-white font-bold rounded-full flex items-center justify-center gap-2 disabled:opacity-60"
               >
                 {saving ? (
-                  <span className="material-symbols-outlined animate-spin">
-                    progress_activity
-                  </span>
+                  <ArrowPathIcon className="w-5 h-5 animate-spin" />
                 ) : (
                   <>
                     ¡Empezar!
-                    <span className="material-symbols-outlined">rocket_launch</span>
+                    <RocketLaunchIcon className="w-5 h-5" />
                   </>
                 )}
               </button>
@@ -417,12 +416,7 @@ export default function Onboarding() {
         {step === "done" && (
           <div className="text-center space-y-8 py-8">
             <div className="w-24 h-24 bg-tertiary-fixed rounded-full flex items-center justify-center mx-auto">
-              <span
-                className="material-symbols-outlined text-4xl text-tertiary"
-                style={{ fontVariationSettings: "'FILL' 1" }}
-              >
-                check_circle
-              </span>
+              <CheckCircleIcon className="w-12 h-12 text-tertiary" />
             </div>
             <div className="space-y-2">
               <h2 className="font-headline text-3xl font-extrabold text-on-surface">
@@ -437,7 +431,7 @@ export default function Onboarding() {
               className="w-full h-14 bg-primary text-white font-bold rounded-full shadow-lg flex items-center justify-center gap-2"
             >
               Ir a mi Agenda
-              <span className="material-symbols-outlined">arrow_forward</span>
+              <ArrowRightIcon className="w-5 h-5" />
             </button>
           </div>
         )}
