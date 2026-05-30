@@ -100,7 +100,7 @@ async function getFeaturedProfessionals(): Promise<FeaturedUser[]> {
       const { data: recent } = await admin
         .from("User")
         .select("id, name, slug, avatarUrl, bio, serviceType, business:Business(name, city)")
-        .eq("role", "OWNER")
+        .eq("appRole", "owner")
         .order("createdAt", { ascending: false })
         .limit(8);
       return (recent ?? []).map((u) => ({
@@ -138,7 +138,7 @@ async function getFeaturedBusinesses(): Promise<FeaturedUser[]> {
         business:Business(name, city),
         services:Service(isActive, price)
       `)
-      .eq("role", "OWNER")
+      .eq("appRole", "owner")
       .not("avatarUrl", "is", null)
       .not("bio", "is", null)
       .order("createdAt", { ascending: false })

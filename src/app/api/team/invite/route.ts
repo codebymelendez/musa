@@ -11,11 +11,11 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient();
     const { data: user } = await supabase
       .from('User')
-      .select('role, businessId')
+      .select('appRole, businessId')
       .eq('id', session.userId)
       .single();
 
-    if (user?.role !== "OWNER" || !user.businessId) {
+    if (user?.appRole !== "owner" || !user.businessId) {
       return NextResponse.json({ error: "Solo el dueño puede invitar personal" }, { status: 403 });
     }
 

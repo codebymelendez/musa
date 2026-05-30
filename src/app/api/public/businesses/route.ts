@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
           avatarUrl,
           bio,
           serviceType,
-          role,
+          appRole,
           onboardingDone,
           services:Service(isActive, name, category, price),
           settings:ProfessionalSettings(workDays, bookingEnabled)
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
         .select(`
           *,
           users:User(
-            name, slug, avatarUrl, bio, serviceType, role, onboardingDone,
+            name, slug, avatarUrl, bio, serviceType, appRole, onboardingDone,
             services:Service(isActive, name, category, price),
             settings:ProfessionalSettings(workDays, bookingEnabled)
           )

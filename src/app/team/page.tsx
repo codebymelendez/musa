@@ -21,7 +21,7 @@ export default function TeamPage() {
   const [copied, setCopied] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user && user.role !== "OWNER") {
+    if (user && user.appRole !== "owner") {
       router.push("/home");
       return;
     }

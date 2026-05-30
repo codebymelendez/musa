@@ -80,16 +80,19 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     const { status, notes, payment } = parsed.data;
 
-    // Actualizar cita
-    const { error: updateError } = await supabase
-      .from('Appointment')
-      .update({
-        ...(status && { status }),
-        ...(notes !== undefined && { notes }),
-      })
-      .eq('id', id);
+    // Actualizar cita solo si hay campos a actualizar
+    const updateFields = {
+      ...(status && { status }),
+      ...(notes !== undefined && { notes }),
+    };
 
-    if (updateError) throw updateError;
+    if (Object.keys(updateFields).length > 0) {
+      const { error: updateError } = await supabase
+        .from('Appointment')
+        .update(updateFields)
+        .eq('id', id);
+      if (updateError) throw updateError;
+    }
 
     // Registrar/actualizar pago si se envía
     // Usamos adminClient para Payment porque la tabla no tiene RLS de escritura para staff
@@ -97,19 +100,40 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       const { amount, method, isPaid = true, notes: payNotes } = payment;
       const adminForPayment = createAdminClient();
 
-      const { error: paymentError } = await adminForPayment
+      // Verificar si ya existe un pago para esta cita
+      const { data: existingPayment } = await adminForPayment
         .from('Payment')
-        .upsert({
-          appointmentId: id,
-          amount,
-          currency: "USD",
-          method,
-          isPaid,
-          notes: payNotes,
-          paidAt: isPaid ? new Date().toISOString() : null,
-        }, { onConflict: 'appointmentId' });
+        .select('id')
+        .eq('appointmentId', id)
+        .maybeSingle();
 
-      if (paymentError) throw paymentError;
+      if (existingPayment) {
+        const { error: paymentError } = await adminForPayment
+          .from('Payment')
+          .update({
+            amount,
+            method,
+            isPaid,
+            notes: payNotes ?? null,
+            paidAt: isPaid ? new Date().toISOString() : null,
+          })
+          .eq('id', existingPayment.id);
+        if (paymentError) throw paymentError;
+      } else {
+        const { error: paymentError } = await adminForPayment
+          .from('Payment')
+          .insert({
+            id: crypto.randomUUID(),
+            appointmentId: id,
+            amount,
+            currency: 'USD',
+            method,
+            isPaid,
+            notes: payNotes ?? null,
+            paidAt: isPaid ? new Date().toISOString() : null,
+          });
+        if (paymentError) throw paymentError;
+      }
     }
 
     // Usamos adminClient para el SELECT final porque incluye Payment (cross-table)

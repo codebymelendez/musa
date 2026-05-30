@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
       phone: user.phone,
       email: user.email,
       slug: user.slug,
-      role: user.role,
+      appRole: user.appRole ?? "owner",
       serviceType: user.serviceType,
       bio: user.bio,
       avatarUrl: user.avatarUrl,
@@ -172,7 +172,7 @@ export async function PATCH(req: NextRequest) {
     if (serviceType) userUpdate.serviceType = serviceType;
     if (businessId) {
       userUpdate.businessId = businessId;
-      userUpdate.role = "OWNER";
+      userUpdate.appRole = "owner";
     }
 
     await admin.from('User').update(userUpdate).eq('id', session.userId);

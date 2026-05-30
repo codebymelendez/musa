@@ -6,10 +6,10 @@ import MusaLogo from "@/components/brand/MusaLogo";
 
 export default function SelectRolePage() {
   const router = useRouter();
-  const [loading, setLoading] = useState<"professional" | "client" | null>(null);
+  const [loading, setLoading] = useState<"owner" | "client" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSelect = async (appRole: "professional" | "client") => {
+  const handleSelect = async (appRole: "owner" | "client") => {
     setLoading(appRole);
     setError(null);
 
@@ -121,7 +121,7 @@ export default function SelectRolePage() {
 
           {/* Profesional */}
           <button
-            onClick={() => handleSelect("professional")}
+            onClick={() => handleSelect("owner")}
             disabled={loading !== null}
             className="w-full group relative overflow-hidden rounded-2xl p-7 text-left transition-all duration-200 hover:shadow-xl active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
             style={{ background: "#1A0E0B" }}
@@ -162,7 +162,7 @@ export default function SelectRolePage() {
                 Agenda digital, gestión de clientas y estadísticas. Todo pensado para tu negocio de belleza.
               </p>
 
-              {loading === "professional" && (
+              {loading === "owner" && (
                 <div className="absolute inset-0 rounded-2xl flex items-center justify-center" style={{ background: "rgba(26,14,11,0.6)" }}>
                   <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#C4996A", borderTopColor: "transparent" }} />
                 </div>

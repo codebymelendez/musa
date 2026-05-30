@@ -55,11 +55,11 @@ export async function POST(req: NextRequest) {
     const admin = createAdminClient();
     const { data: user } = await admin
       .from('User')
-      .select('role, businessId')
+      .select('appRole, businessId')
       .eq('id', session.userId)
       .single();
 
-    if (user?.role !== "OWNER") {
+    if (user?.appRole !== "owner") {
       return NextResponse.json({ error: "Solo el propietario puede crear promociones" }, { status: 403 });
     }
 

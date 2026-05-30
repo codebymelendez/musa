@@ -180,6 +180,7 @@
   html {
     height: -webkit-fill-available;
     -webkit-text-size-adjust: 100%;
+    overflow-x: hidden;
   }
 
   body {
@@ -192,8 +193,6 @@
     -moz-osx-font-smoothing: grayscale;
     min-height: 100vh;
     min-height: -webkit-fill-available;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
   }
 
   /* Double-ring focus — respects border-radius of the element */

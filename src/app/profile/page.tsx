@@ -201,7 +201,7 @@ export default function Profile() {
       {/* Bento Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Negocio */}
-        {user?.role === "OWNER" && (
+        {user?.appRole === "owner" && (
           <section className="bg-surface border border-outline-variant/30 rounded-xl p-6 space-y-4 md:col-span-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">

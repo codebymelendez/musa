@@ -11,7 +11,7 @@ import { sendEmail } from "@/lib/email";
 import { welcomeClient } from "@/lib/emails/welcome-client";
 
 const schema = z.object({
-  appRole: z.enum(["professional", "client"]),
+  appRole: z.enum(["owner", "client"]),
 });
 
 export async function POST(req: NextRequest) {

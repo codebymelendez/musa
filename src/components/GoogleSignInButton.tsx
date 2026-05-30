@@ -14,7 +14,7 @@ export default function GoogleSignInButton({
 }: {
   label?: string;
   /** Si se pasa, los usuarios nuevos se crean directamente con este rol (sin pantalla de selección). */
-  defaultRole?: "client" | "professional";
+  defaultRole?: "client" | "owner";
   onError?: (msg: string) => void;
 }) {
   const [loading, setLoading] = useState(false);
@@ -57,7 +57,7 @@ export default function GoogleSignInButton({
           }
           // Hard redirect: fuerza recarga completa para que useEffect re-ejecute
           // con la sesión ya creada (router.push no re-monta si ya estás en esa ruta)
-          window.location.href = defaultRole === "client" ? "/client" : "/onboarding";
+          window.location.href = defaultRole === "owner" ? "/onboarding" : "/client";
           return;
         }
         // Sin defaultRole → pantalla de selección de rol
@@ -119,7 +119,7 @@ function LegacyGoogleSignInButton({
   defaultRole,
 }: {
   label?: string;
-  defaultRole?: "client" | "professional";
+  defaultRole?: "client" | "owner";
   onError?: (msg: string) => void;
 }) {
   const [loading, setLoading] = useState(false);

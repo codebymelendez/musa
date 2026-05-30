@@ -19,11 +19,11 @@ export async function POST(req: NextRequest) {
 
     const { data: user } = await supabase
       .from('User')
-      .select('role, businessId, business:Business(slug)')
+      .select('appRole, businessId, business:Business(slug)')
       .eq('id', session.userId)
       .single();
 
-    if (user?.role !== "OWNER" || !user.businessId) {
+    if (user?.appRole !== "owner" || !user.businessId) {
       return NextResponse.json({ error: "Solo el propietario puede enviar promos" }, { status: 403 });
     }
 

@@ -21,11 +21,11 @@ async function getOwnerAndPromo(req: NextRequest, id: string) {
 
   const supabase = await createClient();
   const [{ data: user }, { data: promotion }] = await Promise.all([
-    supabase.from('User').select('role, businessId').eq('id', session.userId).single(),
+    supabase.from('User').select('appRole, businessId').eq('id', session.userId).single(),
     supabase.from('Promotion').select('*').eq('id', id).single(),
   ]);
 
-  if (!user || user.role !== "OWNER" || !promotion) return null;
+  if (!user || user.appRole !== "owner" || !promotion) return null;
   if (promotion.businessId !== user.businessId) return null;
 
   return { user, promotion, supabase };

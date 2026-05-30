@@ -55,7 +55,7 @@ export default function BusinessSettingsPage() {
     );
   }
 
-  if (!user || user.role !== "OWNER") {
+  if (!user || user.appRole !== "owner") {
     return <div className="p-8 text-center text-on-surface-muted">No autorizado</div>;
   }
 

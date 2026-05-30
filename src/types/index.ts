@@ -62,7 +62,7 @@ export interface User {
   email: string | null;
   name: string;
   slug: string;
-  role: "OWNER" | "STAFF";
+  appRole: "owner" | "staff" | "client";
   businessId: string | null;
   serviceType: string | null;
   bio: string | null;

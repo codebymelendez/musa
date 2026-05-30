@@ -48,11 +48,11 @@ export async function POST(req: NextRequest) {
   const supabase = createAdminClient();
   const { data: user } = await supabase
     .from("User")
-    .select("role")
+    .select("appRole")
     .eq("id", session.userId)
     .single();
 
-  if (user?.role !== "OWNER") {
+  if (user?.appRole !== "owner") {
     return NextResponse.json({ error: "Solo el propietario puede configurar el programa" }, { status: 403 });
   }
 

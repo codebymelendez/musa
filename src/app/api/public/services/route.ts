@@ -24,7 +24,7 @@ export async function GET() {
 
     const { data, error } = await admin
       .from("Service")
-      .select("name, category, user:User!inner(serviceType, role)")
+      .select("name, category, user:User!inner(serviceType, appRole)")
       .eq("isActive", true)
       .order("name", { ascending: true });
 
