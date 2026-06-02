@@ -1,7 +1,8 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRightIcon, MapPinIcon, ScissorsIcon } from "@heroicons/react/24/outline";
+import { ArrowRightIcon, ChevronDownIcon, MapPinIcon, ScissorsIcon } from "@heroicons/react/24/outline";
 import MusaLogo from "@/components/brand/MusaLogo";
 import HomeSearch from "@/components/HomeSearch";
 import IOSInstallHint from "@/components/IOSInstallHint";
@@ -9,6 +10,12 @@ import { createAdminClient } from "@/lib/supabase-admin";
 
 // ISR: revalidar cada 60s
 export const revalidate = 60;
+
+export const metadata: Metadata = {
+  title: "GetMusa – Reserva con profesionales de belleza en Venezuela",
+  description:
+    "Encuentra y reserva con manicuristas, estilistas y especialistas de belleza en Maracaibo, Valencia y Caracas. Sin WhatsApp, en segundos.",
+};
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -180,6 +187,39 @@ const STATS = [
   { value: "4+",      label: "ciudades en Venezuela" },
 ];
 
+const FAQ_ITEMS = [
+  {
+    q: "¿Qué es GetMusa?",
+    a: "GetMusa es la primera plataforma de reservas de belleza en Venezuela. Permite reservar citas con manicuristas y profesionales de belleza en Maracaibo, Valencia y Caracas en segundos, sin WhatsApp.",
+  },
+  {
+    q: "¿Cómo reservo una cita en GetMusa?",
+    a: "Busca tu profesional por ciudad o servicio, selecciona el día y la hora disponible, y confirma. Recibes un recordatorio automático antes de tu cita.",
+  },
+  {
+    q: "¿Es gratis usar GetMusa?",
+    a: "Para las clientas es completamente gratuito. Las profesionales tienen un plan gratuito para empezar.",
+  },
+  {
+    q: "¿En qué ciudades de Venezuela está disponible GetMusa?",
+    a: "Actualmente disponible en Maracaibo, Valencia y Caracas, con expansión continua.",
+  },
+  {
+    q: "¿Cómo me registro como profesional en GetMusa?",
+    a: "Entra a getmusa.app, selecciona 'Empezar gratis' y completa tu perfil en menos de 10 minutos.",
+  },
+];
+
+const FAQ_JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQ_ITEMS.map(({ q, a }) => ({
+    "@type": "Question",
+    name: q,
+    acceptedAnswer: { "@type": "Answer", text: a },
+  })),
+};
+
 const STEPS = [
   { n: "01", title: "Busca",  desc: "Encuentra tu profesional por servicio, ciudad o nombre del estudio."          },
   { n: "02", title: "Elige",  desc: "Selecciona la fecha y hora disponible directamente desde su perfil."          },
@@ -311,7 +351,7 @@ function FeaturedCard({ user }: { user: FeaturedUser }) {
         className="rounded-b-xl border border-t-0 border-border-subtle px-3 py-3 space-y-0.5 group-hover:border-primary-border transition-colors duration-200"
         style={{ background: "rgba(250,246,242,0.95)" }}
       >
-        <p className="font-ui font-semibold text-[13px] text-on-surface truncate leading-tight">{user.name}</p>
+        <p className="font-ui font-medium text-[13px] text-on-surface truncate leading-tight">{user.name}</p>
         {specialtyLabel && (
           <p className="font-ui text-[11px] text-primary capitalize">{specialtyLabel}</p>
         )}
@@ -342,14 +382,17 @@ async function FeaturedProfessionalsRow() {
       <div className="max-w-6xl mx-auto">
         <div className="px-5 md:px-8 flex items-end justify-between mb-5">
           <div>
-            <p className="musa-sublabel text-on-surface-subtle mb-1.5">Destacadas</p>
+            <p className="musa-sublabel text-on-surface-subtle mb-1.5">Reserva ahora</p>
             <h2 className="font-display font-normal italic text-on-surface" style={{ fontSize: "28px", letterSpacing: "-0.015em" }}>
-              Profesionales recomendadas.
+              Reserva con una profesional.
             </h2>
+            <p className="font-ui text-[13px] text-on-surface-muted mt-1.5">
+              Encuentra especialistas en tu ciudad. Disponibilidad en tiempo real.
+            </p>
           </div>
           <Link
             href="/explore"
-            className="inline-flex items-center gap-1 font-ui text-[12px] font-medium text-on-surface-muted hover:text-on-surface transition-colors self-end"
+            className="inline-flex items-center gap-1 font-ui text-[12px] font-medium text-on-surface-muted hover:text-on-surface transition-colors self-end flex-shrink-0 ml-4"
           >
             Ver todas
             <ArrowRightIcon className="w-3 h-3" />
@@ -422,6 +465,11 @@ function FeaturedRowSkeleton({ title }: { title: string }) {
 
 export default function HomePage() {
   return (
+    <>
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_JSON_LD) }}
+    />
     <div className="bg-background min-h-screen antialiased text-on-surface">
 
       {/* ── Nav ─────────────────────────────────────────────────────── */}
@@ -459,90 +507,113 @@ export default function HomePage() {
       <main>
 
         {/* ── Hero ─────────────────────────────────────────────────────── */}
-        <section className="relative overflow-hidden pt-16">
-          <div className="max-w-6xl mx-auto px-5 md:px-8 py-14 md:py-20 lg:py-24 relative">
-            <div className="grid md:grid-cols-[1fr_340px] lg:grid-cols-[1fr_380px] gap-10 lg:gap-14 items-start">
+        <section className="relative pt-16">
+          <div className="grid md:grid-cols-2">
 
-              {/* Izquierda */}
-              <div className="max-w-[520px]">
-                <p className="musa-sublabel text-on-surface-subtle mb-7">Belleza profesional · Venezuela</p>
-
-                <h1 className="font-display leading-[0.92]" style={{ letterSpacing: "-0.025em", fontSize: "clamp(42px, 6.5vw, 72px)" }}>
-                  <span className="block text-on-surface font-normal">Tu próxima cita</span>
-                  <span className="block text-on-surface font-normal">con la profesional</span>
-                  <em className="block font-light italic text-primary" style={{ marginTop: "0.06em" }}>que mereces.</em>
-                </h1>
-
-                <div className="my-7 flex flex-col gap-[3px]">
-                  <div className="h-px bg-primary opacity-35 w-full" />
-                  <div className="h-[0.5px] opacity-40 w-[55%]" style={{ background: "#C4996A" }} />
-                </div>
-
-                <p className="font-ui text-[15px] text-on-surface-muted leading-relaxed max-w-[320px]">
-                  Las mejores profesionales de belleza, disponibles cuando tú decides.
-                </p>
-
-                {/* Buscador con 3 filtros */}
-                <HomeSearch />
-              </div>
-
-              {/* Derecha: preview de agenda */}
-              <div className="hidden md:block self-stretch">
-                <div
-                  className="relative h-full min-h-[460px] rounded-2xl overflow-hidden flex flex-col justify-between p-7"
-                  style={{ background: "#1A0E0B" }}
+            {/* Columna profesionales — terracota */}
+            <div className="bg-primary flex flex-col justify-between px-8 py-12 md:px-12 md:py-16 lg:px-16 min-h-[360px]">
+              <div>
+                <p
+                  className="font-ui font-medium text-[10.5px] uppercase tracking-[0.12em] mb-6"
+                  style={{ color: "rgba(255,255,255,0.55)" }}
                 >
-                  <span aria-hidden="true" className="absolute -right-6 -top-10 font-display select-none pointer-events-none leading-none font-normal italic" style={{ fontSize: "300px", color: "#C4996A", opacity: 0.055, letterSpacing: "-0.04em" }}>M</span>
-
-                  <p className="musa-sublabel relative z-10" style={{ color: "#5A4035" }}>Tu agenda hoy</p>
-
-                  <div className="space-y-3 relative z-10">
-                    {PREVIEW_APTS.map((apt, i) => (
-                      <div
-                        key={i}
-                        className="rounded-xl px-4 py-3"
-                        style={{
-                          background: apt.isNext ? "rgba(255,255,255,0.075)" : "rgba(255,255,255,0.035)",
-                          borderLeft: `2px solid ${apt.isNext ? "rgba(181,89,62,0.65)" : apt.confirmed ? "rgba(181,89,62,0.28)" : "rgba(139,112,96,0.18)"}`,
-                        }}
-                      >
-                        {apt.isNext && (
-                          <div className="flex items-center gap-1.5 mb-1.5">
-                            <div className="w-[5px] h-[5px] rounded-full flex-shrink-0" style={{ background: "#B5593E", opacity: 0.75 }} />
-                            <span className="font-ui text-[9px] font-medium uppercase tracking-[0.12em]" style={{ color: "#7A5A50" }}>Próxima</span>
-                          </div>
-                        )}
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-ui font-medium text-[13px] leading-tight truncate" style={{ color: apt.isNext ? "#F8F0E8" : "#C4B0A8" }}>{apt.name}</p>
-                            <p className="font-ui text-[11px] mt-[3px] truncate" style={{ color: "#5A4035" }}>{apt.service}</p>
-                          </div>
-                          <span className="font-mono-num text-[12px] flex-shrink-0 pt-0.5" style={{ color: apt.isNext ? "#C4996A" : "#4A3028" }}>{apt.time}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="relative z-10">
-                    <div className="flex flex-col gap-[3px] w-14">
-                      <div className="h-px opacity-[0.22]" style={{ background: "#C4996A" }} />
-                      <div className="h-[0.5px] w-[55%] opacity-[0.14]" style={{ background: "#C4996A" }} />
-                    </div>
-                  </div>
-                </div>
+                  Para profesionales
+                </p>
+                <h2
+                  className="font-display font-normal text-on-primary leading-[0.95]"
+                  style={{ fontSize: "clamp(28px, 3.5vw, 44px)", letterSpacing: "-0.02em" }}
+                >
+                  Deja de gestionar<br />tu negocio
+                  <em className="block font-light italic" style={{ marginTop: "0.04em" }}>
+                    por WhatsApp.
+                  </em>
+                </h2>
+                <p
+                  className="font-ui text-[14px] mt-5 mb-8 leading-relaxed max-w-[300px]"
+                  style={{ color: "rgba(255,255,255,0.68)" }}
+                >
+                  Agenda digital, perfil público y recordatorios automáticos. Tus clientas reservan solas, tú solo trabajas.
+                </p>
+                <Link
+                  href="/login"
+                  className="inline-flex items-center gap-2 font-ui font-medium text-[14px] bg-on-primary text-primary px-6 py-3 rounded-full hover:opacity-90 transition-opacity"
+                >
+                  Empezar gratis
+                  <ArrowRightIcon className="w-4 h-4" />
+                </Link>
+              </div>
+              <div
+                className="mt-10 pt-6 border-t space-y-1.5"
+                style={{ borderColor: "rgba(255,255,255,0.14)" }}
+              >
+                <p className="font-ui text-[12px]" style={{ color: "rgba(255,255,255,0.50)" }}>
+                  ✓ Más de 500 profesionales activas
+                </p>
+                <p className="font-ui text-[12px]" style={{ color: "rgba(255,255,255,0.50)" }}>
+                  ✓ Maracaibo · Valencia · Caracas
+                </p>
               </div>
             </div>
+
+            {/* Columna clientas — crema */}
+            <div className="bg-background flex flex-col justify-start px-8 py-12 md:px-12 md:py-16 lg:px-16 min-h-[360px] border-t md:border-t-0 md:border-l border-border-subtle">
+              <p className="musa-sublabel text-on-surface-subtle mb-6">Para clientas</p>
+              <h1
+                className="font-display font-normal text-on-surface leading-[0.95]"
+                style={{ fontSize: "clamp(28px, 3.5vw, 44px)", letterSpacing: "-0.02em" }}
+              >
+                Reserva con tu<br />profesional favorita
+                <em className="block font-light italic text-primary" style={{ marginTop: "0.04em" }}>
+                  en 30 segundos.
+                </em>
+              </h1>
+              <p className="font-ui text-[14px] text-on-surface-muted mt-5 leading-relaxed max-w-[300px]">
+                Sin WhatsApp. Sin esperar respuesta. Elige, selecciona tu hora y listo.
+              </p>
+              <HomeSearch />
+              <div className="mt-5">
+                <Link
+                  href="/explore"
+                  className="inline-flex items-center gap-1.5 font-ui font-medium text-[13px] text-primary hover:bg-primary-surface rounded-full px-4 py-2 border border-primary-border transition-colors"
+                >
+                  Explorar profesionales
+                  <ArrowRightIcon className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </div>
+
           </div>
         </section>
 
-        {/* ── Fila 1: Profesionales recomendadas ───────────────────────── */}
-        <Suspense fallback={<FeaturedRowSkeleton title="Profesionales recomendadas" />}>
-          <FeaturedProfessionalsRow />
-        </Suspense>
+        {/* ── Stats bar ────────────────────────────────────────────────── */}
+        <div className="bg-surface-sunken border-b border-border-subtle">
+          <div className="max-w-6xl mx-auto">
+            <div className="grid grid-cols-3 divide-x divide-border-subtle">
+              {STATS.map(({ value, label }) => (
+                <div key={label} className="text-center px-4 py-5 md:py-6">
+                  <p
+                    className="font-display font-normal text-on-surface leading-none"
+                    style={{ fontSize: "clamp(22px, 3.5vw, 38px)", letterSpacing: "-0.03em" }}
+                  >
+                    {value}
+                  </p>
+                  <p className="font-ui text-[11px] text-on-surface-muted mt-1.5 leading-snug">
+                    {label}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
 
-        {/* ── Fila 2: Negocios destacados ──────────────────────────────── */}
+        {/* ── Fila 1: Negocios destacados ──────────────────────────────── */}
         <Suspense fallback={<FeaturedRowSkeleton title="Negocios destacados" />}>
           <FeaturedBusinessesRow />
+        </Suspense>
+
+        {/* ── Fila 2: Profesionales recomendadas ───────────────────────── */}
+        <Suspense fallback={<FeaturedRowSkeleton title="Profesionales recomendadas" />}>
+          <FeaturedProfessionalsRow />
         </Suspense>
 
         {/* ── Promotions ───────────────────────────────────────────────── */}
@@ -612,26 +683,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── Stats ─────────────────────────────────────────────────────── */}
-        <section className="py-14 md:py-20">
-          <div className="max-w-6xl mx-auto px-5 md:px-8">
-            <div className="border-t border-b border-border-subtle py-12 md:py-14">
-              <div className="grid grid-cols-3 divide-x divide-border-subtle">
-                {STATS.map(({ value, label }) => (
-                  <div key={label} className="text-center px-4 md:px-10">
-                    <p className="font-display font-normal text-on-surface leading-none" style={{ fontSize: "clamp(32px, 5.5vw, 60px)", letterSpacing: "-0.03em" }}>
-                      {value}
-                    </p>
-                    <p className="font-ui text-[11px] md:text-[12px] text-on-surface-muted mt-2.5 leading-snug max-w-[90px] mx-auto">
-                      {label}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
         {/* ── How it works ─────────────────────────────────────────────── */}
         <section className="py-10 md:py-14">
           <div className="max-w-6xl mx-auto px-5 md:px-8">
@@ -678,6 +729,32 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ── FAQ ──────────────────────────────────────────────────────── */}
+        <section className="py-14 md:py-20" id="faq">
+          <div className="max-w-6xl mx-auto px-5 md:px-8">
+            <p className="musa-sublabel text-on-surface-subtle mb-3">Preguntas frecuentes</p>
+            <h2
+              className="font-display font-normal italic text-on-surface mb-10"
+              style={{ fontSize: "32px", letterSpacing: "-0.015em" }}
+            >
+              Todo lo que necesitas saber.
+            </h2>
+            <div className="max-w-2xl">
+              {FAQ_ITEMS.map(({ q, a }) => (
+                <details key={q} className="group border-b border-border-subtle">
+                  <summary className="flex items-center justify-between py-4 cursor-pointer list-none gap-4">
+                    <span className="font-ui font-medium text-[15px] text-on-surface">{q}</span>
+                    <ChevronDownIcon className="w-4 h-4 text-on-surface-subtle flex-shrink-0 transition-transform duration-200 group-open:rotate-180" />
+                  </summary>
+                  <div className="pb-5 pr-8">
+                    <p className="font-ui text-[14px] text-on-surface-muted leading-relaxed">{a}</p>
+                  </div>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+
         <IOSInstallHint />
 
         {/* ── Footer ─────────────────────────────────────────────────── */}
@@ -688,6 +765,7 @@ export default function HomePage() {
               <Link href="/explore"  className="font-ui text-[12px] text-on-surface-muted hover:text-on-surface transition-colors">Explorar</Link>
               <Link href="/client"   className="font-ui text-[12px] text-on-surface-muted hover:text-on-surface transition-colors">Mis citas</Link>
               <Link href="/login"    className="font-ui text-[12px] text-on-surface-muted hover:text-on-surface transition-colors">Para profesionales</Link>
+              <Link href="/sobre"    className="font-ui text-[12px] text-on-surface-muted hover:text-on-surface transition-colors">Qué es GetMusa</Link>
               <a href="https://www.instagram.com/getmusa.app" target="_blank" rel="noopener noreferrer" aria-label="Musa en Instagram" className="text-on-surface-muted hover:text-primary transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-[15px] h-[15px]" aria-hidden="true">
                   <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
@@ -706,5 +784,6 @@ export default function HomePage() {
         </footer>
       </main>
     </div>
+    </>
   );
 }

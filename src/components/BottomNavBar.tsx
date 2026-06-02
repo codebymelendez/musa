@@ -40,11 +40,19 @@ const HIDDEN_PATHS = [
   "/onboarding",
   "/forgot-password",
   "/reset-password",
+  "/sobre",
+  "/para-profesionales",
 ];
+
+const DISCOVERY_CITIES = ["maracaibo", "valencia", "caracas", "barquisimeto", "maracay"];
 
 export default function BottomNavBar() {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
+
+  const isDiscovery = DISCOVERY_CITIES.some(
+    (c) => pathname === `/${c}` || pathname.startsWith(`/${c}/`)
+  );
 
   const isHidden =
     HIDDEN_PATHS.includes(pathname) ||
@@ -53,7 +61,8 @@ export default function BottomNavBar() {
     pathname.startsWith("/staff/join") ||
     pathname.startsWith("/explore") ||
     (pathname === "/client" || pathname.startsWith("/client/")) ||
-    pathname.startsWith("/cita/");
+    pathname.startsWith("/cita/") ||
+    isDiscovery;
 
   if (isHidden) return null;
 

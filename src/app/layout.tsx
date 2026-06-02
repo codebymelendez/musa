@@ -67,6 +67,34 @@ export default function RootLayout({
         <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml" />
         <link rel="icon" href="/favicon.png" type="image/png" sizes="32x32" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
+        {/* Hreflang + geo country signals */}
+        <link rel="alternate" hrefLang="es-VE" href="https://getmusa.app/" />
+        <link rel="alternate" hrefLang="es" href="https://getmusa.app/" />
+        <meta name="geo.region" content="VE" />
+        <meta name="geo.placename" content="Venezuela" />
+        {/* Organization schema — sitewide */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              name: "GetMusa",
+              alternateName: "Musa",
+              url: "https://getmusa.app",
+              logo: "https://getmusa.app/brand/wordmark.svg",
+              description:
+                "GetMusa es la primera plataforma de reservas de belleza en Venezuela. Conecta clientas con manicuristas, estilistas y especialistas de belleza en Maracaibo, Valencia y Caracas.",
+              foundingDate: "2025",
+              foundingLocation: { "@type": "Place", name: "Venezuela" },
+              areaServed: { "@type": "Country", name: "Venezuela" },
+              sameAs: [
+                "https://www.instagram.com/getmusa.app",
+                "https://www.linkedin.com/company/getmusa",
+              ],
+            }),
+          }}
+        />
       </head>
       <body
         className={`${cormorant.variable} ${dmSans.variable} ${dmMono.variable} font-body antialiased min-h-screen pb-32 tap-highlight-transparent`}
