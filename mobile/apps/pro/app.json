@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "MUSA Pro",
+    "slug": "getmusa-pro",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "getmusa-pro",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#34271E"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.getmusa.pro",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "app.getmusa.pro",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#34271E"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-notifications",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "Permite a MUSA Pro acceder a Face ID"
+        }
+      ],
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "b4250c86-c967-4280-a93b-1f010293accc"
+      }
+    },
+    "owner": "codebymelendezs-team"
+  }
+}

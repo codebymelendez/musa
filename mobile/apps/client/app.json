@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "MUSA",
+    "slug": "getmusa-client",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "getmusa-client",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#34271E"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.getmusa.client",
+      "buildNumber": "1"
+    },
+    "android": {
+      "package": "app.getmusa.client",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#34271E"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-notifications",
+      [
+        "expo-secure-store",
+        { "faceIDPermission": "Permite a MUSA acceder a Face ID" }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": { "origin": false },
+      "eas": { "projectId": "85fde4f1-7d59-4967-8d06-c327a69f4950" }
+    },
+    "owner": "codebymelendezs-team"
+  }
+}

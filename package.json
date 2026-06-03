@@ -2,6 +2,7 @@
   "name": "musa",
   "version": "2.2.0",
   "private": true,
+  "workspaces": ["packages/*"],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
