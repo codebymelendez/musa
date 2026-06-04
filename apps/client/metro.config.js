@@ -2,7 +2,10 @@ const { getDefaultConfig } = require('expo/metro-config')
 const path = require('path')
 
 const projectRoot = __dirname
-const workspaceRoot = path.resolve(projectRoot, '../../..')
+const workspaceRoot = path.resolve(projectRoot, '../..')
+
+// Force Expo Router app root path for the Babel compiler in this monorepo
+process.env.EXPO_ROUTER_APP_ROOT = path.resolve(projectRoot, 'app')
 
 const config = getDefaultConfig(projectRoot)
 

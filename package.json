@@ -2,7 +2,7 @@
   "name": "musa",
   "version": "2.2.0",
   "private": true,
-  "workspaces": ["packages/*"],
+  "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -24,14 +24,17 @@
     "next": "16.2.0",
     "nodemailer": "^8.0.4",
     "qrcode": "^1.5.4",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
     "resend": "^6.12.4",
     "tailwind-merge": "^3.5.0",
     "twilio": "^6.0.2",
     "web-push": "^3.6.7",
     "zod": "^4.3.6",
-    "zustand": "^5.0.12"
+    "zustand": "^5.0.12",
+    "expo": "~54.0.0",
+    "expo-router": "~6.0.24",
+    "react-native": "0.81.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

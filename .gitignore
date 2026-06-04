@@ -3,8 +3,8 @@
 # dependencies
 /node_modules
 .next/
-mobile/apps/pro/node_modules/
-mobile/apps/client/node_modules/
+/apps/pro/node_modules/
+/apps/client/node_modules/
 graphify-out/manifest.json
 graphify-out/cost.json
 graphify-out/cache/

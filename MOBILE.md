@@ -15,7 +15,7 @@
 | Dos apps en stores | Sí — MUSA Pro (profesionales) + MUSA (clientas) | UX más limpia por perfil |
 | Backend | Reutilizar API de Next.js existente | Cero endpoints nuevos para el MVP |
 | Base de datos | Mismo Supabase, mismo schema | Extender PushSubscription para FCM |
-| Monorepo | Sí — mobile/ dentro del repo actual | Un solo lugar para todo |
+| Monorepo | Sí — apps/ + packages/ en el repo actual | Un solo lugar para todo |
 | Builds | Expo EAS (nube) | Windows + iPhone físico, sin Mac |
 | Dev diario | Expo Go en iPhone físico | Sin simulador iOS local |
 | Estado global | Zustand (mismo que web) | Consistencia entre codebases |
@@ -29,9 +29,9 @@
 
 ```
 musa/                              ← raíz del monorepo (repo actual)
-├── src/                           ← Next.js web (NO TOCAR desde mobile)
+├── src/                           ← Next.js web (NO TOCAR desde apps)
 ├── supabase/                      ← migrations compartidas
-├── packages/                      ← NUEVO: código compartido
+├── packages/                      ← código compartido
 │   ├── types/                     ← tipos TypeScript del schema
 │   │   ├── index.ts               ← exporta todo
 │   │   ├── business.ts
@@ -40,54 +40,56 @@ musa/                              ← raíz del monorepo (repo actual)
 │   │   ├── client.ts
 │   │   ├── service.ts
 │   │   └── notification.ts
-│   └── validators/                ← schemas Zod compartidos
-│       ├── index.ts
-│       ├── appointment.ts
-│       └── client.ts
-├── mobile/                        ← NUEVO: proyecto Expo
-│   ├── apps/
-│   │   ├── pro/                   ← MUSA Pro (profesionales)
-│   │   │   ├── app/               ← Expo Router pages
-│   │   │   │   ├── (auth)/        ← login, register
-│   │   │   │   ├── (tabs)/        ← agenda, clientes, stats, perfil
-│   │   │   │   └── _layout.tsx
-│   │   │   ├── components/
-│   │   │   ├── hooks/
-│   │   │   ├── lib/
-│   │   │   │   ├── supabase.ts    ← cliente Supabase (AsyncStorage)
-│   │   │   │   ├── auth.ts        ← Supabase Auth para profesionales
-│   │   │   │   └── api.ts         ← fetch helpers contra /api/
-│   │   │   ├── store/             ← Zustand stores
-│   │   │   ├── app.json           ← config Expo (bundle id, nombre)
-│   │   │   └── eas.json           ← perfiles de build
-│   │   └── client/                ← MUSA (clientas)
-│   │       ├── app/
-│   │       │   ├── (auth)/        ← verify (phone + name)
-│   │       │   ├── (tabs)/        ← explorar, mis citas, puntos
-│   │       │   └── _layout.tsx
-│   │       ├── components/
-│   │       ├── hooks/
-│   │       ├── lib/
-│   │       │   ├── supabase.ts    ← cliente Supabase (solo lectura pública)
-│   │       │   ├── clientAuth.ts  ← JWT propio (AsyncStorage en vez de localStorage)
-│   │       │   └── api.ts
-│   │       ├── store/
-│   │       ├── app.json
-│   │       └── eas.json
-│   └── shared/                    ← componentes UI compartidos entre las dos apps
+│   ├── validators/                ← schemas Zod compartidos
+│   │   ├── index.ts
+│   │   ├── appointment.ts
+│   │   └── client.ts
+│   ├── shared/                    ← componentes UI compartidos entre las dos apps
+│   │   ├── components/
+│   │   │   ├── AppointmentCard.tsx
+│   │   │   ├── ServiceBadge.tsx
+│   │   │   └── Avatar.tsx
+│   │   └── hooks/
+│   │       ├── useNotifications.ts
+│   │       └── usePushToken.ts
+│   ├── ui/                        ← componentes UI compartidos (placeholder)
+│   ├── core/                      ← auth, storage, constants (placeholder)
+│   └── api/                       ← fetch helpers y clientes de API (placeholder)
+├── apps/                          ← apps móviles Expo
+│   ├── pro/                       ← MUSA Pro (profesionales)
+│   │   ├── app/                   ← Expo Router pages
+│   │   │   ├── (auth)/            ← login, register
+│   │   │   ├── (tabs)/            ← agenda, clientes, stats, perfil
+│   │   │   └── _layout.tsx
+│   │   ├── components/
+│   │   ├── hooks/
+│   │   ├── lib/
+│   │   │   ├── supabase.ts        ← cliente Supabase (AsyncStorage)
+│   │   │   ├── auth.ts            ← Supabase Auth para profesionales
+│   │   │   └── api.ts             ← fetch helpers contra /api/
+│   │   ├── store/                 ← Zustand stores
+│   │   ├── app.json               ← config Expo (bundle id, nombre)
+│   │   └── eas.json               ← perfiles de build
+│   └── client/                    ← MUSA (clientas)
+│       ├── app/
+│       │   ├── (auth)/            ← verify (phone + name)
+│       │   ├── (tabs)/            ← explorar, mis citas, puntos
+│       │   └── _layout.tsx
 │       ├── components/
-│       │   ├── AppointmentCard.tsx
-│       │   ├── ServiceBadge.tsx
-│       │   └── Avatar.tsx
-│       └── hooks/
-│           ├── useNotifications.ts
-│           └── usePushToken.ts
+│       ├── hooks/
+│       ├── lib/
+│       │   ├── supabase.ts        ← cliente Supabase (solo lectura pública)
+│       │   ├── clientAuth.ts      ← JWT propio (AsyncStorage en vez de localStorage)
+│       │   └── api.ts
+│       ├── store/
+│       ├── app.json
+│       └── eas.json
 ├── .github/
 │   └── workflows/
 │       ├── deploy-web.yml         ← solo se dispara si cambia src/
-│       ├── deploy-pro.yml         ← solo si cambia mobile/apps/pro/
-│       └── deploy-client.yml      ← solo si cambia mobile/apps/client/
-├── package.json                   ← workspaces configurados
+│       ├── deploy-pro.yml         ← solo si cambia apps/pro/
+│       └── deploy-client.yml      ← solo si cambia apps/client/
+├── package.json                   ← workspaces: ["apps/*", "packages/*"]
 ├── CLAUDE.md                      ← guía Claude Code para la web
 ├── MOBILE.md                      ← este archivo
 └── MUSA_DESIGN_RULES.md
@@ -128,7 +130,7 @@ CREATE UNIQUE INDEX "PushSubscription_endpoint_key"
 ### Regla de negocio post-migración
 
 En `src/lib/notifications.ts` (web), al enviar notificaciones filtrar por `platform = 'web'`.
-En el nuevo `mobile/shared/hooks/useNotifications.ts`, registrar con `platform = 'ios' | 'android'`.
+En el nuevo `packages/shared/hooks/useNotifications.ts`, registrar con `platform = 'ios' | 'android'`.
 
 ---
 
@@ -137,7 +139,7 @@ En el nuevo `mobile/shared/hooks/useNotifications.ts`, registrar con `platform =
 ### MUSA Pro — profesionales (Supabase Auth)
 
 ```typescript
-// mobile/apps/pro/lib/supabase.ts
+// apps/pro/lib/supabase.ts
 import { createClient } from '@supabase/supabase-js'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { AppState } from 'react-native'
@@ -193,7 +195,7 @@ async function signInWithGoogle() {
 ### MUSA (clientas) — JWT propio
 
 ```typescript
-// mobile/apps/client/lib/clientAuth.ts
+// apps/client/lib/clientAuth.ts
 // MISMO algoritmo que src/lib/clientAuth.ts en la web
 // ÚNICO cambio: localStorage → AsyncStorage
 
@@ -229,7 +231,7 @@ export async function clearClientToken(): Promise<void> {
 
 ## Variables de entorno
 
-### MUSA Pro (`mobile/apps/pro/.env`)
+### MUSA Pro (`apps/pro/.env`)
 ```
 EXPO_PUBLIC_SUPABASE_URL=         # mismo que NEXT_PUBLIC_SUPABASE_URL
 EXPO_PUBLIC_SUPABASE_ANON_KEY=    # mismo que NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -237,7 +239,7 @@ EXPO_PUBLIC_API_URL=              # https://getmusa.app (prod) | http://IP_LOCAL
 EXPO_PUBLIC_APP_ENV=              # development | preview | production
 ```
 
-### MUSA Client (`mobile/apps/client/.env`)
+### MUSA Client (`apps/client/.env`)
 ```
 EXPO_PUBLIC_SUPABASE_URL=
 EXPO_PUBLIC_SUPABASE_ANON_KEY=
@@ -263,7 +265,7 @@ EXPO_PUBLIC_APP_ENV=
 
 ### Hook compartido
 ```typescript
-// mobile/shared/hooks/useNotifications.ts
+// packages/shared/hooks/useNotifications.ts
 import * as Notifications from 'expo-notifications'
 import { Platform } from 'react-native'
 
@@ -381,8 +383,8 @@ on:
   push:
     branches: [main]
     paths:
-      - 'mobile/apps/pro/**'
-      - 'mobile/shared/**'
+      - 'apps/pro/**'
+      - 'packages/shared/**'
       - 'packages/**'
 
 jobs:
@@ -394,12 +396,12 @@ jobs:
         with:
           node-version: 20
       - run: npm install -g eas-cli
-      - run: cd mobile/apps/pro && eas build --platform all --profile production --non-interactive
+      - run: cd apps/pro && eas build --platform all --profile production --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 ```
 
-### `deploy-client.yml` (nuevo — idéntico apuntando a mobile/apps/client)
+### `deploy-client.yml` (nuevo — idéntico apuntando a apps/client)
 
 ---
 
@@ -448,7 +450,7 @@ jobs:
 npm run dev                          # corre en localhost:3000
 
 # 2. En otra terminal, iniciar la app
-cd mobile/apps/pro                   # o /client
+cd apps/pro                   # o /client
 npx expo start
 
 # 3. En el iPhone: abrir Expo Go → escanear QR
@@ -482,15 +484,15 @@ eas submit --platform ios
 
 ---
 
-## Reglas para Claude Code al trabajar en mobile/
+## Reglas para Claude Code al trabajar en apps/
 
-1. **Nunca modificar `src/`** desde contexto de trabajo en mobile. Son codebases independientes.
+1. **Nunca modificar `src/`** desde contexto de trabajo en apps. Son codebases independientes.
 2. **Nunca usar `localStorage`** — siempre `AsyncStorage` o `expo-secure-store` para datos sensibles.
 3. **Nunca usar `window`, `document`, o APIs de browser** — React Native no tiene DOM.
 4. **Nunca importar de `@supabase/ssr`** — ese paquete es solo para Next.js. Usar `@supabase/supabase-js` directamente.
 5. **Siempre usar `EXPO_PUBLIC_`** como prefijo en variables de entorno que la app necesita en runtime.
-6. **Los tipos van en `packages/types/`**, no definirlos localmente en mobile si ya existen para la web.
-7. **Respetar `MUSA_DESIGN_RULES.md`** — los colores, tipografía y decisiones visuales aplican también a mobile. El color primario `#B5593E` y el sistema visual MUSA deben trasladarse a NativeWind.
+6. **Los tipos van en `packages/types/`**, no definirlos localmente en apps si ya existen para la web.
+7. **Respetar `MUSA_DESIGN_RULES.md`** — los colores, tipografía y decisiones visuales aplican también a las apps. El color primario `#B5593E` y el sistema visual MUSA deben trasladarse a NativeWind.
 8. **No crear endpoints nuevos** en `src/app/api/` para el MVP — consumir los existentes.
 9. **El campo `platform`** en `PushSubscription` siempre debe enviarse al registrar tokens. Nunca asumir que es web.
 10. **Expo Router file-based routing** — las rutas reflejan la estructura de carpetas en `app/`. Grupos con paréntesis `(tabs)` para tabs y `(auth)` para flujos de autenticación.
@@ -505,7 +507,7 @@ eas submit --platform ios
 | MUSA | `app.getmusa.client` | `app.getmusa.client` | `getmusa-client` | `getmusa-client` | MUSA — Reserva tu cita |
 
 > `extra.eas.projectId` en app.json de MUSA Pro está pendiente — se obtiene al
-> vincular el proyecto en expo.dev con `eas init` desde mobile/apps/pro/
+> vincular el proyecto en expo.dev con `eas init` desde apps/pro/
 
 ---
 
@@ -514,17 +516,20 @@ eas submit --platform ios
 - [x] Arquitectura definida
 - [x] Decisiones técnicas tomadas
 - [x] Schema de DB extendido (pendiente ejecutar migration en Supabase)
-- [x] Monorepo configurado (npm workspaces + packages/)
+- [x] Monorepo migrado — workspaces: ["apps/*", "packages/*"]
+- [x] apps/pro/ y apps/client/ en raíz (antes mobile/apps/)
+- [x] packages/shared/ consolidado junto a types/ y validators/
+- [x] packages/ui/, packages/core/, packages/api/ creados (placeholders)
 - [x] @musa/types v0.1.0 creado (business, user, appointment, client, service, notification, payment, plan)
 - [x] @musa/validators v0.1.0 creado (appointment, client)
-- [x] Proyecto Expo SDK 55 creado para MUSA Pro (mobile/apps/pro)
+- [x] Proyecto Expo SDK 55 creado para MUSA Pro (apps/pro)
 - [x] Scaffolding de pantallas placeholder creado (auth + tabs)
 - [x] lib/supabase.ts creado con AsyncStorage y AppState listener
 - [x] React Native 0.83.1 + React 19.2.4 — instalación limpia sin conflictos
 - [x] Cuentas en stores (Google Play $25 ✓ | Apple Developer $99/año ✓) — en verificación
 - [x] EXPO_TOKEN configurado en GitHub Actions secrets
 - [ ] Migration SQL ejecutada en Supabase (PushSubscription + FCM)
-- [ ] Proyecto Expo creado para MUSA (clientas) — mobile/apps/client
+- [ ] Proyecto Expo creado para MUSA (clientas) — apps/client
 - [ ] Primera pantalla funcional: login con Google OAuth en MUSA Pro
 - [ ] Firebase configurado (FCM)
 - [ ] GitHub Actions workflows configurados
@@ -532,4 +537,4 @@ eas submit --platform ios
 
 ---
 
-*Última actualización: Junio 2026 — codebymelendez.com — v0.2.0 (monorepo funcional, Expo SDK 55)*
+*Última actualización: Junio 2026 — codebymelendez.com — v0.3.0 (monorepo migrado: apps/* + packages/*)*
