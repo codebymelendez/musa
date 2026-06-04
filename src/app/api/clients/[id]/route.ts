@@ -30,6 +30,41 @@ async function getBusinessId(supabase: any, userId: string) {
   return data?.businessId as string | null;
 }
 
+// GET /api/clients/[id] — ficha completa con historial
+export async function GET(req: NextRequest, { params }: Params) {
+  const session = await getSession(req);
+  if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  const { id } = await params;
+
+  try {
+    const admin = createAdminClient();
+    const businessId = await getBusinessId(admin, session.userId);
+    if (!businessId) return NextResponse.json({ error: "Sin negocio" }, { status: 400 });
+
+    const { data: client, error } = await admin
+      .from("Client")
+      .select("*, appointments:Appointment(*, service:Service(*))")
+      .eq("id", id)
+      .eq("businessId", businessId)
+      .single();
+
+    if (error || !client) return NextResponse.json({ error: "Clienta no encontrada" }, { status: 404 });
+
+    const sorted = {
+      ...client,
+      appointments: (client.appointments || []).sort(
+        (a: any, b: any) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+      ),
+    };
+
+    return NextResponse.json(sorted);
+  } catch (err) {
+    console.error("[client GET]", err);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  }
+}
+
 // PATCH /api/clients/[id] — editar clienta
 export async function PATCH(req: NextRequest, { params }: Params) {
   const session = await getSession(req);

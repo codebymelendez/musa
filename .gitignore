@@ -5,6 +5,7 @@
 .next/
 /apps/pro/node_modules/
 /apps/client/node_modules/
+/graphify-out/
 graphify-out/manifest.json
 graphify-out/cost.json
 graphify-out/cache/

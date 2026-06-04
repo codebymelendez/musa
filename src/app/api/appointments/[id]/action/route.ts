@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase-server";
+import { getSession } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { sendClientNotification } from "@/lib/notifications";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, { params }: Params) {
+  const session = await getSession(req);
+  if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
   const { id } = await params;
   const action = req.nextUrl.searchParams.get("action");
 
@@ -13,11 +17,12 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { data: appointment } = await supabase
-      .from('Appointment')
-      .select('*, service:Service(*), user:User(*), client:Client(*)')
-      .eq('id', id)
+      .from("Appointment")
+      .select("*, service:Service(*), user:User(*), client:Client(*)")
+      .eq("id", id)
+      .eq("userId", session.userId)
       .single();
 
     if (!appointment) {
@@ -27,24 +32,21 @@ export async function POST(req: NextRequest, { params }: Params) {
     const newStatus = action === "confirm" ? "confirmed" : "cancelled";
 
     const { error: updateError } = await supabase
-      .from('Appointment')
+      .from("Appointment")
       .update({ status: newStatus })
-      .eq('id', id);
+      .eq("id", id);
 
     if (updateError) throw updateError;
 
-    // Notificar al profesional del cambio
-    const startTime = new Date(appointment.startTime);
-    const startStr = startTime.toLocaleTimeString("es-VE", {
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: "America/Caracas",
-    });
-
     if (action === "cancel") {
+      const startStr = new Date(appointment.startTime).toLocaleTimeString("es-VE", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "America/Caracas",
+      });
       await sendClientNotification(appointment.clientId, {
         title: "Cita cancelada",
-        body: `Tu cita de ${appointment.service.name} el ${startStr} fue cancelada.`,
+        body: `Tu cita de ${appointment.service.name} a las ${startStr} fue cancelada.`,
         url: `/p/${appointment.user.slug}`,
       });
     }

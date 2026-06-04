@@ -25,7 +25,10 @@ export default function LoginScreen() {
       setLoading(true)
       setError(null)
 
-      const redirectUrl = makeRedirectUri({ scheme: 'getmusa-pro' })
+      // Expo Go no registra schemes nativos — usa exp+<slug>://
+      // El build standalone usa el scheme real: getmusa-pro://
+      const scheme = __DEV__ ? 'exp+getmusa-pro' : 'getmusa-pro'
+      const redirectUrl = makeRedirectUri({ scheme })
 
       const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -40,11 +43,26 @@ export default function LoginScreen() {
 
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl)
 
-      if (result.type === 'cancel' || result.type === 'dismiss') {
+      if (result.type === 'success') {
+        // Supabase devuelve tokens en el fragment: #access_token=...&refresh_token=...
+        const fragment = result.url.split('#')[1] ?? ''
+        const params = new URLSearchParams(fragment)
+        const access_token = params.get('access_token')
+        const refresh_token = params.get('refresh_token')
+
+        if (access_token && refresh_token) {
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token,
+            refresh_token,
+          })
+          if (sessionError) throw sessionError
+          // onAuthStateChange en _layout.tsx detecta la sesión y redirige a /(tabs)/calendar
+        } else {
+          throw new Error('Tokens no encontrados en la respuesta')
+        }
+      } else if (result.type === 'cancel' || result.type === 'dismiss') {
         setError('La autenticación fue cancelada.')
       }
-      // Si type === 'success' Supabase procesa el token vía deep link
-      // y onAuthStateChange en _layout.tsx redirige automáticamente
     } catch {
       setError('No se pudo iniciar sesión con Google. Intenta de nuevo.')
     } finally {
