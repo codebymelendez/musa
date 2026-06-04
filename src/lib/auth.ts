@@ -4,9 +4,23 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "./supabase-server";
+import { createAdminClient } from "./supabase-admin";
 
 export async function getSession(req?: NextRequest, res?: NextResponse) {
   try {
+    // Mobile clients send the Supabase JWT as a Bearer token (no cookies)
+    if (req) {
+      const authHeader = req.headers.get("authorization");
+      if (authHeader?.startsWith("Bearer ")) {
+        const token = authHeader.slice(7);
+        const { data: { user }, error } = await createAdminClient().auth.getUser(token);
+        if (!error && user) {
+          return { userId: user.id, phone: user.phone || "", email: user.email };
+        }
+      }
+    }
+
+    // Web clients use Supabase SSR cookie auth
     const supabase = await createClient(req, res);
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error || !user) return null;

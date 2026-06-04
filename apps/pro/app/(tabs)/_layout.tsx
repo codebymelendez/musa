@@ -1,4 +1,14 @@
 import { Tabs } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
+
+type IoniconName = React.ComponentProps<typeof Ionicons>['name']
+
+const TABS: { name: string; title: string; icon: IoniconName }[] = [
+  { name: 'calendar',  title: 'Agenda',        icon: 'calendar-outline'   },
+  { name: 'clients',   title: 'Clientes',       icon: 'people-outline'     },
+  { name: 'stats',     title: 'Estadísticas',   icon: 'bar-chart-outline'  },
+  { name: 'profile',   title: 'Perfil',         icon: 'person-outline'     },
+]
 
 export default function TabsLayout() {
   return (
@@ -6,14 +16,31 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: '#B5593E',
-        tabBarInactiveTintColor: '#888',
-        tabBarStyle: { backgroundColor: '#fff' },
+        tabBarInactiveTintColor: '#AAAAAA',
+        tabBarStyle: {
+          backgroundColor: '#FFFFFF',
+          borderTopWidth: 1,
+          borderTopColor: '#EDE8E4',
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '500',
+          marginBottom: 2,
+        },
       }}
     >
-      <Tabs.Screen name="calendar" options={{ title: 'Agenda' }} />
-      <Tabs.Screen name="clients" options={{ title: 'Clientes' }} />
-      <Tabs.Screen name="stats" options={{ title: 'Estadísticas' }} />
-      <Tabs.Screen name="profile" options={{ title: 'Perfil' }} />
+      {TABS.map(({ name, title, icon }) => (
+        <Tabs.Screen
+          key={name}
+          name={name}
+          options={{
+            title,
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name={icon} size={size} color={color} />
+            ),
+          }}
+        />
+      ))}
     </Tabs>
   )
 }
