@@ -188,7 +188,14 @@ export interface SettingsData {
   bio: string | null
   avatarUrl: string | null
   businessId: string | null
-  business: { id: string; name: string; slug: string; city: string | null } | null
+  business: {
+    id: string; name: string; slug: string; city: string | null;
+    address?: string | null; description?: string | null;
+    whatsapp?: string | null; instagram?: string | null;
+    plan?: { name: string; limits?: { maxMonthlyAppointments?: number; maxStaff?: number } } | null;
+    users?: TeamMember[];
+    invitations?: TeamInvitation[];
+  } | null
   settings: {
     workDays: number[]    // [0-6] where 0=Sunday
     startHour: number     // HHMM e.g. 800 = 08:00
@@ -212,6 +219,10 @@ export interface SettingsPatch {
   name?: string
   bio?: string
   businessName?: string
+  businessAddress?: string
+  businessDescription?: string
+  businessWhatsapp?: string
+  businessInstagram?: string
   settings?: {
     workDays?: number[]
     startHour?: number
@@ -241,6 +252,7 @@ export interface ServiceItem {
   price: number
   currency: string
   category: string
+  description?: string | null
 }
 
 export async function getServices(): Promise<ServiceItem[]> {
@@ -250,4 +262,256 @@ export async function getServices(): Promise<ServiceItem[]> {
   if (res.status === 401) { await handle401(); return [] }
   if (!res.ok) return []
   return res.json()
+}
+
+export async function createService(data: {
+  name: string; durationMin: number; price: number;
+  description?: string; category?: string;
+}): Promise<ServiceItem> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); throw new Error('No auth') }
+  const res = await fetch(`${API_URL}/api/services`, {
+    method: 'POST', headers, body: JSON.stringify(data),
+  })
+  if (res.status === 401) { await handle401(); throw new Error('Unauthorized') }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}
+
+export async function updateService(id: string, data: Partial<{
+  name: string; durationMin: number; price: number;
+  description: string; category: string;
+}>): Promise<void> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); return }
+  const res = await fetch(`${API_URL}/api/services/${id}`, {
+    method: 'PATCH', headers, body: JSON.stringify(data),
+  })
+  if (res.status === 401) { await handle401(); return }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+}
+
+export async function deleteService(id: string): Promise<void> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); return }
+  const res = await fetch(`${API_URL}/api/services/${id}`, { method: 'DELETE', headers })
+  if (res.status === 401) { await handle401(); return }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+}
+
+// ─── Create Appointment ───────────────────────────────────────────────────────
+
+export async function createAppointment(data: {
+  clientId?: string | null
+  serviceId: string
+  startTime: string
+  endTime: string
+  notes?: string
+  status?: string
+}): Promise<{ id: string }> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); throw new Error('No auth') }
+  const res = await fetch(`${API_URL}/api/appointments`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ status: 'confirmed', ...data }),
+  })
+  if (res.status === 401) { await handle401(); throw new Error('Unauthorized') }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}
+
+// ─── Promotions ───────────────────────────────────────────────────────────────
+
+export interface PromotionItem {
+  id: string
+  title: string
+  description: string | null
+  discount: number
+  validFrom: string | null
+  validUntil: string | null
+  isActive: boolean
+  createdAt: string
+}
+
+export async function getPromotions(): Promise<PromotionItem[]> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); return [] }
+  const res = await fetch(`${API_URL}/api/promotions`, { headers })
+  if (res.status === 401) { await handle401(); return [] }
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function createPromotion(data: {
+  title: string; description?: string; discount: number;
+  validFrom?: string; validUntil?: string; isActive: boolean;
+}): Promise<PromotionItem> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); throw new Error('No auth') }
+  const res = await fetch(`${API_URL}/api/promotions`, {
+    method: 'POST', headers, body: JSON.stringify(data),
+  })
+  if (res.status === 401) { await handle401(); throw new Error('Unauthorized') }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}
+
+export async function updatePromotion(id: string, data: Partial<{
+  title: string; description: string; discount: number;
+  validFrom: string; validUntil: string; isActive: boolean;
+}>): Promise<void> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); return }
+  const res = await fetch(`${API_URL}/api/promotions/${id}`, {
+    method: 'PATCH', headers, body: JSON.stringify(data),
+  })
+  if (res.status === 401) { await handle401(); return }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+}
+
+export async function deletePromotion(id: string): Promise<void> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); return }
+  const res = await fetch(`${API_URL}/api/promotions/${id}`, { method: 'DELETE', headers })
+  if (res.status === 401) { await handle401(); return }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+}
+
+export async function broadcastPromotion(promotionId: string): Promise<void> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); return }
+  const res = await fetch(`${API_URL}/api/promotions/broadcast`, {
+    method: 'POST', headers, body: JSON.stringify({ promotionId }),
+  })
+  if (res.status === 401) { await handle401(); return }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+}
+
+// ─── Team ─────────────────────────────────────────────────────────────────────
+
+export interface TeamMember {
+  id: string; name: string; email: string; appRole: string; createdAt: string;
+}
+
+export interface TeamInvitation {
+  id: string; email: string; createdAt: string; status: string;
+}
+
+export async function inviteTeamMember(email: string): Promise<void> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); return }
+  const res = await fetch(`${API_URL}/api/team/invite`, {
+    method: 'POST', headers, body: JSON.stringify({ email, role: 'STAFF' }),
+  })
+  if (res.status === 401) { await handle401(); return }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+}
+
+// ─── Loyalty ─────────────────────────────────────────────────────────────────
+
+export interface LoyaltyProgram {
+  id: string
+  businessId: string
+  name: string
+  isActive: boolean
+  accumulationType: 'visits' | 'points'
+  pointsPerVisit: number
+  rewardThreshold: number
+  rewardDescription: string
+  validUntil: string | null
+  updatedAt: string
+}
+
+export interface LoyaltyAccount {
+  id: string
+  clientId: string
+  businessId: string
+  totalPoints: number
+  lifetimePoints: number
+  qrToken: string | null
+  createdAt: string
+  updatedAt: string
+  client: { id: string; name: string; phone: string; email?: string | null } | null
+  program: {
+    id: string; name: string; rewardThreshold: number; pointsPerVisit: number;
+    accumulationType: string; rewardDescription: string; isActive: boolean
+  } | null
+}
+
+export async function getLoyaltyProgram(): Promise<LoyaltyProgram | null> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); return null }
+  const res = await fetch(`${API_URL}/api/loyalty/program`, { headers })
+  if (res.status === 401) { await handle401(); return null }
+  if (!res.ok) return null
+  const json = await res.json()
+  return json.program ?? null
+}
+
+export async function saveLoyaltyProgram(data: {
+  name?: string
+  isActive?: boolean
+  accumulationType?: 'visits' | 'points'
+  pointsPerVisit?: number
+  rewardThreshold?: number
+  rewardDescription?: string
+  validUntil?: string | null
+}): Promise<LoyaltyProgram> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); throw new Error('No auth') }
+  const res = await fetch(`${API_URL}/api/loyalty/program`, {
+    method: 'POST', headers, body: JSON.stringify(data),
+  })
+  if (res.status === 401) { await handle401(); throw new Error('Unauthorized') }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`)
+  }
+  const json = await res.json()
+  return json.program
+}
+
+export async function getLoyaltyAccounts(): Promise<LoyaltyAccount[]> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); return [] }
+  const res = await fetch(`${API_URL}/api/loyalty/accounts`, { headers })
+  if (res.status === 401) { await handle401(); return [] }
+  if (!res.ok) return []
+  const json = await res.json()
+  return json.accounts ?? []
+}
+
+export async function findLoyaltyAccountByClientId(clientId: string): Promise<LoyaltyAccount | null> {
+  const accounts = await getLoyaltyAccounts()
+  return accounts.find(a => a.clientId === clientId) ?? null
+}
+
+export async function redeemLoyaltyReward(accountId: string): Promise<{ redemptionId: string; pointsUsed: number }> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); throw new Error('No auth') }
+  const res = await fetch(`${API_URL}/api/loyalty/redeem`, {
+    method: 'POST', headers, body: JSON.stringify({ accountId }),
+  })
+  if (res.status === 401) { await handle401(); throw new Error('Unauthorized') }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+// ─── Time slot helper ────────────────────────────────────────────────────────
+
+export function generateTimeSlots(startHour: number, endHour: number, slotMin: number): string[] {
+  const slots: string[] = []
+  let h = Math.floor(startHour / 100)
+  let m = startHour % 100
+  const endMinutes = Math.floor(endHour / 100) * 60 + (endHour % 100)
+  while (h * 60 + m < endMinutes) {
+    slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
+    const total = h * 60 + m + slotMin
+    h = Math.floor(total / 60)
+    m = total % 60
+  }
+  return slots
 }

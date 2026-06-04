@@ -2,12 +2,16 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Linking, Modal, RefreshControl,
-  KeyboardAvoidingView, Platform, Animated,
+  KeyboardAvoidingView, Platform, Animated, Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, router } from 'expo-router'
-import { getClientById, updateClientNotes, type ClientItem, type AppointmentStatus } from '../../lib/api'
+import {
+  getClientById, updateClientNotes,
+  getLoyaltyProgram, findLoyaltyAccountByClientId, redeemLoyaltyReward,
+  type ClientItem, type AppointmentStatus, type LoyaltyProgram, type LoyaltyAccount,
+} from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials, formatTime, formatShortDate, formatMoney } from '../../lib/utils'
 
 // ─── status pill (mini) ───────────────────────────────────────────────────────
@@ -27,6 +31,82 @@ function MiniPill({ status }: { status: AppointmentStatus }) {
   return (
     <View style={[styles.pill, { backgroundColor: bg }]}>
       <Text style={[styles.pillText, { color: text }]}>{STATUS_LABEL[status]}</Text>
+    </View>
+  )
+}
+
+// ─── loyalty section ──────────────────────────────────────────────────────────
+
+function LoyaltySection({
+  program, account, onRedeem,
+}: {
+  program: LoyaltyProgram
+  account: LoyaltyAccount | null
+  onRedeem: () => void
+}) {
+  const totalPoints = account?.totalPoints ?? 0
+  const threshold = program.rewardThreshold
+  const progress = Math.min(1, totalPoints / threshold)
+  const canRedeem = totalPoints >= threshold
+
+  return (
+    <View style={styles.sectionBlock}>
+      <Text style={styles.sectionTitle}>Fidelidad</Text>
+
+      {/* Points hero */}
+      <View style={styles.loyaltyHero}>
+        <View style={styles.loyaltyPointsBox}>
+          <Text style={[styles.loyaltyPoints, { fontFamily: MONO }]}>{totalPoints}</Text>
+          <Text style={styles.loyaltyPointsLabel}>puntos</Text>
+        </View>
+        {account?.lifetimePoints != null && account.lifetimePoints > 0 && (
+          <View style={styles.loyaltyLifetime}>
+            <Text style={styles.loyaltyLifetimeLabel}>Total histórico</Text>
+            <Text style={[styles.loyaltyLifetimeValue, { fontFamily: MONO }]}>
+              {account.lifetimePoints}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Progress bar */}
+      <View style={styles.progressSection}>
+        <View style={styles.progressBar}>
+          <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+        </View>
+        <Text style={styles.progressLabel}>
+          {canRedeem
+            ? '¡Lista para canjear su premio!'
+            : `${totalPoints} / ${threshold} puntos para el próximo premio`}
+        </Text>
+      </View>
+
+      {/* Reward description */}
+      {program.rewardDescription ? (
+        <View style={styles.rewardRow}>
+          <Ionicons name="gift-outline" size={15} color={PRIMARY} />
+          <Text style={styles.rewardText}>{program.rewardDescription}</Text>
+        </View>
+      ) : null}
+
+      {/* Redeem button */}
+      {canRedeem && account && (
+        <TouchableOpacity
+          style={styles.redeemBtn}
+          onPress={onRedeem}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+          <Text style={styles.redeemBtnText}>Registrar canje</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* No account yet */}
+      {!account && (
+        <Text style={styles.noAccountHint}>
+          Esta clienta aún no tiene puntos acumulados
+        </Text>
+      )}
     </View>
   )
 }
@@ -84,11 +164,7 @@ function NotesModal({
             placeholderTextColor="#AAAAAA"
             textAlignVertical="top"
           />
-          <TouchableOpacity
-            style={styles.btnPrimary}
-            onPress={() => onSave(value)}
-            activeOpacity={0.85}
-          >
+          <TouchableOpacity style={styles.btnPrimary} onPress={() => onSave(value)} activeOpacity={0.85}>
             <Text style={styles.btnPrimaryText}>Guardar notas</Text>
           </TouchableOpacity>
         </View>
@@ -108,12 +184,23 @@ export default function ClientDetailScreen() {
   const [notesModal, setNotesModal] = useState(false)
   const [saving, setSaving] = useState(false)
 
+  // loyalty state
+  const [loyaltyProgram, setLoyaltyProgram] = useState<LoyaltyProgram | null>(null)
+  const [loyaltyAccount, setLoyaltyAccount] = useState<LoyaltyAccount | null>(null)
+  const [redeeming, setRedeeming] = useState(false)
+
   const load = useCallback(async () => {
     if (!id) return
     setState({ kind: 'loading' })
     try {
-      const data = await getClientById(id)
+      const [data, program, account] = await Promise.all([
+        getClientById(id),
+        getLoyaltyProgram(),
+        findLoyaltyAccountByClientId(id),
+      ])
       setState(data ? { kind: 'ok', data } : { kind: 'error' })
+      setLoyaltyProgram(program)
+      setLoyaltyAccount(account)
     } catch { setState({ kind: 'error' }) }
   }, [id])
 
@@ -127,23 +214,56 @@ export default function ClientDetailScreen() {
       await updateClientNotes(id, notes)
       setState(prev => prev.kind === 'ok' ? { ...prev, data: { ...prev.data, notes } } : prev)
       setNotesModal(false)
-    } catch { /* silently fail — could show toast */ }
+    } catch { /* silently fail */ }
     finally { setSaving(false) }
   }
 
+  function handleRedeem() {
+    if (!loyaltyAccount || !loyaltyProgram) return
+    Alert.alert(
+      'Registrar canje',
+      `¿Confirmas el canje de ${loyaltyProgram.rewardThreshold} puntos por "${loyaltyProgram.rewardDescription}"?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Confirmar canje',
+          onPress: async () => {
+            setRedeeming(true)
+            try {
+              const result = await redeemLoyaltyReward(loyaltyAccount.id)
+              // update local points
+              setLoyaltyAccount(prev => prev
+                ? { ...prev, totalPoints: prev.totalPoints - result.pointsUsed }
+                : prev
+              )
+              Alert.alert('', `¡Canje registrado! Se descontaron ${result.pointsUsed} puntos.`)
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : 'Error al registrar el canje'
+              Alert.alert('Error', msg)
+            } finally { setRedeeming(false) }
+          },
+        },
+      ]
+    )
+  }
+
   const title = state.kind === 'ok' ? state.data.name : 'Clienta'
+  const showLoyalty = loyaltyProgram?.isActive === true
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="chevron-back-outline" size={24} color={DARK} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
         <View style={styles.backBtn} />
       </View>
 
-      {state.kind === 'loading' && <ScrollView contentContainerStyle={styles.content}><Skeleton /></ScrollView>}
+      {state.kind === 'loading' && (
+        <ScrollView contentContainerStyle={styles.content}><Skeleton /></ScrollView>
+      )}
 
       {state.kind === 'error' && (
         <View style={styles.centerState}>
@@ -177,8 +297,6 @@ export default function ClientDetailScreen() {
                   <Ionicons name="call-outline" size={16} color={PRIMARY} />
                   <Text style={styles.phoneText}>{c.phone}</Text>
                 </TouchableOpacity>
-
-                {/* Tags */}
                 {c.tags && c.tags.length > 0 && (
                   <View style={styles.tagsRow}>
                     {c.tags.map((tag, i) => (
@@ -189,6 +307,15 @@ export default function ClientDetailScreen() {
                   </View>
                 )}
               </View>
+
+              {/* Loyalty — visible solo si el programa está activo */}
+              {showLoyalty && loyaltyProgram && (
+                <LoyaltySection
+                  program={loyaltyProgram}
+                  account={loyaltyAccount}
+                  onRedeem={handleRedeem}
+                />
+              )}
 
               {/* Appointment history */}
               <View style={styles.sectionBlock}>
@@ -224,7 +351,8 @@ export default function ClientDetailScreen() {
               <View style={styles.sectionBlock}>
                 <View style={styles.sectionRow}>
                   <Text style={styles.sectionTitle}>Notas</Text>
-                  <TouchableOpacity onPress={() => setNotesModal(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <TouchableOpacity onPress={() => setNotesModal(true)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <Text style={styles.editLink}>Editar</Text>
                   </TouchableOpacity>
                 </View>
@@ -248,7 +376,7 @@ export default function ClientDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FAFAF9' },
+  safe: { flex: 1, backgroundColor: SURFACE },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 8, paddingVertical: 12,
@@ -310,4 +438,26 @@ const styles = StyleSheet.create({
   skeletonWrap: { alignItems: 'center', paddingTop: 16 },
   skeletonAvatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#F0EDE9' },
   skeletonLine: { height: 14, backgroundColor: '#F0EDE9', borderRadius: 6, alignSelf: 'stretch' },
+  // loyalty
+  loyaltyHero: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  loyaltyPointsBox: { alignItems: 'flex-start' },
+  loyaltyPoints: { fontSize: 40, fontWeight: '500', color: PRIMARY, lineHeight: 44 },
+  loyaltyPointsLabel: { fontSize: 12, color: GRAY, marginTop: 2 },
+  loyaltyLifetime: { alignItems: 'flex-end' },
+  loyaltyLifetimeLabel: { fontSize: 11, color: GRAY },
+  loyaltyLifetimeValue: { fontSize: 18, fontWeight: '500', color: DARK },
+  progressSection: { marginBottom: 14 },
+  progressBar: {
+    height: 6, borderRadius: 3, backgroundColor: '#EDE8E4', overflow: 'hidden', marginBottom: 6,
+  },
+  progressFill: { height: '100%', backgroundColor: PRIMARY, borderRadius: 3 },
+  progressLabel: { fontSize: 12, color: GRAY },
+  rewardRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },
+  rewardText: { flex: 1, fontSize: 14, color: DARK },
+  redeemBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    height: 48, backgroundColor: PRIMARY, borderRadius: 24,
+  },
+  redeemBtnText: { color: '#fff', fontSize: 15, fontWeight: '500' },
+  noAccountHint: { fontSize: 13, color: '#BBBBBB', fontStyle: 'italic' },
 })

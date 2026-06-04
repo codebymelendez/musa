@@ -266,6 +266,16 @@ export default function CalendarScreen() {
             <AppointmentCard key={item.id} item={item} />
           ))}
       </ScrollView>
+
+      {/* ── FAB ── */}
+      <TouchableOpacity
+        style={fabStyle}
+        onPress={() => router.push('/appointments/new' as Parameters<typeof router.push>[0])}
+        activeOpacity={0.85}
+        accessibilityLabel="Nueva cita"
+      >
+        <Ionicons name="add" size={28} color="#fff" />
+      </TouchableOpacity>
     </SafeAreaView>
   )
 }
@@ -275,6 +285,15 @@ export default function CalendarScreen() {
 const PRIMARY = '#B5593E'
 const DARK    = '#34271E'
 const MONO    = Platform.select({ ios: 'Courier New', android: 'monospace' }) as string
+
+// FAB outside StyleSheet so it can use absolute positioning on top of ScrollView
+const fabStyle = StyleSheet.create({
+  fab: {
+    position: 'absolute', bottom: 24, right: 20, zIndex: 10,
+    width: 56, height: 56, borderRadius: 28,
+    backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center',
+  },
+}).fab
 
 // ─── styles ───────────────────────────────────────────────────────────────────
 
