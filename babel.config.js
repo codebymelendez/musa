@@ -1,5 +1,5 @@
 module.exports = function (api) {
-  api.cache(true)
+  api.cache.never()
 
   const isMetro = api.caller((caller) => caller && (caller.name === 'metro' || caller.bundler === 'metro'))
 
