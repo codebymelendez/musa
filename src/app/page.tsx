@@ -772,18 +772,15 @@ export default function HomePage() {
               </p>
 
               <div className="flex items-center justify-center gap-4 flex-wrap">
-                <div
-                  className="flex items-center gap-3.5 px-5 py-3 rounded-xl border bg-surface-raised text-left hover:border-primary transition-colors duration-200"
-                  style={{ borderColor: "#34271E" }}
-                >
-                  {/* Icono oficial Apple App Store */}
-                  <svg className="w-[22px] h-[22px] flex-shrink-0 text-[#34271E] fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M17.05 20.28c-.98 1.56-2.02 3.1-3.72 3.14-1.67.03-2.2-.97-4.1-.97-1.9 0-2.5.94-4.1.1C3.48 22.1 2 17.58 3.52 13.88c.76-1.84 2.45-3.01 4.31-3.04 1.4-.02 2.72.95 3.58.95.86 0 2.44-1.15 4.14-.98.71.03 2.71.28 3.99 2.15-.1.06-2.38 1.39-2.36 4.13.03 3.28 2.87 4.39 2.9 4.4-.02.08-.46 1.57-1.54 3.2zM14.03 4.22c.73-.88 1.22-2.11 1.08-3.34-1.05.04-2.33.7-3.08 1.58-.65.75-1.22 1.99-1.07 3.2 1.17.09 2.37-.58 3.07-1.44z"/>
-                  </svg>
-                  <div>
-                    <p className="font-ui text-[9px] text-on-surface-subtle uppercase tracking-wider leading-none mb-1">Próximamente en</p>
-                    <p className="font-ui font-semibold text-[15px] text-[#34271E] leading-none">App Store</p>
-                  </div>
+                <div className="flex-shrink-0 hover:scale-[1.02] transition-transform duration-200 cursor-default">
+                  {/* Badge oficial Apple App Store */}
+                  <Image
+                    src="/logo_app_store.svg"
+                    alt="App Store Badge"
+                    width={138}
+                    height={46}
+                    className="h-[46px] w-auto flex-shrink-0"
+                  />
                 </div>
 
                 <div
@@ -791,9 +788,13 @@ export default function HomePage() {
                   style={{ borderColor: "#34271E" }}
                 >
                   {/* Icono oficial Google Play Store */}
-                  <svg className="w-[22px] h-[22px] flex-shrink-0 text-[#34271E] fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M3.609 1.814L13.784 12l-10.175 10.186A1.85 1.85 0 0 1 3 20.79V3.21c0-.573.262-1.096.609-1.396zm11.231 9.13L18.423 8.9c.755-.436 1.4-.064 1.4.805v4.59c0 .87-.645 1.242-1.4.806l-3.583-2.043a1.057 1.057 0 0 1 0-1.814zM3.824 1.15l10.22 10.22 3.424-3.424L4.721.228A1.84 1.84 0 0 0 3.824 1.15zm9.64 12.062l-9.64 9.64c.294.286.678.368.897.242l12.748-7.284-4.005-2.598z"/>
-                  </svg>
+                  <Image
+                    src="/google-play.svg"
+                    alt="Google Play Logo"
+                    width={22}
+                    height={22}
+                    className="w-[22px] h-[22px] flex-shrink-0"
+                  />
                   <div>
                     <p className="font-ui text-[9px] text-on-surface-subtle uppercase tracking-wider leading-none mb-1">Próximamente en</p>
                     <p className="font-ui font-semibold text-[15px] text-[#34271E] leading-none">Google Play</p>
@@ -817,7 +818,10 @@ export default function HomePage() {
           {/* ── Footer ─────────────────────────────────────────────────── */}
           <footer className="border-t border-border-subtle py-8">
             <div className="max-w-6xl mx-auto px-5 md:px-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <Link href="/"><MusaLogo variant="wordmark" size="sm" /></Link>
+              <Link href="/" className="flex-shrink-0">
+                <span className="md:hidden"><MusaLogo variant="monogram" size="sm" /></span>
+                <span className="hidden md:inline-flex"><MusaLogo variant="combo" size="md" /></span>
+              </Link>
               <div className="flex items-center gap-5">
                 <Link href="/explore" className="font-ui text-[12px] text-on-surface-muted hover:text-on-surface transition-colors">Explorar</Link>
                 <Link href="/client" className="font-ui text-[12px] text-on-surface-muted hover:text-on-surface transition-colors">Mis citas</Link>
