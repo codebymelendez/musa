@@ -4,10 +4,11 @@ import { Ionicons } from '@expo/vector-icons'
 type IoniconName = React.ComponentProps<typeof Ionicons>['name']
 
 const TABS: { name: string; title: string; icon: IoniconName }[] = [
-  { name: 'calendar',  title: 'Agenda',        icon: 'calendar-outline'   },
-  { name: 'clients',   title: 'Clientes',       icon: 'people-outline'     },
-  { name: 'stats',     title: 'Estadísticas',   icon: 'bar-chart-outline'  },
-  { name: 'profile',   title: 'Perfil',         icon: 'person-outline'     },
+  { name: 'index',    title: 'Inicio',   icon: 'home-outline'      },
+  { name: 'calendar', title: 'Agenda',   icon: 'calendar-outline'  },
+  { name: 'clients',  title: 'Clientas', icon: 'people-outline'    },
+  { name: 'business', title: 'Negocio',  icon: 'briefcase-outline' },
+  { name: 'settings', title: 'Ajustes',  icon: 'settings-outline'  },
 ]
 
 export default function TabsLayout() {
@@ -41,6 +42,8 @@ export default function TabsLayout() {
           }}
         />
       ))}
+      {/* Accessible via router.push but not visible in tab bar */}
+      <Tabs.Screen name="stats" options={{ href: null }} />
     </Tabs>
   )
 }

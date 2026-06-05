@@ -1,91 +1,106 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-  Animated,
-  StyleSheet,
-  Platform,
+  View, Text, ScrollView, TouchableOpacity,
+  RefreshControl, Animated, StyleSheet, Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import {
-  getAppointments,
-  toVenezuelaDate,
-  type AppointmentItem,
-  type AppointmentStatus,
+  getAppointments, toVenezuelaDate,
+  type AppointmentItem, type AppointmentStatus,
 } from '../../lib/api'
+
+// ─── module-level cache (survives view switches) ──────────────────────────────
+
+const _cache = new Map<string, AppointmentItem[]>()
+
+// ─── constants ────────────────────────────────────────────────────────────────
+
+const PRIMARY = '#B5593E'
+const DARK    = '#34271E'
+const SERIF   = Platform.select({ ios: 'Georgia', android: 'serif' }) as string
+const MONO    = Platform.select({ ios: 'Courier New', android: 'monospace' }) as string
 
 // ─── date helpers ─────────────────────────────────────────────────────────────
 
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1)
-}
+function cap(s: string): string { return s.charAt(0).toUpperCase() + s.slice(1) }
 
-function formatWeekday(date: Date): string {
-  return capitalize(
-    new Intl.DateTimeFormat('es-ES', { weekday: 'long' }).format(date)
-  )
+function formatWeekday(d: Date): string {
+  return cap(new Intl.DateTimeFormat('es-ES', { weekday: 'long' }).format(d))
 }
-
-function formatFullDate(date: Date): string {
-  return new Intl.DateTimeFormat('es-ES', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(date)
+function formatFullDate(d: Date): string {
+  return new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).format(d)
 }
-
 function formatTime(iso: string): string {
   return new Intl.DateTimeFormat('es-VE', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: 'America/Caracas',
+    hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Caracas',
   }).format(new Date(iso))
 }
-
-function isToday(date: Date): boolean {
-  const now = new Date()
-  return (
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate()
-  )
+function isToday(d: Date): boolean {
+  const n = new Date()
+  return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate()
 }
-
-function addDays(date: Date, n: number): Date {
-  const d = new Date(date)
-  d.setDate(d.getDate() + n)
-  return d
+function addDays(d: Date, n: number): Date {
+  const r = new Date(d); r.setDate(r.getDate() + n); return r
+}
+function addMonths(d: Date, n: number): Date {
+  const r = new Date(d); r.setMonth(r.getMonth() + n); return r
+}
+function startOfWeek(d: Date): Date {
+  const r = new Date(d); r.setHours(0, 0, 0, 0)
+  const day = r.getDay()
+  r.setDate(r.getDate() + (day === 0 ? -6 : 1 - day))
+  return r
+}
+function weekDays(monday: Date): Date[] {
+  return Array.from({ length: 7 }, (_, i) => addDays(monday, i))
+}
+function monthCells(year: number, month: number): Date[] {
+  const first = new Date(year, month, 1)
+  const last  = new Date(year, month + 1, 0)
+  const offset = (first.getDay() === 0 ? 7 : first.getDay()) - 1
+  const cells: Date[] = []
+  for (let i = offset; i > 0; i--) cells.push(addDays(first, -i))
+  for (let d = 1; d <= last.getDate(); d++) cells.push(new Date(year, month, d))
+  let extra = 1
+  while (cells.length % 7 !== 0) cells.push(addDays(last, extra++))
+  return cells
+}
+function chunk<T>(arr: T[], n: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n))
+  return out
+}
+function weekRangeLabel(monday: Date): string {
+  const sunday = addDays(monday, 6)
+  const sm = new Intl.DateTimeFormat('es-ES', { month: 'short' }).format(monday)
+  const em = new Intl.DateTimeFormat('es-ES', { month: 'short' }).format(sunday)
+  const yr = sunday.getFullYear()
+  if (monday.getMonth() === sunday.getMonth())
+    return `${monday.getDate()} – ${sunday.getDate()} ${em} ${yr}`
+  return `${monday.getDate()} ${sm} – ${sunday.getDate()} ${em} ${yr}`
+}
+function monthLabel(d: Date): string {
+  return cap(new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' }).format(d))
 }
 
 // ─── status pill ─────────────────────────────────────────────────────────────
 
 const STATUS_LABEL: Record<AppointmentStatus, string> = {
-  confirmed: 'Confirmada',
-  pending:   'Pendiente',
-  cancelled: 'Cancelada',
-  completed: 'Completada',
+  confirmed: 'Confirmada', pending: 'Pendiente', cancelled: 'Cancelada', completed: 'Completada',
 }
-
 const STATUS_COLORS: Record<AppointmentStatus, { bg: string; text: string }> = {
   confirmed: { bg: '#E8F5E9', text: '#2E7D32' },
   pending:   { bg: '#FFF8E1', text: '#8B6914' },
   cancelled: { bg: '#FDECEA', text: '#C62828' },
   completed: { bg: '#F5F5F5', text: '#757575' },
 }
-
 function StatusPill({ status }: { status: AppointmentStatus }) {
   const { bg, text } = STATUS_COLORS[status]
   return (
-    <View style={[styles.pill, { backgroundColor: bg }]}>
-      <Text style={[styles.pillText, { color: text }]}>
-        {STATUS_LABEL[status]}
-      </Text>
+    <View style={[s.pill, { backgroundColor: bg }]}>
+      <Text style={[s.pillText, { color: text }]}>{STATUS_LABEL[status]}</Text>
     </View>
   )
 }
@@ -95,103 +110,201 @@ function StatusPill({ status }: { status: AppointmentStatus }) {
 function AppointmentCard({ item }: { item: AppointmentItem }) {
   return (
     <TouchableOpacity
-      style={styles.card}
+      style={s.card}
       onPress={() => router.push(`/appointments/${item.id}` as Parameters<typeof router.push>[0])}
       activeOpacity={0.72}
     >
-      <View style={styles.cardRow}>
-        <Text style={styles.timeText}>
-          {formatTime(item.startTime)} — {formatTime(item.endTime)}
-        </Text>
+      <View style={s.cardRow}>
+        <Text style={s.timeText}>{formatTime(item.startTime)} — {formatTime(item.endTime)}</Text>
         <StatusPill status={item.status} />
       </View>
-      <Text style={styles.clientName}>{item.client.name}</Text>
-      <Text style={styles.serviceName}>{item.service.name}</Text>
+      <Text style={s.clientName}>{item.client.name}</Text>
+      <Text style={s.serviceName}>{item.service.name}</Text>
     </TouchableOpacity>
   )
 }
 
-// ─── skeleton ────────────────────────────────────────────────────────────────
+// ─── skeleton / empty / error ─────────────────────────────────────────────────
 
 function SkeletonCards() {
   const opacity = useRef(new Animated.Value(0.45)).current
-
   useEffect(() => {
-    const anim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, {
-          toValue: 1,
-          duration: 750,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity, {
-          toValue: 0.45,
-          duration: 750,
-          useNativeDriver: true,
-        }),
-      ])
-    )
-    anim.start()
-    return () => anim.stop()
+    const a = Animated.loop(Animated.sequence([
+      Animated.timing(opacity, { toValue: 1, duration: 750, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 0.45, duration: 750, useNativeDriver: true }),
+    ]))
+    a.start(); return () => a.stop()
   }, [opacity])
-
   return (
     <>
       {[80, 55, 65].map((w, i) => (
-        <Animated.View key={i} style={[styles.skeletonCard, { opacity }]}>
-          <View style={[styles.skeletonLine, { width: `${w}%` }]} />
-          <View style={[styles.skeletonLine, { width: '50%', marginTop: 6 }]} />
-          <View style={[styles.skeletonLine, { width: '38%', marginTop: 4 }]} />
+        <Animated.View key={i} style={[s.skeletonCard, { opacity }]}>
+          <View style={[s.skeletonLine, { width: `${w}%` }]} />
+          <View style={[s.skeletonLine, { width: '50%', marginTop: 6 }]} />
+          <View style={[s.skeletonLine, { width: '38%', marginTop: 4 }]} />
         </Animated.View>
       ))}
     </>
   )
 }
-
-// ─── empty state ──────────────────────────────────────────────────────────────
-
-function EmptyState() {
+function EmptyDay() {
   return (
-    <View style={styles.centerState}>
+    <View style={s.centerState}>
       <Ionicons name="calendar-outline" size={52} color="#CCCCCC" />
-      <Text style={styles.emptyText}>Sin citas para este día</Text>
+      <Text style={s.emptyText}>Sin citas para este día</Text>
     </View>
   )
 }
-
-// ─── error state ─────────────────────────────────────────────────────────────
-
 function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
-    <View style={styles.centerState}>
-      <Text style={styles.errorText}>No se pudieron cargar las citas</Text>
-      <TouchableOpacity
-        style={styles.retryBtn}
-        onPress={onRetry}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.retryText}>Reintentar</Text>
+    <View style={s.centerState}>
+      <Text style={s.errorText}>No se pudieron cargar las citas</Text>
+      <TouchableOpacity style={s.retryBtn} onPress={onRetry} activeOpacity={0.85}>
+        <Text style={s.retryText}>Reintentar</Text>
       </TouchableOpacity>
     </View>
   )
 }
 
+// ─── shared day-label row ─────────────────────────────────────────────────────
+
+const WLABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
+
+// ─── week view ────────────────────────────────────────────────────────────────
+
+function WeekView({
+  weekStart, selectedDate, cacheVersion, onSelectDay,
+}: {
+  weekStart: Date; selectedDate: Date; cacheVersion: number; onSelectDay: (d: Date) => void
+}) {
+  const todayKey    = toVenezuelaDate(new Date())
+  const selectedKey = toVenezuelaDate(selectedDate)
+  const days        = weekDays(weekStart)
+
+  const groups = days
+    .map(day => ({
+      day,
+      appts: (_cache.get(toVenezuelaDate(day)) ?? [])
+        .filter(a => a.status !== 'cancelled')
+        .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()),
+    }))
+    .filter(g => g.appts.length > 0)
+
+  return (
+    <View style={{ flex: 1 }}>
+      {/* Mini 7-column grid */}
+      <View style={s.weekGrid}>
+        {days.map((day, i) => {
+          const key       = toVenezuelaDate(day)
+          const appts     = _cache.get(key) ?? []
+          const hasDot    = appts.filter(a => a.status !== 'cancelled').length > 0
+          const isT       = key === todayKey
+          const isSel     = key === selectedKey && !isT
+          return (
+            <TouchableOpacity key={i} style={s.weekCell} onPress={() => onSelectDay(day)} activeOpacity={0.7}>
+              <Text style={s.wkLabel}>{WLABELS[i]}</Text>
+              <View style={[s.wkCircle, isT && s.wkCircleToday, isSel && s.wkCircleSel]}>
+                <Text style={[s.wkNum, isT && s.wkNumToday, isSel && s.wkNumSel]}>{day.getDate()}</Text>
+              </View>
+              <View style={hasDot ? s.dot : s.dotEmpty} />
+            </TouchableOpacity>
+          )
+        })}
+      </View>
+
+      {/* Appointments list grouped by day */}
+      <ScrollView style={s.scroll} contentContainerStyle={[s.listContent, !groups.length && { flexGrow: 1 }]} showsVerticalScrollIndicator={false}>
+        {!groups.length ? (
+          <View style={s.centerState}>
+            <Ionicons name="calendar-outline" size={52} color="#CCCCCC" />
+            <Text style={s.emptyText}>Sin citas esta semana</Text>
+          </View>
+        ) : groups.map(({ day, appts }) => (
+          <View key={toVenezuelaDate(day)}>
+            <Text style={s.groupLabel}>
+              {cap(new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }).format(day))}
+            </Text>
+            {appts.map(item => <AppointmentCard key={item.id} item={item} />)}
+          </View>
+        ))}
+      </ScrollView>
+    </View>
+  )
+}
+
+// ─── month view ───────────────────────────────────────────────────────────────
+
+function MonthView({
+  year, month, cacheVersion, onSelectDay,
+}: {
+  year: number; month: number; cacheVersion: number; onSelectDay: (d: Date) => void
+}) {
+  const todayKey = toVenezuelaDate(new Date())
+  const rows     = chunk(monthCells(year, month), 7)
+
+  return (
+    <ScrollView style={s.scroll} contentContainerStyle={{ paddingHorizontal: 8, paddingTop: 8, paddingBottom: 88 }} showsVerticalScrollIndicator={false}>
+      {/* Day-of-week header */}
+      <View style={s.monthHeaderRow}>
+        {WLABELS.map(l => (
+          <View key={l} style={s.monthHeaderCell}>
+            <Text style={s.monthHeaderText}>{l}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Weeks */}
+      {rows.map((row, ri) => (
+        <View key={ri} style={s.monthRow}>
+          {row.map((day, ci) => {
+            const key      = toVenezuelaDate(day)
+            const appts    = _cache.get(key) ?? []
+            const hasDot   = day.getMonth() === month && appts.filter(a => a.status !== 'cancelled').length > 0
+            const isCur    = day.getMonth() === month
+            const isT      = key === todayKey
+            return (
+              <TouchableOpacity key={ci} style={s.monthCell} onPress={() => onSelectDay(day)} activeOpacity={0.7}>
+                <View style={[s.mnCircle, isT && s.mnCircleToday]}>
+                  <Text style={[s.mnNum, !isCur && s.mnNumFaded, isT && s.mnNumToday]}>
+                    {day.getDate()}
+                  </Text>
+                </View>
+                <View style={hasDot ? s.dot : s.dotEmpty} />
+              </TouchableOpacity>
+            )
+          })}
+        </View>
+      ))}
+    </ScrollView>
+  )
+}
+
 // ─── screen ───────────────────────────────────────────────────────────────────
 
-type ScreenState =
-  | { kind: 'loading' }
-  | { kind: 'error' }
-  | { kind: 'ok'; data: AppointmentItem[] }
+type ViewMode    = 'day' | 'week' | 'month'
+type ScreenState = { kind: 'loading' } | { kind: 'error' } | { kind: 'ok'; data: AppointmentItem[] }
 
 export default function CalendarScreen() {
-  const [date, setDate] = useState(new Date())
-  const [state, setState] = useState<ScreenState>({ kind: 'loading' })
-  const [refreshing, setRefreshing] = useState(false)
+  const today0 = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }
 
-  const load = useCallback(async (d: Date) => {
+  const [view,         setView]         = useState<ViewMode>('day')
+  const [date,         setDate]         = useState(today0)
+  const [weekStart,    setWeekStart]    = useState(() => startOfWeek(new Date()))
+  const [monthViewDt,  setMonthViewDt]  = useState(new Date())
+  const [state,        setState]        = useState<ScreenState>({ kind: 'loading' })
+  const [refreshing,   setRefreshing]   = useState(false)
+  const [cacheVersion, setCacheVersion] = useState(0)
+
+  const load = useCallback(async (d: Date, force = false) => {
+    const key = toVenezuelaDate(d)
+    if (!force && _cache.has(key)) {
+      setState({ kind: 'ok', data: _cache.get(key)! })
+      return
+    }
     setState({ kind: 'loading' })
     try {
-      const data = await getAppointments(toVenezuelaDate(d))
+      const data = await getAppointments(key)
+      _cache.set(key, data)
       setState({ kind: 'ok', data })
     } catch {
       setState({ kind: 'error' })
@@ -200,93 +313,124 @@ export default function CalendarScreen() {
 
   useEffect(() => { load(date) }, [date, load])
 
+  // Background fetch for week view
+  useEffect(() => {
+    if (view !== 'week') return
+    const uncached = weekDays(weekStart).filter(d => !_cache.has(toVenezuelaDate(d)))
+    if (!uncached.length) return
+    Promise.all(
+      uncached.map(d =>
+        getAppointments(toVenezuelaDate(d))
+          .then(data => { _cache.set(toVenezuelaDate(d), data) })
+          .catch(() => {})
+      )
+    ).then(() => setCacheVersion(v => v + 1))
+  }, [view, weekStart])
+
   const onRefresh = async () => {
     setRefreshing(true)
-    await load(date)
+    _cache.delete(toVenezuelaDate(date))
+    await load(date, true)
     setRefreshing(false)
   }
 
-  const todayActive = isToday(date)
+  function selectDay(d: Date) {
+    const n = new Date(d); n.setHours(0, 0, 0, 0)
+    setDate(n)
+    setView('day')
+  }
+
+  function goBack() {
+    if (view === 'day')   setDate(d => addDays(d, -1))
+    if (view === 'week')  setWeekStart(d => addDays(d, -7))
+    if (view === 'month') setMonthViewDt(d => addMonths(d, -1))
+  }
+  function goForward() {
+    if (view === 'day')   setDate(d => addDays(d, 1))
+    if (view === 'week')  setWeekStart(d => addDays(d, 7))
+    if (view === 'month') setMonthViewDt(d => addMonths(d, 1))
+  }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={s.safe} edges={['top']}>
 
       {/* ── header ── */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.navBtn}
-          onPress={() => setDate(d => addDays(d, -1))}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityLabel="Día anterior"
-        >
+      <View style={s.header}>
+        <TouchableOpacity style={s.navBtn} onPress={goBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="chevron-back-outline" size={24} color={DARK} />
         </TouchableOpacity>
 
-        <View style={styles.headerCenter}>
-          <Text style={[styles.weekday, todayActive && styles.weekdayActive]}>
-            {formatWeekday(date)}
-          </Text>
-          <Text style={styles.headerDate}>{formatFullDate(date)}</Text>
+        <View style={s.headerCenter}>
+          {view === 'day' && (
+            <>
+              <Text style={[s.weekday, isToday(date) && s.weekdayActive]}>{formatWeekday(date)}</Text>
+              <Text style={s.headerDate}>{formatFullDate(date)}</Text>
+            </>
+          )}
+          {view === 'week' && (
+            <>
+              <Text style={s.weekday}>Semana</Text>
+              <Text style={s.headerDate}>{weekRangeLabel(weekStart)}</Text>
+            </>
+          )}
+          {view === 'month' && (
+            <Text style={s.weekday}>{monthLabel(monthViewDt)}</Text>
+          )}
         </View>
 
-        <TouchableOpacity
-          style={styles.navBtn}
-          onPress={() => setDate(d => addDays(d, 1))}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityLabel="Día siguiente"
-        >
+        <TouchableOpacity style={s.navBtn} onPress={goForward} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="chevron-forward-outline" size={24} color={DARK} />
         </TouchableOpacity>
       </View>
 
-      {/* ── list ── */}
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={PRIMARY}
-            colors={[PRIMARY]}
-          />
-        }
-      >
-        {state.kind === 'loading' && <SkeletonCards />}
+      {/* ── view selector ── */}
+      <View style={s.selector}>
+        {(['day', 'week', 'month'] as ViewMode[]).map(v => {
+          const label  = v === 'day' ? 'Día' : v === 'week' ? 'Semana' : 'Mes'
+          const active = view === v
+          return (
+            <TouchableOpacity key={v} style={[s.pill2, active && s.pill2Active]} onPress={() => setView(v)} activeOpacity={0.8}>
+              <Text style={[s.pill2Text, active && s.pill2TextActive]}>{label}</Text>
+            </TouchableOpacity>
+          )
+        })}
+      </View>
 
-        {state.kind === 'error' && (
-          <ErrorState onRetry={() => load(date)} />
-        )}
+      {/* ── day view ── */}
+      {view === 'day' && (
+        <ScrollView
+          style={s.scroll}
+          contentContainerStyle={s.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} colors={[PRIMARY]} />}
+        >
+          {state.kind === 'loading' && <SkeletonCards />}
+          {state.kind === 'error'   && <ErrorState onRetry={() => load(date)} />}
+          {state.kind === 'ok' && state.data.length === 0 && <EmptyDay />}
+          {state.kind === 'ok' && state.data.map(item => <AppointmentCard key={item.id} item={item} />)}
+        </ScrollView>
+      )}
 
-        {state.kind === 'ok' && state.data.length === 0 && <EmptyState />}
+      {/* ── week view ── */}
+      {view === 'week' && (
+        <WeekView weekStart={weekStart} selectedDate={date} cacheVersion={cacheVersion} onSelectDay={selectDay} />
+      )}
 
-        {state.kind === 'ok' &&
-          state.data.map(item => (
-            <AppointmentCard key={item.id} item={item} />
-          ))}
-      </ScrollView>
+      {/* ── month view ── */}
+      {view === 'month' && (
+        <MonthView year={monthViewDt.getFullYear()} month={monthViewDt.getMonth()} cacheVersion={cacheVersion} onSelectDay={selectDay} />
+      )}
 
       {/* ── FAB ── */}
-      <TouchableOpacity
-        style={fabStyle}
-        onPress={() => router.push('/appointments/new' as Parameters<typeof router.push>[0])}
-        activeOpacity={0.85}
-        accessibilityLabel="Nueva cita"
-      >
+      <TouchableOpacity style={fabStyle} onPress={() => router.push('/appointments/new' as Parameters<typeof router.push>[0])} activeOpacity={0.85}>
         <Ionicons name="add" size={28} color="#fff" />
       </TouchableOpacity>
     </SafeAreaView>
   )
 }
 
-// ─── constants ────────────────────────────────────────────────────────────────
+// ─── fab ─────────────────────────────────────────────────────────────────────
 
-const PRIMARY = '#B5593E'
-const DARK    = '#34271E'
-const MONO    = Platform.select({ ios: 'Courier New', android: 'monospace' }) as string
-
-// FAB outside StyleSheet so it can use absolute positioning on top of ScrollView
 const fabStyle = StyleSheet.create({
   fab: {
     position: 'absolute', bottom: 24, right: 20, zIndex: 10,
@@ -297,155 +441,87 @@ const fabStyle = StyleSheet.create({
 
 // ─── styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#FAFAF9',
-  },
+const s = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: '#FAFAF9' },
 
   // header
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E5E0DC',
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 8, paddingVertical: 12,
+    backgroundColor: '#FFFFFF', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E5E0DC',
   },
-  navBtn: {
-    width: 48,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  weekday: {
-    fontSize: 18,
-    fontWeight: '500',
-    color: DARK,
-    letterSpacing: 0.2,
-    marginBottom: 2,
-  },
-  weekdayActive: {
-    color: PRIMARY,
-  },
-  headerDate: {
-    fontSize: 13,
-    fontWeight: '400',
-    color: '#999999',
-    letterSpacing: 0.1,
-  },
+  navBtn:        { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
+  headerCenter:  { flex: 1, alignItems: 'center' },
+  weekday:       { fontSize: 18, fontWeight: '500', color: DARK, letterSpacing: 0.2, marginBottom: 2 },
+  weekdayActive: { color: PRIMARY },
+  headerDate:    { fontSize: 13, color: '#999999', letterSpacing: 0.1 },
 
-  // list
-  scroll: {
-    flex: 1,
+  // view selector
+  selector: {
+    flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 10, gap: 8,
+    backgroundColor: '#fff', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E5E0DC',
   },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 32,
-    flexGrow: 1,
-  },
+  pill2:          { flex: 1, height: 36, borderRadius: 18, backgroundColor: '#EDE8E4', alignItems: 'center', justifyContent: 'center' },
+  pill2Active:    { backgroundColor: PRIMARY },
+  pill2Text:      { fontSize: 14, fontWeight: '500', color: '#666666' },
+  pill2TextActive:{ color: '#fff' },
+
+  // shared scroll + list
+  scroll:      { flex: 1 },
+  listContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 88, flexGrow: 1 },
 
   // appointment card
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#EDE8E4',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginBottom: 10,
-  },
-  cardRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  timeText: {
-    fontFamily: MONO,
-    fontSize: 14,
-    color: DARK,
-    letterSpacing: 0.4,
-  },
-  clientName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: DARK,
-    marginBottom: 3,
-  },
-  serviceName: {
-    fontSize: 13,
-    fontWeight: '400',
-    color: '#888888',
-  },
+  card:        { backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 1, borderColor: '#EDE8E4', paddingHorizontal: 16, paddingVertical: 14, marginBottom: 10 },
+  cardRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  timeText:    { fontFamily: MONO, fontSize: 14, color: DARK, letterSpacing: 0.4 },
+  clientName:  { fontSize: 16, fontWeight: '500', color: DARK, marginBottom: 3 },
+  serviceName: { fontSize: 13, color: '#888888' },
 
   // status pill
-  pill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  pillText: {
-    fontSize: 12,
-    fontWeight: '500',
-    letterSpacing: 0.15,
-  },
+  pill:     { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
+  pillText: { fontSize: 12, fontWeight: '500', letterSpacing: 0.15 },
 
   // skeleton
-  skeletonCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#EDE8E4',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    marginBottom: 10,
-  },
-  skeletonLine: {
-    height: 13,
-    backgroundColor: '#EEEBE8',
-    borderRadius: 6,
-  },
+  skeletonCard: { backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 1, borderColor: '#EDE8E4', paddingHorizontal: 16, paddingVertical: 16, marginBottom: 10 },
+  skeletonLine: { height: 13, backgroundColor: '#EEEBE8', borderRadius: 6 },
 
-  // centered states (empty / error)
-  centerState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 72,
-    gap: 16,
-  },
-  emptyText: {
-    fontSize: 15,
-    fontWeight: '400',
-    color: '#AAAAAA',
-  },
-  errorText: {
-    fontSize: 15,
-    fontWeight: '400',
-    color: '#888888',
-    textAlign: 'center',
-  },
+  // center states
+  centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 72, gap: 16 },
+  emptyText:   { fontSize: 15, color: '#AAAAAA' },
+  errorText:   { fontSize: 15, color: '#888888', textAlign: 'center' },
+  retryBtn:    { height: 48, paddingHorizontal: 36, backgroundColor: PRIMARY, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  retryText:   { fontSize: 15, fontWeight: '500', color: '#FFFFFF', letterSpacing: 0.2 },
 
-  // retry CTA
-  retryBtn: {
-    height: 48,
-    paddingHorizontal: 36,
-    backgroundColor: PRIMARY,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
+  // week grid
+  weekGrid: {
+    flexDirection: 'row', paddingHorizontal: 8, paddingVertical: 12,
+    backgroundColor: '#fff', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E5E0DC',
   },
-  retryText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#FFFFFF',
-    letterSpacing: 0.2,
-  },
+  weekCell:      { flex: 1, alignItems: 'center', gap: 3 },
+  wkLabel:       { fontSize: 11, fontWeight: '500', color: '#AAAAAA' },
+  wkCircle:      { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  wkCircleToday: { backgroundColor: PRIMARY },
+  wkCircleSel:   { backgroundColor: '#EDE8E4' },
+  wkNum:         { fontSize: 15, fontWeight: '500', color: DARK },
+  wkNumToday:    { color: '#fff' },
+  wkNumSel:      { color: DARK },
+
+  // shared dot
+  dot:      { width: 5, height: 5, borderRadius: 3, backgroundColor: PRIMARY },
+  dotEmpty: { width: 5, height: 5 },
+
+  // week group label (Georgia/serif)
+  groupLabel: { fontFamily: SERIF, fontSize: 15, color: DARK, paddingTop: 16, paddingBottom: 8 },
+
+  // month grid
+  monthHeaderRow:  { flexDirection: 'row', marginBottom: 4 },
+  monthHeaderCell: { flex: 1, alignItems: 'center', paddingVertical: 6 },
+  monthHeaderText: { fontSize: 11, fontWeight: '500', color: '#AAAAAA' },
+  monthRow:        { flexDirection: 'row' },
+  monthCell:       { flex: 1, alignItems: 'center', paddingVertical: 4, minHeight: 46 },
+  mnCircle:        { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  mnCircleToday:   { backgroundColor: PRIMARY },
+  mnNum:           { fontSize: 14, color: DARK },
+  mnNumToday:      { color: '#fff' },
+  mnNumFaded:      { color: '#CCCCCC' },
 })

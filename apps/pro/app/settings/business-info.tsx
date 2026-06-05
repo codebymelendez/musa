@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  View, Text, ScrollView, TouchableOpacity, TextInput,
+  View, Text, Image, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Animated, Share, Linking, Alert,
 } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
@@ -32,15 +32,16 @@ function Skeleton() {
 
 type LoadState = 'loading' | 'error' | 'ready'
 
-export default function BusinessSettingsScreen() {
+export default function BusinessInfoScreen() {
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [slug, setSlug] = useState('')
   const [planName, setPlanName] = useState('')
   const [planLimits, setPlanLimits] = useState<{ maxMonthlyAppointments?: number; maxStaff?: number }>({})
 
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [businessName, setBusinessName] = useState('')
   const [address, setAddress] = useState('')
-  const [description, setDescription] = useState('')
+  const [bio, setBio] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
   const [instagram, setInstagram] = useState('')
 
@@ -59,9 +60,10 @@ export default function BusinessSettingsScreen() {
       setSlug(data.slug ?? '')
       setBusinessName(data.business?.name ?? '')
       setAddress(data.business?.address ?? '')
-      setDescription(data.business?.description ?? '')
-      setWhatsapp(data.business?.whatsapp ?? '')
-      setInstagram(data.business?.instagram ?? '')
+      setBio(data.bio ?? '')
+      setLogoUrl(data.business?.logoUrl ?? null)
+      setWhatsapp(data.whatsapp ?? '')
+      setInstagram(data.instagram ?? '')
       setPlanName(data.business?.plan?.name ?? 'Free')
       setPlanLimits(data.business?.plan?.limits ?? {})
       setDirty(false)
@@ -77,11 +79,11 @@ export default function BusinessSettingsScreen() {
     setSaving(true)
     try {
       await updateSettings({
+        bio: bio.trim(),
+        whatsapp: whatsapp.trim(),
+        instagram: instagram.trim(),
         businessName: businessName.trim(),
         businessAddress: address.trim(),
-        businessDescription: description.trim(),
-        businessWhatsapp: whatsapp.trim(),
-        businessInstagram: instagram.trim(),
       })
       setSavedMsg(true)
       setDirty(false)
@@ -100,10 +102,7 @@ export default function BusinessSettingsScreen() {
 
   async function handleShare() {
     const link = `${APP_URL}/p/${slug}`
-    await Share.share({
-      message: `Reserva tu cita en ${link}`,
-      url: link,
-    })
+    await Share.share({ message: `Reserva tu cita en ${link}`, url: link })
   }
 
   const bookingLink = `${APP_URL}/p/${slug}`
@@ -115,7 +114,7 @@ export default function BusinessSettingsScreen() {
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="chevron-back-outline" size={24} color={DARK} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Ajustes</Text>
+        <Text style={styles.headerTitle}>Información del negocio</Text>
         <View style={styles.backBtn} />
       </View>
 
@@ -134,15 +133,17 @@ export default function BusinessSettingsScreen() {
         <>
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-            {/* Mi negocio */}
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Mi negocio</Text>
 
-              {/* Avatar placeholder */}
               <View style={styles.avatarSection}>
-                <View style={styles.avatarCircle}>
-                  <Ionicons name="business-outline" size={32} color={GRAY} />
-                </View>
+                {logoUrl ? (
+                  <Image source={{ uri: logoUrl }} style={styles.avatarCircle} />
+                ) : (
+                  <View style={styles.avatarCircle}>
+                    <Ionicons name="business-outline" size={32} color={GRAY} />
+                  </View>
+                )}
                 <TouchableOpacity style={styles.changePhotoBtn} activeOpacity={0.75}>
                   <Text style={styles.changePhotoText}>Cambiar foto</Text>
                 </TouchableOpacity>
@@ -165,8 +166,8 @@ export default function BusinessSettingsScreen() {
               <Text style={[styles.label, { marginTop: 14 }]}>Descripción</Text>
               <TextInput
                 style={[styles.input, { height: 80, textAlignVertical: 'top', paddingTop: 10 }]}
-                value={description}
-                onChangeText={v => { setDescription(v); markDirty() }}
+                value={bio}
+                onChangeText={v => { setBio(v); markDirty() }}
                 multiline placeholderTextColor="#AAAAAA"
                 placeholder="Describe tu negocio…"
               />
@@ -194,7 +195,6 @@ export default function BusinessSettingsScreen() {
               </View>
             </View>
 
-            {/* Enlace de reserva */}
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Enlace de reserva</Text>
               <View style={styles.linkBox}>
@@ -216,7 +216,6 @@ export default function BusinessSettingsScreen() {
               </View>
             </View>
 
-            {/* Plan actual */}
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Plan actual</Text>
               <View style={styles.planRow}>
@@ -249,7 +248,6 @@ export default function BusinessSettingsScreen() {
             <View style={{ height: 20 }} />
           </ScrollView>
 
-          {/* Fixed save button */}
           {(dirty || savedMsg) && (
             <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
               {savedMsg ? (
@@ -280,7 +278,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER,
   },
   backBtn: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontFamily: SERIF, fontSize: 22, color: DARK },
+  headerTitle: { fontFamily: SERIF, fontSize: 20, color: DARK },
   content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
   card: {
     backgroundColor: '#fff', borderRadius: 16, borderWidth: 1,

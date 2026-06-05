@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Modal, Animated, Alert, RefreshControl,
-  KeyboardAvoidingView, Platform, ScrollView, Switch,
+  KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -40,16 +40,14 @@ function formatDateInput(raw: string): string {
   return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
 }
 
-function promoStatus(p: PromotionItem): 'active' | 'inactive' | 'expired' {
-  if (!p.isActive) return 'inactive'
+function promoStatus(p: PromotionItem): 'active' | 'expired' {
   if (p.validUntil && new Date(p.validUntil) < new Date()) return 'expired'
   return 'active'
 }
 
 const STATUS_CONFIG = {
-  active:   { label: 'Activa',   bg: '#E8F5E9', text: '#2E7D32' },
-  inactive: { label: 'Inactiva', bg: '#F5F5F5', text: '#757575' },
-  expired:  { label: 'Expirada', bg: '#FDECEA', text: '#C62828' },
+  active:  { label: 'Activa',   bg: '#E8F5E9', text: '#2E7D32' },
+  expired: { label: 'Expirada', bg: '#FDECEA', text: '#C62828' },
 }
 
 // ─── promotion card ───────────────────────────────────────────────────────────
@@ -114,12 +112,11 @@ function CreateModal({
   const [discount, setDiscount] = useState('')
   const [validFrom, setValidFrom] = useState('')
   const [validUntil, setValidUntil] = useState('')
-  const [isActive, setIsActive] = useState(true)
   const [saving, setSaving] = useState(false)
 
   function reset() {
     setTitle(''); setDescription(''); setDiscount('')
-    setValidFrom(''); setValidUntil(''); setIsActive(true)
+    setValidFrom(''); setValidUntil('')
   }
 
   async function handleCreate() {
@@ -133,7 +130,6 @@ function CreateModal({
         discount: parseFloat(discount) || 0,
         validFrom: parseDisplayDate(validFrom) ?? undefined,
         validUntil: parseDisplayDate(validUntil) ?? undefined,
-        isActive,
       })
       reset()
       onCreated(p)
@@ -185,12 +181,6 @@ function CreateModal({
                   onChangeText={v => setValidUntil(formatDateInput(v))}
                   placeholder="DD/MM/YYYY" placeholderTextColor="#AAAAAA" keyboardType="number-pad" />
               </View>
-            </View>
-
-            <View style={promoStyles.toggleRow}>
-              <Text style={promoStyles.toggleLabel}>Activa desde el inicio</Text>
-              <Switch value={isActive} onValueChange={setIsActive}
-                trackColor={{ false: '#DDDDDD', true: PRIMARY }} thumbColor="#fff" />
             </View>
 
             <TouchableOpacity

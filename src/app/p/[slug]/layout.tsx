@@ -20,7 +20,7 @@ const getProfile = cache(async (slug: string) => {
   const admin = createAdminClient();
   const { data } = await admin
     .from("User")
-    .select("name, slug, bio, avatarUrl, serviceType, business:Business(name, city)")
+    .select("name, slug, bio, avatarUrl, serviceType, phone, whatsapp, business:Business(name, city, address)")
     .eq("slug", slug)
     .maybeSingle();
   if (!data) return null;
@@ -33,7 +33,9 @@ const getProfile = cache(async (slug: string) => {
     bio: string | null;
     avatarUrl: string | null;
     serviceType: string | null;
-    business: { name: string; city: string | null } | null;
+    phone: string | null;
+    whatsapp: string | null;
+    business: { name: string; city: string | null; address: string | null } | null;
   };
 });
 
@@ -46,34 +48,56 @@ export async function generateMetadata({
   const user = await getProfile(slug);
 
   if (!user) {
-    return { title: "Profesional | GetMusa" };
+    return { title: "Profesional | MUSA" };
   }
 
-  const city = user.business?.city ?? "Venezuela";
-  const specialty = SERVICE_LABEL[user.serviceType ?? ""] ?? user.serviceType ?? "belleza";
-  const specialtyLower = specialty.toLowerCase();
+  const specialty = SERVICE_LABEL[user.serviceType ?? ""] ?? user.serviceType ?? null;
+  const city = user.business?.city ?? null;
   const url = `https://getmusa.app/p/${slug}`;
 
-  const title = `${user.name} – ${specialty} en ${city} | GetMusa`;
-  const description = `Reserva con ${user.name}, especialista en ${specialtyLower} en ${city}. Sin WhatsApp, sin espera. Agenda tu cita en GetMusa.`;
+  let title: string;
+  if (specialty && city) {
+    title = `${user.name} — ${specialty} en ${city} | MUSA`;
+  } else if (specialty) {
+    title = `${user.name} — ${specialty} | MUSA`;
+  } else {
+    title = `${user.name} | MUSA`;
+  }
+
+  const rawBio = user.bio?.trim();
+  const description = rawBio
+    ? rawBio.slice(0, 155)
+    : `Reserva tu cita con ${user.name} en MUSA.${specialty ? ` ${specialty} · Disponible online.` : " Disponible online."}`;
+
+  const keywords = [
+    user.name,
+    specialty,
+    city,
+    "reserva online",
+    "cita",
+    "belleza Venezuela",
+    "MUSA",
+  ].filter(Boolean) as string[];
 
   return {
     title,
     description,
+    keywords,
     alternates: { canonical: url },
+    robots: { index: true, follow: true },
     openGraph: {
       title,
       description,
       url,
-      siteName: "GetMusa",
+      siteName: "MUSA",
       locale: "es_VE",
-      type: "website",
+      type: "profile",
       ...(user.avatarUrl
         ? { images: [{ url: user.avatarUrl, width: 400, height: 400, alt: user.name }] }
         : {}),
     },
     twitter: {
-      card: "summary_large_image",
+      card: "summary",
       title,
       description,
       ...(user.avatarUrl ? { images: [user.avatarUrl] } : {}),
@@ -85,24 +109,28 @@ export default async function ProfileLayout({ children, params }: LayoutProps) {
   const { slug } = await params;
   const user = await getProfile(slug);
 
-  const city = user?.business?.city ?? "Venezuela";
-  const specialty = user?.serviceType
-    ? (SERVICE_LABEL[user.serviceType] ?? user.serviceType)
-    : "Servicios de belleza";
+  const telephone = user?.whatsapp ?? user?.phone ?? null;
 
   const jsonLd = user
     ? {
         "@context": "https://schema.org",
         "@type": "LocalBusiness",
-        name: user.name,
-        description: specialty,
-        address: {
-          "@type": "PostalAddress",
-          addressLocality: city,
-          addressCountry: "VE",
-        },
+        name: user.business?.name ?? user.name,
+        ...(user.bio ? { description: user.bio } : {}),
         url: `https://getmusa.app/p/${slug}`,
+        ...(telephone ? { telephone } : {}),
+        ...(user.business?.address
+          ? {
+              address: {
+                "@type": "PostalAddress",
+                streetAddress: user.business.address,
+                ...(user.business.city ? { addressLocality: user.business.city } : {}),
+                addressCountry: "VE",
+              },
+            }
+          : {}),
         ...(user.avatarUrl ? { image: user.avatarUrl } : {}),
+        priceRange: "$$",
       }
     : null;
 

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Modal, Animated, Alert, RefreshControl,
-  KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView, Platform, Linking,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -139,8 +139,11 @@ export default function TeamScreen() {
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [members, setMembers] = useState<TeamMember[]>([])
   const [invitations, setInvitations] = useState<TeamInvitation[]>([])
+  const [planName, setPlanName] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [showInviteModal, setShowInviteModal] = useState(false)
+
+  const isTeamPlan = planName?.toLowerCase() === 'team'
 
   const load = useCallback(async () => {
     setLoadState('loading')
@@ -149,6 +152,7 @@ export default function TeamScreen() {
       if (!data) { setLoadState('error'); return }
       setMembers(data.business?.users ?? [])
       setInvitations(data.business?.invitations ?? [])
+      setPlanName(data.business?.plan?.name ?? null)
       setLoadState('ready')
     } catch { setLoadState('error') }
   }, [])
@@ -187,6 +191,22 @@ export default function TeamScreen() {
           <Text style={teamStyles.grayText}>No se pudo cargar el equipo</Text>
           <TouchableOpacity style={teamStyles.retryBtn} onPress={load} activeOpacity={0.85}>
             <Text style={teamStyles.retryText}>Reintentar</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {loadState === 'ready' && !isTeamPlan && (
+        <View style={teamStyles.planBanner}>
+          <Ionicons name="lock-closed-outline" size={20} color="#F57C00" />
+          <Text style={teamStyles.planBannerText}>
+            Esta función está disponible en el plan Team
+          </Text>
+          <TouchableOpacity
+            style={teamStyles.planBannerBtn}
+            onPress={() => Linking.openURL('https://getmusa.app')}
+            activeOpacity={0.85}
+          >
+            <Text style={teamStyles.planBannerBtnText}>Ver planes</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -314,6 +334,17 @@ const teamStyles = StyleSheet.create({
     padding: 14, marginBottom: 16,
   },
   infoText: { flex: 1, fontSize: 13, color: GRAY, lineHeight: 19 },
+  planBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 20, paddingVertical: 14,
+    backgroundColor: '#FFF8E7', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#FFE082',
+  },
+  planBannerText: { flex: 1, fontSize: 13, color: '#E65100' },
+  planBannerBtn: {
+    paddingHorizontal: 12, height: 32, borderRadius: 16,
+    backgroundColor: '#F57C00', alignItems: 'center', justifyContent: 'center',
+  },
+  planBannerBtnText: { fontSize: 12, fontWeight: '500', color: '#fff' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
   grayText: { fontSize: 14, color: '#AAAAAA' },
   retryBtn: { height: 48, paddingHorizontal: 32, backgroundColor: PRIMARY, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },

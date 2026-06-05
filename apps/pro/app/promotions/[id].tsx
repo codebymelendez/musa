@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Alert, Switch, Animated,
+  StyleSheet, Alert, Animated,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, router } from 'expo-router'
 import { getPromotions, updatePromotion, deletePromotion, type PromotionItem } from '../../lib/api'
@@ -60,11 +60,12 @@ export default function PromotionEditScreen() {
   const [discount, setDiscount] = useState('')
   const [validFrom, setValidFrom] = useState('')
   const [validUntil, setValidUntil] = useState('')
-  const [isActive, setIsActive] = useState(true)
 
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [savedMsg, setSavedMsg] = useState(false)
+
+  const insets = useSafeAreaInsets()
 
   const load = useCallback(async () => {
     setLoadState('loading')
@@ -78,7 +79,6 @@ export default function PromotionEditScreen() {
       setDiscount(String(found.discount))
       setValidFrom(formatDisplayDate(found.validFrom))
       setValidUntil(formatDisplayDate(found.validUntil))
-      setIsActive(found.isActive)
       setLoadState('ready')
     } catch { setLoadState('error') }
   }, [id])
@@ -95,7 +95,6 @@ export default function PromotionEditScreen() {
         discount: parseFloat(discount) || 0,
         validFrom: parseDisplayDate(validFrom) ?? undefined,
         validUntil: parseDisplayDate(validUntil) ?? undefined,
-        isActive,
       })
       setSavedMsg(true)
       setTimeout(() => setSavedMsg(false), 2000)
@@ -184,11 +183,6 @@ export default function PromotionEditScreen() {
                 </View>
               </View>
 
-              <View style={styles.toggleRow}>
-                <Text style={styles.toggleLabel}>Promoción activa</Text>
-                <Switch value={isActive} onValueChange={setIsActive}
-                  trackColor={{ false: '#DDDDDD', true: PRIMARY }} thumbColor="#fff" />
-              </View>
             </View>
 
             <TouchableOpacity
@@ -200,7 +194,7 @@ export default function PromotionEditScreen() {
             <View style={{ height: 20 }} />
           </ScrollView>
 
-          <View style={styles.bottomBar}>
+          <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
             {savedMsg ? (
               <View style={styles.savedBadge}>
                 <Ionicons name="checkmark-circle-outline" size={18} color="#2E7D32" />
@@ -249,7 +243,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20, justifyContent: 'center', marginBottom: 8,
   },
   deleteBtnText: { fontSize: 15, fontWeight: '500', color: '#C62828' },
-  bottomBar: { paddingHorizontal: 20, paddingVertical: 16, backgroundColor: SURFACE },
+  bottomBar: { paddingHorizontal: 20, paddingTop: 16, backgroundColor: SURFACE },
   btnPrimary: { height: 52, backgroundColor: PRIMARY, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
   btnPrimaryText: { color: '#fff', fontSize: 16, fontWeight: '500' },
   savedBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 52, gap: 8 },

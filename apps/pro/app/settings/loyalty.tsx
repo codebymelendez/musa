@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Switch, Animated, Alert,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import {
@@ -65,6 +65,8 @@ export default function LoyaltyScreen() {
   // save state
   const [saving, setSaving] = useState(false)
   const [savedMsg, setSavedMsg] = useState(false)
+
+  const insets = useSafeAreaInsets()
 
   const load = useCallback(async () => {
     setLoadState('loading')
@@ -275,7 +277,7 @@ export default function LoyaltyScreen() {
           </ScrollView>
 
           {/* ─── Bottom CTA ─── */}
-          <View style={styles.bottomBar}>
+          <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
             {savedMsg ? (
               <View style={styles.savedBadge}>
                 <Ionicons name="checkmark-circle-outline" size={18} color="#2E7D32" />
@@ -349,7 +351,7 @@ const styles = StyleSheet.create({
   infoHint: { fontSize: 12, color: GRAY, lineHeight: 18 },
   // bottom
   bottomBar: {
-    paddingHorizontal: 20, paddingVertical: 16,
+    paddingHorizontal: 20, paddingTop: 16,
     backgroundColor: '#fff', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: BORDER,
   },
   btnPrimary: { height: 52, backgroundColor: PRIMARY, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },

@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
-  StyleSheet, RefreshControl, Animated,
+  StyleSheet, RefreshControl, Animated, Modal,
+  KeyboardAvoidingView, Platform, ScrollView, Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import { getClients, type ClientItem } from '../../lib/api'
-import { PRIMARY, DARK, BORDER, GRAY, MONO, SERIF, initials } from '../../lib/utils'
+import { getClients, createClient, type ClientItem } from '../../lib/api'
+import { PRIMARY, DARK, BORDER, GRAY, MONO, SERIF, SURFACE, initials } from '../../lib/utils'
 
 // ─── skeleton ─────────────────────────────────────────────────────────────────
 
@@ -74,6 +75,130 @@ function ClientRow({ item, onPress }: { item: ClientItem; onPress: () => void })
   )
 }
 
+// ─── add client modal ─────────────────────────────────────────────────────────
+
+const TAGS = ['VIP', 'Nueva', 'Regular', 'Frecuente'] as const
+
+function AddClientModal({
+  visible, onClose, onCreated,
+}: {
+  visible: boolean; onClose: () => void; onCreated: (c: ClientItem) => void
+}) {
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
+  const [notes, setNotes] = useState('')
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [saving, setSaving] = useState(false)
+
+  function reset() {
+    setName(''); setPhone(''); setEmail(''); setNotes(''); setSelectedTags([])
+  }
+
+  function toggleTag(tag: string) {
+    setSelectedTags(prev =>
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+    )
+  }
+
+  async function handleCreate() {
+    if (!name.trim()) { Alert.alert('', 'El nombre es requerido'); return }
+    if (!phone.trim()) { Alert.alert('', 'El teléfono es requerido'); return }
+    setSaving(true)
+    try {
+      const client = await createClient({
+        name: name.trim(),
+        phone: phone.trim(),
+        email: email.trim() || undefined,
+        notes: notes.trim() || undefined,
+        tags: selectedTags,
+      })
+      reset()
+      onCreated(client)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error desconocido'
+      Alert.alert('Error', msg)
+    } finally { setSaving(false) }
+  }
+
+  const slideAnim = useRef(new Animated.Value(500)).current
+  useEffect(() => {
+    Animated.timing(slideAnim, {
+      toValue: visible ? 0 : 500, duration: 280, useNativeDriver: true,
+    }).start()
+    if (!visible) reset()
+  }, [visible])
+
+  return (
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <TouchableOpacity style={modalStyles.overlay} activeOpacity={1} onPress={onClose} />
+        <Animated.View style={[modalStyles.sheet, { transform: [{ translateY: slideAnim }] }]}>
+          <View style={modalStyles.handle} />
+          <Text style={modalStyles.title}>Nueva clienta</Text>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <Text style={modalStyles.label}>Nombre completo *</Text>
+            <TextInput
+              style={modalStyles.input} value={name} onChangeText={setName}
+              placeholder="María García" placeholderTextColor="#AAAAAA"
+            />
+
+            <Text style={[modalStyles.label, { marginTop: 14 }]}>Teléfono *</Text>
+            <TextInput
+              style={modalStyles.input} value={phone} onChangeText={setPhone}
+              placeholder="04141234567" placeholderTextColor="#AAAAAA"
+              keyboardType="phone-pad"
+            />
+
+            <Text style={[modalStyles.label, { marginTop: 14 }]}>
+              Email <Text style={{ color: GRAY }}>(opcional)</Text>
+            </Text>
+            <TextInput
+              style={modalStyles.input} value={email} onChangeText={setEmail}
+              placeholder="maria@email.com" placeholderTextColor="#AAAAAA"
+              keyboardType="email-address" autoCapitalize="none"
+            />
+
+            <Text style={[modalStyles.label, { marginTop: 14 }]}>
+              Notas <Text style={{ color: GRAY }}>(opcional)</Text>
+            </Text>
+            <TextInput
+              style={[modalStyles.input, { height: 70, textAlignVertical: 'top', paddingTop: 10 }]}
+              value={notes} onChangeText={setNotes} multiline
+              placeholder="Preferencias, alergias…" placeholderTextColor="#AAAAAA"
+            />
+
+            <Text style={[modalStyles.label, { marginTop: 14 }]}>Etiquetas</Text>
+            <View style={modalStyles.tagsRow}>
+              {TAGS.map(tag => {
+                const active = selectedTags.includes(tag)
+                return (
+                  <TouchableOpacity
+                    key={tag}
+                    style={[modalStyles.tagChip, active && modalStyles.tagChipActive]}
+                    onPress={() => toggleTag(tag)}
+                    activeOpacity={0.78}
+                  >
+                    <Text style={[modalStyles.tagText, active && { color: '#fff' }]}>{tag}</Text>
+                  </TouchableOpacity>
+                )
+              })}
+            </View>
+
+            <TouchableOpacity
+              style={[modalStyles.btnPrimary, { marginTop: 24, marginBottom: 8 }, saving && { opacity: 0.6 }]}
+              onPress={handleCreate} disabled={saving} activeOpacity={0.85}
+            >
+              <Text style={modalStyles.btnPrimaryText}>{saving ? 'Creando…' : 'Crear clienta'}</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </Animated.View>
+      </KeyboardAvoidingView>
+    </Modal>
+  )
+}
+
 // ─── screen ───────────────────────────────────────────────────────────────────
 
 type State = { kind: 'loading' } | { kind: 'error' } | { kind: 'ok'; data: ClientItem[] }
@@ -82,6 +207,7 @@ export default function ClientsScreen() {
   const [state, setState] = useState<State>({ kind: 'loading' })
   const [query, setQuery] = useState('')
   const [refreshing, setRefreshing] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
 
   const load = useCallback(async () => {
     setState({ kind: 'loading' })
@@ -102,6 +228,15 @@ export default function ClientsScreen() {
         return c.name.toLowerCase().includes(q) || c.phone.includes(q)
       })
     : []
+
+  function handleCreated(client: ClientItem) {
+    setState(prev =>
+      prev.kind === 'ok'
+        ? { kind: 'ok', data: [client, ...prev.data] }
+        : { kind: 'ok', data: [client] }
+    )
+    setShowAddModal(false)
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -157,6 +292,21 @@ export default function ClientsScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      {/* FAB */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => setShowAddModal(true)}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="add" size={28} color="#fff" />
+      </TouchableOpacity>
+
+      <AddClientModal
+        visible={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onCreated={handleCreated}
+      />
     </SafeAreaView>
   )
 }
@@ -174,7 +324,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F3F0', borderRadius: 12, height: 44, paddingHorizontal: 12,
   },
   searchInput: { flex: 1, fontSize: 15, color: DARK },
-  listPad: { paddingTop: 8, paddingBottom: 32 },
+  listPad: { paddingTop: 8, paddingBottom: 88 },
   row: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 20, paddingVertical: 14, gap: 14, backgroundColor: '#fff',
@@ -196,4 +346,38 @@ const styles = StyleSheet.create({
   skeletonRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, gap: 14 },
   skeletonAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F0EDE9' },
   skeletonLine: { height: 13, backgroundColor: '#F0EDE9', borderRadius: 6 },
+  fab: {
+    position: 'absolute', bottom: 32, right: 24,
+    width: 56, height: 56, borderRadius: 28,
+    backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center',
+  },
+})
+
+const modalStyles = StyleSheet.create({
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+  sheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 48, maxHeight: '92%',
+  },
+  handle: {
+    width: 40, height: 4, borderRadius: 2, backgroundColor: '#DDDDDD',
+    alignSelf: 'center', marginBottom: 16,
+  },
+  title: { fontFamily: SERIF, fontSize: 22, color: DARK, marginBottom: 20 },
+  label: { fontSize: 12, color: GRAY, marginBottom: 6 },
+  input: {
+    height: 46, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
+    paddingHorizontal: 14, fontSize: 15, color: DARK, backgroundColor: SURFACE,
+  },
+  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tagChip: {
+    paddingHorizontal: 16, height: 36, borderRadius: 18,
+    backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  tagChipActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  tagText: { fontSize: 13, fontWeight: '500', color: DARK },
+  btnPrimary: { height: 52, backgroundColor: PRIMARY, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
+  btnPrimaryText: { color: '#fff', fontSize: 16, fontWeight: '500' },
 })

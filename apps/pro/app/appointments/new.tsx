@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Modal, FlatList, Animated, Platform, Alert,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import {
@@ -177,6 +177,7 @@ export default function NewAppointmentScreen() {
   const [notes, setNotes] = useState('')
   const [creating, setCreating] = useState(false)
 
+  const insets = useSafeAreaInsets()
   const selectedDate = dateMode === 'today' ? today : dateMode === 'tomorrow' ? tomorrow : pickedDate
 
   const load = useCallback(async () => {
@@ -420,7 +421,7 @@ export default function NewAppointmentScreen() {
           </ScrollView>
 
           {/* Fixed bottom CTA */}
-          <View style={styles.bottomBar}>
+          <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
             <TouchableOpacity
               style={[styles.btnPrimary, creating && { opacity: 0.6 }]}
               onPress={handleCreate}
@@ -521,7 +522,7 @@ const styles = StyleSheet.create({
   },
   charCount: { fontSize: 11, color: '#BBBBBB', textAlign: 'right', marginTop: 4 },
   bottomBar: {
-    paddingHorizontal: 20, paddingVertical: 16,
+    paddingHorizontal: 20, paddingTop: 16,
     backgroundColor: '#fff', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: BORDER,
   },
   btnPrimary: {

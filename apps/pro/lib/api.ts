@@ -187,11 +187,15 @@ export interface SettingsData {
   serviceType: string | null
   bio: string | null
   avatarUrl: string | null
+  whatsapp: string | null
+  instagram: string | null
   businessId: string | null
   business: {
     id: string; name: string; slug: string; city: string | null;
-    address?: string | null; description?: string | null;
-    whatsapp?: string | null; instagram?: string | null;
+    address?: string | null;
+    logoUrl?: string | null;
+    phone?: string | null;
+    category?: string | null;
     plan?: { name: string; limits?: { maxMonthlyAppointments?: number; maxStaff?: number } } | null;
     users?: TeamMember[];
     invitations?: TeamInvitation[];
@@ -218,11 +222,11 @@ export async function getSettings(): Promise<SettingsData | null> {
 export interface SettingsPatch {
   name?: string
   bio?: string
+  avatarUrl?: string
+  whatsapp?: string
+  instagram?: string
   businessName?: string
   businessAddress?: string
-  businessDescription?: string
-  businessWhatsapp?: string
-  businessInstagram?: string
   settings?: {
     workDays?: number[]
     startHour?: number
@@ -329,7 +333,7 @@ export interface PromotionItem {
   discount: number
   validFrom: string | null
   validUntil: string | null
-  isActive: boolean
+  isActive?: boolean
   createdAt: string
 }
 
@@ -339,12 +343,13 @@ export async function getPromotions(): Promise<PromotionItem[]> {
   const res = await fetch(`${API_URL}/api/promotions`, { headers })
   if (res.status === 401) { await handle401(); return [] }
   if (!res.ok) return []
-  return res.json()
+  const json = await res.json()
+  return json.promotions ?? []
 }
 
 export async function createPromotion(data: {
   title: string; description?: string; discount: number;
-  validFrom?: string; validUntil?: string; isActive: boolean;
+  validFrom?: string; validUntil?: string;
 }): Promise<PromotionItem> {
   const headers = await authHeaders()
   if (!headers) { await handle401(); throw new Error('No auth') }
@@ -352,8 +357,29 @@ export async function createPromotion(data: {
     method: 'POST', headers, body: JSON.stringify(data),
   })
   if (res.status === 401) { await handle401(); throw new Error('Unauthorized') }
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`)
+  }
+  const json = await res.json()
+  return json.promotion
+}
+
+export async function createClient(data: {
+  name: string; phone: string; email?: string; notes?: string; tags?: string[];
+}): Promise<ClientItem> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); throw new Error('No auth') }
+  const res = await fetch(`${API_URL}/api/clients`, {
+    method: 'POST', headers, body: JSON.stringify(data),
+  })
+  if (res.status === 401) { await handle401(); throw new Error('Unauthorized') }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`)
+  }
+  const client = await res.json()
+  return { ...client, appointments: client.appointments ?? [] }
 }
 
 export async function updatePromotion(id: string, data: Partial<{

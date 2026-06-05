@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Animated, Alert,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, router } from 'expo-router'
 import { getServices, updateService, deleteService, type ServiceItem } from '../../lib/api'
@@ -44,6 +44,8 @@ export default function ServiceEditScreen() {
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [savedMsg, setSavedMsg] = useState(false)
+
+  const insets = useSafeAreaInsets()
 
   const load = useCallback(async () => {
     setLoadState('loading')
@@ -193,7 +195,7 @@ export default function ServiceEditScreen() {
             <View style={{ height: 20 }} />
           </ScrollView>
 
-          <View style={styles.bottomBar}>
+          <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
             {savedMsg ? (
               <View style={styles.savedBadge}>
                 <Ionicons name="checkmark-circle-outline" size={18} color="#2E7D32" />
@@ -250,7 +252,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20, justifyContent: 'center', marginBottom: 8,
   },
   deleteBtnText: { fontSize: 15, fontWeight: '500', color: '#C62828' },
-  bottomBar: { paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#FAFAF9' },
+  bottomBar: { paddingHorizontal: 20, paddingTop: 16, backgroundColor: '#FAFAF9' },
   btnPrimary: { height: 52, backgroundColor: PRIMARY, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
   btnPrimaryText: { color: '#fff', fontSize: 16, fontWeight: '500' },
   savedBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 52, gap: 8 },
