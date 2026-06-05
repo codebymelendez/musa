@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { signClientToken } from "@/lib/clientAuth";
+import { rateLimit } from "@/lib/rateLimit";
 
 const schema = z.object({
   phone: z.string().min(7),
@@ -10,6 +11,15 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    // 1. Rate Limiting por IP (Máximo 10 intentos por minuto)
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "127.0.0.1";
+    if (!rateLimit(ip, { limit: 10, windowMs: 60 * 1000 })) {
+      return NextResponse.json(
+        { error: "Demasiados intentos de verificación. Inténtalo de nuevo en un minuto." },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
@@ -21,20 +31,27 @@ export async function POST(req: NextRequest) {
 
     // Normalizar teléfono (solo números)
     const normalizedPhone = phone.replace(/\D/g, "");
+    if (normalizedPhone.length < 7) {
+      return NextResponse.json({ error: "Número de teléfono incompleto" }, { status: 400 });
+    }
 
-    // Búsqueda súper flexible: traemos todos y filtramos en JS
-    const { data: allClients, error: searchError } = await supabase
+    // Obtener los últimos 7 dígitos para buscar de forma rápida y eficiente por sufijo
+    const suffix = normalizedPhone.slice(-7);
+
+    // Búsqueda súper optimizada a nivel de DB por sufijo telefónico
+    const { data: matchedClients, error: searchError } = await supabase
       .from('Client')
-      .select('id, name, phone');
+      .select('id, name, phone')
+      .like('phone', `%${suffix}%`);
 
     if (searchError) {
       console.error("[client verify] Error en consulta:", searchError);
       return NextResponse.json({ error: "Error en base de datos" }, { status: 500 });
     }
 
-    console.log(`[client verify] Buscando: ${phone} (${normalizedPhone}). Clientes en DB: ${allClients?.length || 0}`);
+    console.log(`[client verify] Buscando: ${phone} (${normalizedPhone}). Coincidencias en DB: ${matchedClients?.length || 0}`);
 
-    const client = allClients?.find(c => {
+    const client = matchedClients?.find(c => {
        const cPhone = c.phone.replace(/\D/g, "");
        const match = cPhone.includes(normalizedPhone) || 
                      normalizedPhone.includes(cPhone) || 

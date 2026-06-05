@@ -3,6 +3,7 @@ import { z } from "zod";
 import { randomBytes } from "crypto";
 import { sendEmail } from "@/lib/mailer";
 import { createClient } from "@/lib/supabase-server";
+import { rateLimit } from "@/lib/rateLimit";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -12,6 +13,15 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    // 1. Rate Limiting por IP (Máximo 3 solicitudes por minuto)
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "127.0.0.1";
+    if (!rateLimit(ip, { limit: 3, windowMs: 60 * 1000 })) {
+      return NextResponse.json(
+        { error: "Demasiadas solicitudes de recuperación. Inténtalo de nuevo en un minuto." },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
