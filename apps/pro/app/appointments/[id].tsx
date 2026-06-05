@@ -140,22 +140,24 @@ export default function AppointmentDetailScreen() {
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             {/* Client card */}
             <View style={styles.card}>
-              <Text style={styles.clientName}>{apt.client.name}</Text>
-              <TouchableOpacity
-                style={styles.phoneRow}
-                onPress={() => Linking.openURL(`tel:${apt.client.phone}`)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="call-outline" size={16} color={PRIMARY} />
-                <Text style={styles.phoneText}>{apt.client.phone}</Text>
-              </TouchableOpacity>
+              <Text style={styles.clientName}>{apt.client?.name ?? 'Sin nombre'}</Text>
+              {apt.client?.phone ? (
+                <TouchableOpacity
+                  style={styles.phoneRow}
+                  onPress={() => Linking.openURL(`tel:${apt.client?.phone}`)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="call-outline" size={16} color={PRIMARY} />
+                  <Text style={styles.phoneText}>{apt.client?.phone}</Text>
+                </TouchableOpacity>
+              ) : null}
               <View style={styles.divider} />
-              <Text style={styles.serviceLabel}>{apt.service.name}</Text>
+              <Text style={styles.serviceLabel}>{apt.service?.name ?? 'Sin servicio'}</Text>
               <View style={styles.metaRow}>
-                <Text style={styles.metaText}>{apt.service.durationMin} min</Text>
+                <Text style={styles.metaText}>{apt.service?.durationMin ?? 0} min</Text>
                 <Text style={styles.metaDot}>·</Text>
                 <Text style={[styles.metaText, { fontFamily: MONO }]}>
-                  {formatMoney(apt.service.price, apt.service.currency)}
+                  {formatMoney(apt.service?.price ?? 0, apt.service?.currency ?? 'USD')}
                 </Text>
               </View>
             </View>

@@ -118,8 +118,8 @@ function AppointmentCard({ item }: { item: AppointmentItem }) {
         <Text style={s.timeText}>{formatTime(item.startTime)} — {formatTime(item.endTime)}</Text>
         <StatusPill status={item.status} />
       </View>
-      <Text style={s.clientName}>{item.client.name}</Text>
-      <Text style={s.serviceName}>{item.service.name}</Text>
+      <Text style={s.clientName}>{item.client?.name ?? 'Sin nombre'}</Text>
+      <Text style={s.serviceName}>{item.service?.name ?? 'Sin servicio'}</Text>
     </TouchableOpacity>
   )
 }
