@@ -266,8 +266,9 @@ export default function TeamScreen() {
 
           {/* Invite button */}
           <TouchableOpacity
-            style={teamStyles.btnPrimary}
-            onPress={() => setShowInviteModal(true)}
+            style={[teamStyles.btnPrimary, !isTeamPlan && { opacity: 0.4 }]}
+            onPress={isTeamPlan ? () => setShowInviteModal(true) : undefined}
+            disabled={!isTeamPlan}
             activeOpacity={0.85}>
             <Ionicons name="person-add-outline" size={18} color="#fff" />
             <Text style={teamStyles.btnPrimaryText}>Invitar miembro</Text>

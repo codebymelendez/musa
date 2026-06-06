@@ -7,8 +7,8 @@ const createSchema = z.object({
   title: z.string().min(3),
   description: z.string().optional().default(""),
   discount: z.number().min(1).max(100),
-  validFrom: z.string().datetime(),
-  validUntil: z.string().datetime(),
+  validFrom: z.string().datetime().optional().nullable(),
+  validUntil: z.string().datetime().optional().nullable(),
   targetUserId: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
 });
@@ -82,8 +82,8 @@ export async function POST(req: NextRequest) {
         ...parsed.data,
         id: crypto.randomUUID(),
         businessId: user.businessId,
-        validFrom: new Date(parsed.data.validFrom).toISOString(),
-        validUntil: new Date(parsed.data.validUntil).toISOString(),
+        validFrom: parsed.data.validFrom ? new Date(parsed.data.validFrom).toISOString() : new Date().toISOString(),
+        validUntil: parsed.data.validUntil ? new Date(parsed.data.validUntil).toISOString() : null,
       })
       .select()
       .single();

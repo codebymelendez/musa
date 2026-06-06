@@ -27,6 +27,7 @@ export function formatDate(iso: string): string {
   return capitalize(
     new Intl.DateTimeFormat('es-ES', {
       weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+      timeZone: 'America/Caracas',
     }).format(new Date(iso))
   )
 }
@@ -34,6 +35,7 @@ export function formatDate(iso: string): string {
 export function formatShortDate(iso: string): string {
   return new Intl.DateTimeFormat('es-ES', {
     day: 'numeric', month: 'short',
+    timeZone: 'America/Caracas',
   }).format(new Date(iso))
 }
 

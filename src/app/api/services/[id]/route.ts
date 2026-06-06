@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -39,8 +40,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const { id } = await params;
 
-  const supabase = await createClient();
-  const { data: service } = await supabase
+  const admin = createAdminClient();
+  const { data: service } = await admin
     .from('Service')
     .select('id')
     .eq('id', id)
@@ -56,7 +57,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Datos inválidos" }, { status: 400 });
     }
 
-    const { data: updated, error } = await supabase
+    const { data: updated, error } = await admin
       .from('Service')
       .update(parsed.data)
       .eq('id', id)

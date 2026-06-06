@@ -8,6 +8,9 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   try {
+    const body = await req.json().catch(() => ({}))
+    const email: string | undefined = typeof body.email === 'string' ? body.email.trim().toLowerCase() : undefined
+
     const supabase = await createClient();
     const { data: user } = await supabase
       .from('User')
@@ -30,6 +33,7 @@ export async function POST(req: NextRequest) {
         token,
         code,
         role: "STAFF",
+        ...(email && { email }),
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 días
       })
       .select()

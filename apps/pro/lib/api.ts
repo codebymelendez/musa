@@ -7,6 +7,24 @@ export function toVenezuelaDate(date: Date): string {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Caracas' }).format(date)
 }
 
+// Supabase returns timestamps without timezone suffix ("2026-06-05 13:00:00").
+// JS parses those as LOCAL time instead of UTC. Add Z to force UTC interpretation.
+export function normalizeISODate(dateStr: string): string {
+  if (!dateStr) return dateStr
+  if (dateStr.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(dateStr)) return dateStr
+  return dateStr.replace(' ', 'T') + 'Z'
+}
+
+function normalizeAppointment(apt: AppointmentItem): AppointmentItem {
+  return {
+    ...apt,
+    startTime: normalizeISODate(apt.startTime),
+    endTime:   normalizeISODate(apt.endTime),
+    createdAt: normalizeISODate(apt.createdAt),
+    updatedAt: normalizeISODate(apt.updatedAt),
+  }
+}
+
 async function authHeaders(): Promise<Record<string, string> | null> {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session?.access_token) return null
@@ -59,7 +77,8 @@ export async function getAppointments(date: string): Promise<AppointmentItem[]> 
   const res = await fetch(`${API_URL}/api/appointments?date=${date}`, { headers })
   if (res.status === 401) { await handle401(); return [] }
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  const data: AppointmentItem[] = await res.json()
+  return data.map(normalizeAppointment)
 }
 
 export async function getUpcomingAppointments(limitDays = 7): Promise<AppointmentItem[]> {
@@ -74,7 +93,7 @@ export async function getUpcomingAppointments(limitDays = 7): Promise<Appointmen
   if (res.status === 401) { await handle401(); return [] }
   if (!res.ok) return []
   const data: AppointmentItem[] = await res.json()
-  return data.filter(a => a.status !== 'cancelled').slice(0, 3)
+  return data.filter(a => a.status !== 'cancelled').slice(0, 3).map(normalizeAppointment)
 }
 
 export async function getAppointmentById(id: string): Promise<AppointmentItem | null> {
@@ -83,7 +102,8 @@ export async function getAppointmentById(id: string): Promise<AppointmentItem | 
   const res = await fetch(`${API_URL}/api/appointments/${id}`, { headers })
   if (res.status === 401) { await handle401(); return null }
   if (!res.ok) return null
-  return res.json()
+  const data: AppointmentItem = await res.json()
+  return normalizeAppointment(data)
 }
 
 // action = 'confirm' | 'cancel' — uses query param per backend contract
@@ -138,7 +158,11 @@ export async function getClientById(id: string): Promise<ClientItem | null> {
   const res = await fetch(`${API_URL}/api/clients/${id}`, { headers })
   if (res.status === 401) { await handle401(); return null }
   if (!res.ok) return null
-  return res.json()
+  const data: ClientItem = await res.json()
+  return {
+    ...data,
+    appointments: (data.appointments ?? []).map(normalizeAppointment),
+  }
 }
 
 export async function updateClientNotes(id: string, notes: string): Promise<void> {

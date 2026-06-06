@@ -136,6 +136,16 @@ export default function AppointmentDetailScreen() {
 
       {state.kind === 'ok' && (() => {
         const apt = state.data
+        if (!apt.client || !apt.service) {
+          return (
+            <View style={styles.centerState}>
+              <Text style={styles.errorText}>No se pudo cargar el detalle completo de la cita.</Text>
+              <TouchableOpacity style={styles.retryBtn} onPress={load} activeOpacity={0.85}>
+                <Text style={styles.retryText}>Reintentar</Text>
+              </TouchableOpacity>
+            </View>
+          )
+        }
         return (
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             {/* Client card */}

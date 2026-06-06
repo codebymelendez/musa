@@ -7,7 +7,7 @@ const createSchema = z.object({
   name: z.string().min(1, "El nombre es obligatorio"),
   description: z.string().optional(),
   imageUrl: z.string().url().optional().or(z.literal("")),
-  category: z.enum(["nails", "hair", "brows", "makeup", "other"]),
+  category: z.enum(["nails", "hair", "brows", "makeup", "other"]).optional().default("other"),
   durationMin: z.number().int().positive("La duración debe ser mayor a 0"),
   price: z.number().nonnegative("El precio no puede ser negativo"),
   currency: z.string().default("USD"),
