@@ -8,9 +8,9 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import {
   getSettings, getServices, getPromotions, getLoyaltyProgram,
-  type LoyaltyProgram, type ServiceItem,
+  type LoyaltyProgram,
 } from '../../lib/api'
-import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF } from '../../lib/utils'
+import { PRIMARY, DARK, SURFACE, BORDER, GRAY, SERIF, initials } from '../../lib/utils'
 
 const APP_URL = (process.env.EXPO_PUBLIC_APP_URL ?? 'https://getmusa.app').replace(/\/$/, '')
 
@@ -59,7 +59,11 @@ function NavRow({
   locked?: boolean
 }) {
   return (
-    <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.72}>
+    <TouchableOpacity
+      style={styles.row}
+      onPress={locked ? undefined : onPress}
+      activeOpacity={locked ? 1 : 0.72}
+    >
       <View style={[styles.rowIconWrap, locked && styles.rowIconWrapLocked]}>
         <Ionicons name={icon} size={20} color={locked ? '#AAAAAA' : PRIMARY} />
       </View>
@@ -67,7 +71,11 @@ function NavRow({
         <Text style={[styles.rowLabel, locked && { color: GRAY }]}>{label}</Text>
         {subtitle ? <Text style={styles.rowSub}>{subtitle}</Text> : null}
       </View>
-      <Ionicons name="chevron-forward-outline" size={16} color="#CCCCCC" />
+      <Ionicons
+        name={locked ? 'lock-closed-outline' : 'chevron-forward-outline'}
+        size={16}
+        color="#CCCCCC"
+      />
     </TouchableOpacity>
   )
 }
@@ -79,12 +87,11 @@ export default function BusinessScreen() {
   const [refreshing, setRefreshing] = useState(false)
 
   const [businessName, setBusinessName] = useState('')
-  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [slug, setSlug] = useState('')
   const [planName, setPlanName] = useState<string | null>(null)
   const [teamCount, setTeamCount] = useState(0)
   const [serviceCount, setServiceCount] = useState(0)
-  const [serviceList, setServiceList] = useState<ServiceItem[]>([])
   const [activePromoCount, setActivePromoCount] = useState(0)
   const [loyaltyProgram, setLoyaltyProgram] = useState<LoyaltyProgram | null>(null)
   const [copied, setCopied] = useState(false)
@@ -102,12 +109,11 @@ export default function BusinessScreen() {
         getLoyaltyProgram(),
       ])
       setBusinessName(sData?.business?.name ?? '')
-      setLogoUrl(sData?.business?.logoUrl ?? null)
+      setAvatarUrl(sData?.avatarUrl ?? null)
       setSlug(sData?.slug ?? '')
       setPlanName(sData?.business?.plan?.name ?? null)
       setTeamCount(sData?.business?.users?.length ?? 0)
       setServiceCount(services.length)
-      setServiceList(services.slice(0, 3))
       setCity(sData?.business?.city ?? 'Caracas')
       const now = new Date()
       setActivePromoCount(
@@ -159,20 +165,17 @@ export default function BusinessScreen() {
             {/* ─── Hero / Profile Details ─── */}
             <View style={styles.hero}>
               <View style={styles.avatarContainer}>
-                {logoUrl ? (
-                  <Image source={{ uri: logoUrl }} style={styles.avatarCircle} />
+                {avatarUrl ? (
+                  <Image source={{ uri: avatarUrl }} style={styles.avatarCircle} />
                 ) : (
                   <View style={styles.avatarCircle}>
                     {businessName ? (
-                      <Text style={styles.avatarLetter}>{businessName[0]?.toUpperCase()}</Text>
+                      <Text style={styles.avatarLetter}>{initials(businessName)}</Text>
                     ) : (
-                      <Ionicons name="business-outline" size={36} color={GRAY} />
+                      <Ionicons name="person-outline" size={36} color={GRAY} />
                     )}
                   </View>
                 )}
-                <TouchableOpacity style={styles.avatarEditBtn}>
-                  <Ionicons name="pencil-outline" size={14} color="#fff" />
-                </TouchableOpacity>
               </View>
               
               <Text style={styles.businessName}>{businessName || 'Mi Negocio'}</Text>
@@ -186,85 +189,53 @@ export default function BusinessScreen() {
               </View>
             </View>
 
-            {/* ─── Services Bento Card ─── */}
-            <View style={styles.sectionCard}>
-              <View style={styles.sectionCardHeader}>
-                <Text style={styles.bentoLabel}>SERVICIOS</Text>
-                <TouchableOpacity style={styles.addBtn}>
-                  <Ionicons name="add-circle-outline" size={16} color={PRIMARY} />
-                  <Text style={styles.addBtnText}>Agregar</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.servicesList}>
-                {serviceList.length === 0 ? (
-                  <Text style={{ fontSize: 14, color: GRAY, paddingVertical: 12, textAlign: 'center' }}>
-                    Sin servicios configurados aún.
-                  </Text>
-                ) : (
-                  serviceList.map((svc, idx) => (
-                    <View key={svc.id}>
-                      {idx > 0 && <View style={styles.serviceDivider} />}
-                      <View style={styles.serviceRow}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.serviceTitle}>{svc.name}</Text>
-                          <Text style={styles.serviceMeta}>{svc.durationMin} min{svc.category ? ` • ${svc.category}` : ''}</Text>
-                        </View>
-                        <Text style={[styles.servicePrice, { fontFamily: MONO }]}>
-                          {svc.currency === 'USD' ? '$' : ''}{svc.price}
-                        </Text>
-                      </View>
-                    </View>
-                  ))
-                )}
-              </View>
+            {/* ─── Navigation ─── */}
+            <View style={styles.card}>
+              <NavRow
+                icon="cut-outline"
+                label="Mis servicios"
+                subtitle={serviceCount === 1 ? '1 servicio' : `${serviceCount} servicios`}
+                onPress={() => router.push('/services' as Parameters<typeof router.push>[0])}
+              />
+              <View style={styles.rowDivider} />
+              <NavRow
+                icon="pricetag-outline"
+                label="Promociones"
+                subtitle={activePromoCount > 0 ? `${activePromoCount} activa${activePromoCount !== 1 ? 's' : ''}` : 'Sin promociones activas'}
+                onPress={() => router.push('/promotions' as Parameters<typeof router.push>[0])}
+              />
+              <View style={styles.rowDivider} />
+              <NavRow
+                icon="gift-outline"
+                label="Programa de fidelidad"
+                subtitle={loyaltySubtitle()}
+                onPress={() => router.push('/settings/loyalty' as Parameters<typeof router.push>[0])}
+              />
+              <View style={styles.rowDivider} />
+              <NavRow
+                icon="people-outline"
+                label="Mi equipo"
+                subtitle={teamSubtitle()}
+                onPress={() => router.push('/team' as Parameters<typeof router.push>[0])}
+                locked={!isTeamPlan}
+              />
+              <View style={styles.rowDivider} />
+              <NavRow
+                icon="bar-chart-outline"
+                label="Estadísticas"
+                subtitle="Ver rendimiento del negocio"
+                onPress={() => router.push('/stats' as Parameters<typeof router.push>[0])}
+              />
             </View>
 
             {/* ─── Portfolio Gallery ─── */}
             <View style={styles.sectionCard}>
               <View style={styles.sectionCardHeader}>
                 <Text style={styles.bentoLabel}>GALERÍA</Text>
-                <TouchableOpacity>
-                  <Text style={styles.manageAllText}>Gestionar todo</Text>
-                </TouchableOpacity>
               </View>
-              <View style={[styles.galleryGrid, { alignItems: 'center', justifyContent: 'center', paddingVertical: 20 }]}>
+              <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 20 }}>
                 <Text style={{ fontSize: 14, color: GRAY, textAlign: 'center' }}>Portafolio próximamente</Text>
               </View>
-            </View>
-
-            {/* ─── Business Navigation Settings Rows ─── */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>AJUSTES DE NEGOCIO</Text>
-              <View style={styles.card}>
-                <NavRow
-                  icon="calendar-outline"
-                  label="Disponibilidad"
-                  onPress={() => router.push('/settings/availability' as Parameters<typeof router.push>[0])}
-                />
-                <View style={styles.rowDivider} />
-                <NavRow
-                  icon="notifications-outline"
-                  label="Notificaciones"
-                  onPress={() => {}}
-                />
-                <View style={styles.rowDivider} />
-                <NavRow
-                  icon="card-outline"
-                  label="Métodos de pago"
-                  onPress={() => {}}
-                />
-              </View>
-            </View>
-
-            {/* ─── Online Booking Toggle Card ─── */}
-            <View style={styles.toggleCard}>
-              <View style={styles.toggleRow}>
-                <Text style={styles.toggleLabel}>Reserva Online</Text>
-                <View style={styles.fakeToggleActive}>
-                  <View style={styles.fakeToggleCircleActive} />
-                </View>
-              </View>
-              <Text style={styles.toggleDesc}>Las clientas pueden reservar servicios directamente desde tu perfil público de MUSA.</Text>
             </View>
           </>
         )}
@@ -294,11 +265,6 @@ const styles = StyleSheet.create({
     marginBottom: 12, overflow: 'hidden', borderWidth: 1, borderColor: BORDER,
   },
   avatarLetter: { fontSize: 36, fontWeight: '500', color: PRIMARY },
-  avatarEditBtn: {
-    position: 'absolute', bottom: 12, right: 0,
-    backgroundColor: PRIMARY, width: 28, height: 28, borderRadius: 14,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: SURFACE,
-  },
   businessName: { fontFamily: SERIF, fontSize: 24, color: DARK, marginBottom: 4 },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   locationText: { fontSize: 13, color: GRAY },
@@ -333,7 +299,7 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
-    height: 56, paddingHorizontal: 18,
+    height: 60, paddingHorizontal: 18,
   },
   rowIconWrap: {
     width: 34, height: 34, borderRadius: 8,

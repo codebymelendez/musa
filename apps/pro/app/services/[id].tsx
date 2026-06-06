@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Animated, Alert,
+  StyleSheet, Animated, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -129,10 +129,15 @@ export default function ServiceEditScreen() {
       )}
 
       {loadState === 'ready' && (
-        <>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+        >
           <ScrollView
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Información del servicio</Text>
@@ -212,7 +217,7 @@ export default function ServiceEditScreen() {
               </TouchableOpacity>
             )}
           </View>
-        </>
+        </KeyboardAvoidingView>
       )}
     </SafeAreaView>
   )

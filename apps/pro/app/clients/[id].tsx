@@ -8,11 +8,11 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, router } from 'expo-router'
 import {
-  getClientById, updateClientNotes,
+  getClientById, updateClient,
   getLoyaltyProgram, findLoyaltyAccountByClientId, redeemLoyaltyReward,
   type ClientItem, type AppointmentStatus, type LoyaltyProgram, type LoyaltyAccount,
 } from '../../lib/api'
-import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials, formatTime, formatShortDate, formatMoney } from '../../lib/utils'
+import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials, formatShortDate, formatMoney } from '../../lib/utils'
 
 // ─── status pill (mini) ───────────────────────────────────────────────────────
 
@@ -53,7 +53,6 @@ function LoyaltySection({
     <View style={styles.sectionBlock}>
       <Text style={styles.sectionTitle}>Fidelidad</Text>
 
-      {/* Points hero */}
       <View style={styles.loyaltyHero}>
         <View style={styles.loyaltyPointsBox}>
           <Text style={[styles.loyaltyPoints, { fontFamily: MONO }]}>{totalPoints}</Text>
@@ -69,7 +68,6 @@ function LoyaltySection({
         )}
       </View>
 
-      {/* Progress bar */}
       <View style={styles.progressSection}>
         <View style={styles.progressBar}>
           <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
@@ -81,7 +79,6 @@ function LoyaltySection({
         </Text>
       </View>
 
-      {/* Reward description */}
       {program.rewardDescription ? (
         <View style={styles.rewardRow}>
           <Ionicons name="gift-outline" size={15} color={PRIMARY} />
@@ -89,23 +86,15 @@ function LoyaltySection({
         </View>
       ) : null}
 
-      {/* Redeem button */}
       {canRedeem && account && (
-        <TouchableOpacity
-          style={styles.redeemBtn}
-          onPress={onRedeem}
-          activeOpacity={0.85}
-        >
+        <TouchableOpacity style={styles.redeemBtn} onPress={onRedeem} activeOpacity={0.85}>
           <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
           <Text style={styles.redeemBtnText}>Registrar canje</Text>
         </TouchableOpacity>
       )}
 
-      {/* No account yet */}
       {!account && (
-        <Text style={styles.noAccountHint}>
-          Esta clienta aún no tiene puntos acumulados
-        </Text>
+        <Text style={styles.noAccountHint}>Esta clienta aún no tiene puntos acumulados</Text>
       )}
     </View>
   )
@@ -135,40 +124,237 @@ function Skeleton() {
   )
 }
 
-// ─── notes modal ──────────────────────────────────────────────────────────────
+// ─── edit client modal ────────────────────────────────────────────────────────
 
-function NotesModal({
-  visible, initial, onClose, onSave,
-}: { visible: boolean; initial: string; onClose: () => void; onSave: (v: string) => void }) {
-  const [value, setValue] = useState(initial)
-  useEffect(() => { if (visible) setValue(initial) }, [visible, initial])
+const AVAILABLE_TAGS = ['VIP', 'Nueva', 'Regular', 'Frecuente']
+
+function formatBirthday(iso: string): string {
+  const parts = iso.split('-')
+  if (parts.length < 3) return iso
+  return `${parts[2]}/${parts[1]}/${parts[0]}`
+}
+
+type ClientUpdate = {
+  name: string
+  phone: string
+  email: string | null
+  birthday: string | null
+  tags: string[]
+  notes: string
+}
+
+function EditClientModal({
+  visible, client, onClose, onSave,
+}: {
+  visible: boolean
+  client: ClientItem
+  onClose: () => void
+  onSave: (data: ClientUpdate) => Promise<void>
+}) {
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
+  const [day, setDay] = useState('')
+  const [month, setMonth] = useState('')
+  const [year, setYear] = useState('')
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const refMonth = useRef<TextInput>(null)
+  const refYear = useRef<TextInput>(null)
+
+  useEffect(() => {
+    if (!visible) return
+    setName(client.name)
+    setPhone(client.phone)
+    setEmail(client.email ?? '')
+    setSelectedTags(client.tags ?? [])
+    setNotes(client.notes ?? '')
+    if (client.birthday) {
+      const parts = client.birthday.split('-')
+      setYear(parts[0] ?? '')
+      setMonth(parts[1] ?? '')
+      setDay(parts[2] ?? '')
+    } else {
+      setDay(''); setMonth(''); setYear('')
+    }
+  }, [visible, client])
+
+  function toggleTag(tag: string) {
+    setSelectedTags(prev =>
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+    )
+  }
+
+  async function handleSave() {
+    if (!name.trim()) { Alert.alert('', 'El nombre es requerido'); return }
+    if (!phone.trim()) { Alert.alert('', 'El teléfono es requerido'); return }
+
+    let birthday: string | null = null
+    if (day && month && year && year.length === 4) {
+      birthday = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+    }
+
+    setSaving(true)
+    try {
+      await onSave({
+        name: name.trim(),
+        phone: phone.trim(),
+        email: email.trim() || null,
+        birthday,
+        tags: selectedTags,
+        notes: notes.trim(),
+      })
+    } finally { setSaving(false) }
+  }
+
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={styles.modalOverlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <View style={styles.modalSheet}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Notas</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close-outline" size={24} color={DARK} />
-            </TouchableOpacity>
-          </View>
-          <TextInput
-            style={styles.notesInput}
-            value={value}
-            onChangeText={setValue}
-            multiline
-            placeholder="Escribe notas sobre esta clienta..."
-            placeholderTextColor="#AAAAAA"
-            textAlignVertical="top"
-          />
-          <TouchableOpacity style={styles.btnPrimary} onPress={() => onSave(value)} activeOpacity={0.85}>
-            <Text style={styles.btnPrimaryText}>Guardar notas</Text>
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <SafeAreaView style={styles.mSafe} edges={['top', 'bottom']}>
+        <View style={styles.mHeader}>
+          <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={styles.mCancel}>Cancelar</Text>
+          </TouchableOpacity>
+          <Text style={styles.mTitle}>Editar clienta</Text>
+          <TouchableOpacity onPress={handleSave} disabled={saving} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={[styles.mSave, saving && { opacity: 0.5 }]}>
+              {saving ? 'Guardando…' : 'Guardar'}
+            </Text>
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <ScrollView
+            contentContainerStyle={styles.mContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Text style={styles.mLabel}>Nombre completo *</Text>
+            <TextInput
+              style={styles.mInput}
+              value={name}
+              onChangeText={setName}
+              placeholderTextColor="#AAAAAA"
+              returnKeyType="next"
+            />
+
+            <Text style={[styles.mLabel, { marginTop: 14 }]}>Teléfono *</Text>
+            <TextInput
+              style={styles.mInput}
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+              placeholderTextColor="#AAAAAA"
+            />
+
+            <Text style={[styles.mLabel, { marginTop: 14 }]}>
+              Email <Text style={{ color: '#BBBBBB' }}>(opcional)</Text>
+            </Text>
+            <TextInput
+              style={styles.mInput}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              placeholderTextColor="#AAAAAA"
+            />
+
+            <Text style={[styles.mLabel, { marginTop: 14 }]}>
+              Cumpleaños <Text style={{ color: '#BBBBBB' }}>(opcional)</Text>
+            </Text>
+            <View style={styles.mBirthdayRow}>
+              <View style={styles.mBirthdayField}>
+                <Text style={styles.mBirthdayLabel}>DD</Text>
+                <TextInput
+                  style={styles.mBirthdayInput}
+                  value={day}
+                  onChangeText={v => {
+                    const d = v.replace(/\D/g, '').slice(0, 2)
+                    setDay(d)
+                    if (d.length === 2) refMonth.current?.focus()
+                  }}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                  placeholder="DD"
+                  placeholderTextColor="#AAAAAA"
+                  textAlign="center"
+                />
+              </View>
+              <Text style={styles.mBirthdaySep}>/</Text>
+              <View style={styles.mBirthdayField}>
+                <Text style={styles.mBirthdayLabel}>MM</Text>
+                <TextInput
+                  ref={refMonth}
+                  style={styles.mBirthdayInput}
+                  value={month}
+                  onChangeText={v => {
+                    const m = v.replace(/\D/g, '').slice(0, 2)
+                    setMonth(m)
+                    if (m.length === 2) refYear.current?.focus()
+                  }}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                  placeholder="MM"
+                  placeholderTextColor="#AAAAAA"
+                  textAlign="center"
+                />
+              </View>
+              <Text style={styles.mBirthdaySep}>/</Text>
+              <View style={[styles.mBirthdayField, { flex: 2 }]}>
+                <Text style={styles.mBirthdayLabel}>AAAA</Text>
+                <TextInput
+                  ref={refYear}
+                  style={styles.mBirthdayInput}
+                  value={year}
+                  onChangeText={v => setYear(v.replace(/\D/g, '').slice(0, 4))}
+                  keyboardType="number-pad"
+                  maxLength={4}
+                  placeholder="AAAA"
+                  placeholderTextColor="#AAAAAA"
+                  textAlign="center"
+                />
+              </View>
+            </View>
+
+            <Text style={[styles.mLabel, { marginTop: 14 }]}>Etiquetas</Text>
+            <View style={styles.mTagsRow}>
+              {AVAILABLE_TAGS.map(tag => {
+                const active = selectedTags.includes(tag)
+                return (
+                  <TouchableOpacity
+                    key={tag}
+                    style={[styles.mChip, active && styles.mChipActive]}
+                    onPress={() => toggleTag(tag)}
+                    activeOpacity={0.78}
+                  >
+                    <Text style={[styles.mChipText, active && styles.mChipTextActive]}>{tag}</Text>
+                  </TouchableOpacity>
+                )
+              })}
+            </View>
+
+            <Text style={[styles.mLabel, { marginTop: 14 }]}>
+              Notas <Text style={{ color: '#BBBBBB' }}>(opcional)</Text>
+            </Text>
+            <TextInput
+              style={styles.mNotesInput}
+              value={notes}
+              onChangeText={setNotes}
+              multiline
+              placeholder="Alergias, preferencias, etc."
+              placeholderTextColor="#AAAAAA"
+              textAlignVertical="top"
+            />
+
+            <View style={{ height: 20 }} />
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
     </Modal>
   )
 }
@@ -181,10 +367,8 @@ export default function ClientDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const [state, setState] = useState<State>({ kind: 'loading' })
   const [refreshing, setRefreshing] = useState(false)
-  const [notesModal, setNotesModal] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [editModal, setEditModal] = useState(false)
 
-  // loyalty state
   const [loyaltyProgram, setLoyaltyProgram] = useState<LoyaltyProgram | null>(null)
   const [loyaltyAccount, setLoyaltyAccount] = useState<LoyaltyAccount | null>(null)
   const [redeeming, setRedeeming] = useState(false)
@@ -207,15 +391,20 @@ export default function ClientDetailScreen() {
   useEffect(() => { load() }, [load])
   const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false) }
 
-  async function saveNotes(notes: string) {
+  async function saveClient(data: ClientUpdate) {
     if (!id) return
-    setSaving(true)
     try {
-      await updateClientNotes(id, notes)
-      setState(prev => prev.kind === 'ok' ? { ...prev, data: { ...prev.data, notes } } : prev)
-      setNotesModal(false)
-    } catch { /* silently fail */ }
-    finally { setSaving(false) }
+      await updateClient(id, data)
+    } catch {
+      Alert.alert('Error', 'No se pudieron guardar los cambios')
+      return
+    }
+    setState(prev =>
+      prev.kind === 'ok'
+        ? { ...prev, data: { ...prev.data, ...data } }
+        : prev
+    )
+    setEditModal(false)
   }
 
   function handleRedeem() {
@@ -231,7 +420,6 @@ export default function ClientDetailScreen() {
             setRedeeming(true)
             try {
               const result = await redeemLoyaltyReward(loyaltyAccount.id)
-              // update local points
               setLoyaltyAccount(prev => prev
                 ? { ...prev, totalPoints: prev.totalPoints - result.pointsUsed }
                 : prev
@@ -258,7 +446,14 @@ export default function ClientDetailScreen() {
           <Ionicons name="chevron-back-outline" size={24} color={DARK} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
-        <View style={styles.backBtn} />
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => setEditModal(true)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          disabled={state.kind !== 'ok'}
+        >
+          <Ionicons name="pencil-outline" size={20} color={state.kind === 'ok' ? PRIMARY : GRAY} />
+        </TouchableOpacity>
       </View>
 
       {state.kind === 'loading' && (
@@ -297,6 +492,12 @@ export default function ClientDetailScreen() {
                   <Ionicons name="call-outline" size={16} color={PRIMARY} />
                   <Text style={styles.phoneText}>{c.phone}</Text>
                 </TouchableOpacity>
+                {c.birthday ? (
+                  <View style={styles.birthdayRow}>
+                    <Ionicons name="gift-outline" size={14} color={GRAY} />
+                    <Text style={styles.birthdayText}>{formatBirthday(c.birthday)}</Text>
+                  </View>
+                ) : null}
                 {c.tags && c.tags.length > 0 && (
                   <View style={styles.tagsRow}>
                     {c.tags.map((tag, i) => (
@@ -308,7 +509,6 @@ export default function ClientDetailScreen() {
                 )}
               </View>
 
-              {/* Loyalty — visible solo si el programa está activo */}
               {showLoyalty && loyaltyProgram && (
                 <LoyaltySection
                   program={loyaltyProgram}
@@ -321,15 +521,10 @@ export default function ClientDetailScreen() {
               <View style={styles.sectionBlock}>
                 <Text style={styles.sectionTitle}>Historial de citas</Text>
                 {!c.appointments || c.appointments.length === 0 ? (
-                  <Text style={styles.grayText}>Sin citas registradas</Text>
+                  <Text style={styles.grayText}>Sin citas anteriores registradas</Text>
                 ) : (
                   c.appointments.map(apt => (
-                    <TouchableOpacity
-                      key={apt.id}
-                      style={styles.aptRow}
-                      onPress={() => router.push(`/appointments/${apt.id}` as Parameters<typeof router.push>[0])}
-                      activeOpacity={0.72}
-                    >
+                    <View key={apt.id} style={styles.aptRow}>
                       <View style={styles.aptLeft}>
                         <Text style={styles.aptDate}>{formatShortDate(apt.startTime)}</Text>
                         <Text style={styles.aptService}>{apt.service?.name ?? '—'}</Text>
@@ -342,31 +537,25 @@ export default function ClientDetailScreen() {
                         )}
                         <MiniPill status={apt.status} />
                       </View>
-                    </TouchableOpacity>
+                    </View>
                   ))
                 )}
               </View>
 
               {/* Notes */}
-              <View style={styles.sectionBlock}>
-                <View style={styles.sectionRow}>
+              {c.notes ? (
+                <View style={styles.sectionBlock}>
                   <Text style={styles.sectionTitle}>Notas</Text>
-                  <TouchableOpacity onPress={() => setNotesModal(true)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Text style={styles.editLink}>Editar</Text>
-                  </TouchableOpacity>
+                  <Text style={styles.notesText}>{c.notes}</Text>
                 </View>
-                <Text style={styles.notesText}>
-                  {c.notes ? c.notes : <Text style={styles.grayText}>Sin notas</Text>}
-                </Text>
-              </View>
+              ) : null}
             </ScrollView>
 
-            <NotesModal
-              visible={notesModal}
-              initial={c.notes ?? ''}
-              onClose={() => setNotesModal(false)}
-              onSave={saveNotes}
+            <EditClientModal
+              visible={editModal}
+              client={c}
+              onClose={() => setEditModal(false)}
+              onSave={saveClient}
             />
           </>
         )
@@ -392,8 +581,10 @@ const styles = StyleSheet.create({
   },
   avatarLgText: { fontSize: 26, fontWeight: '500', color: PRIMARY },
   heroName: { fontFamily: SERIF, fontSize: 24, color: DARK, marginBottom: 8 },
-  phoneRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+  phoneRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   phoneText: { fontSize: 15, color: PRIMARY },
+  birthdayRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  birthdayText: { fontSize: 13, color: GRAY },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
   tag: { backgroundColor: '#EDE8E4', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
   tagText: { fontSize: 12, color: DARK },
@@ -402,8 +593,6 @@ const styles = StyleSheet.create({
     borderColor: BORDER, padding: 18, marginBottom: 14,
   },
   sectionTitle: { fontSize: 13, fontWeight: '500', color: GRAY, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },
-  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  editLink: { fontSize: 14, color: PRIMARY },
   aptRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER,
@@ -420,20 +609,6 @@ const styles = StyleSheet.create({
   centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
   retryBtn: { height: 48, paddingHorizontal: 32, backgroundColor: PRIMARY, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
   retryText: { color: '#fff', fontSize: 15, fontWeight: '500' },
-  // modal
-  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
-  modalSheet: {
-    backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    padding: 24, paddingBottom: 36,
-  },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  modalTitle: { fontSize: 18, fontWeight: '500', color: DARK },
-  notesInput: {
-    minHeight: 120, borderWidth: 1, borderColor: BORDER, borderRadius: 12,
-    padding: 14, fontSize: 15, color: DARK, marginBottom: 16,
-  },
-  btnPrimary: { height: 52, backgroundColor: PRIMARY, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-  btnPrimaryText: { color: '#fff', fontSize: 16, fontWeight: '500' },
   // skeleton
   skeletonWrap: { alignItems: 'center', paddingTop: 16 },
   skeletonAvatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#F0EDE9' },
@@ -447,9 +622,7 @@ const styles = StyleSheet.create({
   loyaltyLifetimeLabel: { fontSize: 11, color: GRAY },
   loyaltyLifetimeValue: { fontSize: 18, fontWeight: '500', color: DARK },
   progressSection: { marginBottom: 14 },
-  progressBar: {
-    height: 6, borderRadius: 3, backgroundColor: '#EDE8E4', overflow: 'hidden', marginBottom: 6,
-  },
+  progressBar: { height: 6, borderRadius: 3, backgroundColor: '#EDE8E4', overflow: 'hidden', marginBottom: 6 },
   progressFill: { height: '100%', backgroundColor: PRIMARY, borderRadius: 3 },
   progressLabel: { fontSize: 12, color: GRAY },
   rewardRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },
@@ -460,4 +633,40 @@ const styles = StyleSheet.create({
   },
   redeemBtnText: { color: '#fff', fontSize: 15, fontWeight: '500' },
   noAccountHint: { fontSize: 13, color: '#BBBBBB', fontStyle: 'italic' },
+  // edit modal (full-screen)
+  mSafe: { flex: 1, backgroundColor: SURFACE },
+  mHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 14,
+    backgroundColor: '#fff', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER,
+  },
+  mCancel: { fontSize: 15, color: GRAY },
+  mTitle: { fontSize: 17, fontWeight: '500', color: DARK },
+  mSave: { fontSize: 15, fontWeight: '600', color: PRIMARY },
+  mContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
+  mLabel: { fontSize: 12, color: GRAY, marginBottom: 6 },
+  mInput: {
+    height: 46, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
+    paddingHorizontal: 14, fontSize: 15, color: DARK, backgroundColor: SURFACE,
+  },
+  mBirthdayRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
+  mBirthdayField: { flex: 1 },
+  mBirthdayLabel: { fontSize: 10, color: GRAY, marginBottom: 4, textAlign: 'center' },
+  mBirthdayInput: {
+    height: 46, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
+    fontSize: 15, color: DARK, backgroundColor: SURFACE,
+  },
+  mBirthdaySep: { fontSize: 20, color: GRAY, paddingBottom: 12 },
+  mTagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  mChip: {
+    paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20,
+    borderWidth: 1, borderColor: BORDER, backgroundColor: SURFACE,
+  },
+  mChipActive: { borderColor: PRIMARY, backgroundColor: '#FDF0EC' },
+  mChipText: { fontSize: 13, fontWeight: '500', color: GRAY },
+  mChipTextActive: { color: PRIMARY },
+  mNotesInput: {
+    minHeight: 100, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
+    padding: 14, fontSize: 15, color: DARK,
+  },
 })

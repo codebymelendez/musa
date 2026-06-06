@@ -8,11 +8,11 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import {
-  getSettings, getAppointments, getPromotions,
+  getSettings, getAppointments, getPromotions, getStats, getClients, getAppointmentsInRange,
   getLoyaltyProgram, getLoyaltyAccounts, createClient, toVenezuelaDate,
   type AppointmentItem, type PromotionItem, type LoyaltyProgram, type ClientItem,
 } from '../../lib/api'
-import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, capitalize, formatTime } from '../../lib/utils'
+import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, capitalize, formatTime, formatMoney } from '../../lib/utils'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -182,17 +182,30 @@ export default function HomeScreen() {
   const [loyaltyStats, setLoyaltyStats] = useState({ clientsWithPoints: 0, totalPoints: 0 })
   const [showAddClient, setShowAddClient] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [weeklyRevenue, setWeeklyRevenue] = useState<number | null>(null)
+  const [monthlyRevenue, setMonthlyRevenue] = useState<number | null>(null)
+  const [newClientsCount, setNewClientsCount] = useState<number | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
+      const venezNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Caracas' }))
+      const year = venezNow.getFullYear()
+      const month = venezNow.getMonth() + 1
+      const firstDayStr = `${year}-${String(month).padStart(2, '0')}-01`
+      const weekFrom = new Date(Date.now() - 7 * 86_400_000).toISOString()
+      const weekTo = new Date().toISOString()
       const todayStr = toVenezuelaDate(new Date())
-      const [sData, appts, promoList, program, accounts] = await Promise.all([
+
+      const [sData, appts, promoList, program, accounts, statsData, clients, weekAppts] = await Promise.all([
         getSettings(),
         getAppointments(todayStr),
         getPromotions(),
         getLoyaltyProgram(),
         getLoyaltyAccounts(),
+        getStats(year, month).catch(() => null),
+        getClients().catch(() => [] as ClientItem[]),
+        getAppointmentsInRange(weekFrom, weekTo).catch(() => [] as AppointmentItem[]),
       ])
       setUserName(sData?.name?.split(' ')[0] ?? '')
       setAvatarUrl(sData?.avatarUrl ?? null)
@@ -204,6 +217,12 @@ export default function HomeScreen() {
         clientsWithPoints: withPts.length,
         totalPoints: withPts.reduce((s, a) => s + a.totalPoints, 0),
       })
+      if (statsData) setMonthlyRevenue(statsData.monthlyRevenue)
+      const wRev = weekAppts
+        .filter(a => a.status === 'completed')
+        .reduce((sum, a) => sum + (a.payment?.isPaid ? a.payment.amount : a.service.price), 0)
+      setWeeklyRevenue(wRev)
+      setNewClientsCount(clients.filter(c => (c.createdAt ?? '').slice(0, 10) >= firstDayStr).length)
     } catch { /* show what loaded */ }
     finally { setLoading(false) }
   }, [])
@@ -283,49 +302,60 @@ export default function HomeScreen() {
 
         {/* ─── Bento Stats Grid ─── */}
         {loading ? (
-          <View style={{ paddingHorizontal: 20, gap: 10 }}>
-            <PulseSkeleton height={120} mx={0} mb={0} />
+          <View style={{ paddingHorizontal: 20, gap: 10, marginBottom: 24 }}>
+            <PulseSkeleton height={100} mx={0} mb={0} />
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <View style={{ flex: 1 }}>
-                <PulseSkeleton height={110} mx={0} mb={0} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <PulseSkeleton height={110} mx={0} mb={0} />
-              </View>
+              <View style={{ flex: 1 }}><PulseSkeleton height={100} mx={0} mb={0} /></View>
+              <View style={{ flex: 1 }}><PulseSkeleton height={100} mx={0} mb={0} /></View>
             </View>
+            <PulseSkeleton height={68} mx={0} mb={0} />
           </View>
         ) : (
           <View style={styles.bentoContainer}>
-            {/* Revenue Card (Main Stat) */}
-            <View style={styles.revenueCard}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.bentoLabel}>INGRESOS DE LA SEMANA</Text>
-                <Ionicons name="trending-up-outline" size={16} color={PRIMARY} />
+            {/* Row 1: Citas hoy (full, dark) */}
+            <View style={styles.apptsTodayCard}>
+              <Text style={[styles.bentoLabel, { color: '#fff', opacity: 0.6 }]}>CITAS DE HOY</Text>
+              <Text style={[styles.bentoValLarge, { fontFamily: MONO, color: '#fff' }]}>
+                {appointments.length}
+              </Text>
+              {nextAppt ? (
+                <Text style={[styles.bentoSubText, { color: '#fff', opacity: 0.7 }]}>
+                  Siguiente a las {formatTime(nextAppt.startTime)}
+                </Text>
+              ) : (
+                <Text style={[styles.bentoSubText, { color: '#fff', opacity: 0.7 }]}>Día libre 🌿</Text>
+              )}
+            </View>
+
+            {/* Row 2: Ingresos semana + Clientas nuevas */}
+            <View style={styles.subStatsRow}>
+              <View style={styles.halfCard}>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.bentoLabel}>INGRESOS SEMANA</Text>
+                  <Ionicons name="trending-up-outline" size={13} color={PRIMARY} />
+                </View>
+                <Text style={[styles.bentoVal, { fontFamily: MONO }]}>
+                  {weeklyRevenue !== null ? formatMoney(weeklyRevenue) : '—'}
+                </Text>
+                <Text style={styles.bentoSubText}>Últimos 7 días</Text>
               </View>
-              <View>
-                <Text style={[styles.bentoValLarge, { fontFamily: MONO }]}>—</Text>
-                <Text style={styles.bentoSubText}>Estadísticas próximamente</Text>
+
+              <View style={styles.halfCard}>
+                <Text style={styles.bentoLabel}>CLIENTAS NUEVAS</Text>
+                <Text style={[styles.bentoVal, { fontFamily: MONO }]}>
+                  {newClientsCount !== null ? String(newClientsCount) : '—'}
+                </Text>
+                <Text style={styles.bentoSubText}>Este mes</Text>
               </View>
             </View>
 
-            {/* Sub Stats Row */}
-            <View style={styles.subStatsRow}>
-              {/* New Clients */}
-              <View style={styles.newClientsCard}>
-                <Text style={styles.bentoLabel}>CLIENTAS NUEVAS</Text>
-                <Text style={[styles.bentoVal, { fontFamily: MONO }]}>—</Text>
-                <Text style={[styles.bentoSubText, { marginTop: 4 }]}>Próximamente</Text>
-              </View>
-
-              {/* Appointments Today */}
-              <View style={styles.apptsTodayCard}>
-                <Text style={[styles.bentoLabel, { color: '#fff', opacity: 0.6 }]}>CITAS DE HOY</Text>
-                <Text style={[styles.bentoVal, { fontFamily: MONO, color: '#fff' }]}>{appointments.length}</Text>
-                {nextAppt ? (
-                  <Text style={[styles.bentoSubText, { color: '#fff', opacity: 0.6 }]}>Siguiente a las {formatTime(nextAppt.startTime)}</Text>
-                ) : (
-                  <Text style={[styles.bentoSubText, { color: '#fff', opacity: 0.6 }]}>Día libre 🌿</Text>
-                )}
+            {/* Row 3: Ingresos del mes (full, compact) */}
+            <View style={styles.monthCard}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.bentoLabel}>INGRESOS DEL MES</Text>
+                <Text style={[styles.bentoVal, { fontFamily: MONO }]}>
+                  {monthlyRevenue !== null ? formatMoney(monthlyRevenue) : '—'}
+                </Text>
               </View>
             </View>
           </View>
@@ -453,27 +483,24 @@ const styles = StyleSheet.create({
   greetingName: { fontFamily: SERIF, fontSize: 32, color: DARK, marginTop: 4 },
 
   bentoContainer: { paddingHorizontal: 20, gap: 10, marginBottom: 24 },
-  revenueCard: {
-    backgroundColor: '#F5F0EB', borderRadius: 16, borderWidth: 1, borderColor: BORDER,
-    padding: 18, minHeight: 130, justifyContent: 'space-between',
-  },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   bentoLabel: { fontSize: 10, fontWeight: '600', color: GRAY, letterSpacing: 0.8 },
   bentoValLarge: { fontSize: 34, color: DARK, fontWeight: 'normal', marginTop: 12 },
   bentoSubText: { fontSize: 11, color: GRAY, marginTop: 4 },
-
-  subStatsRow: { flexDirection: 'row', gap: 10 },
-  newClientsCard: {
-    flex: 1, backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: BORDER,
-    padding: 16, height: 120, justifyContent: 'space-between',
-  },
   bentoVal: { fontSize: 24, color: DARK, fontWeight: 'normal', marginTop: 8 },
-  avatarStack: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  stackedAvatar: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: '#fff' },
 
   apptsTodayCard: {
-    flex: 1, backgroundColor: DARK, borderRadius: 16,
-    padding: 16, height: 120, justifyContent: 'space-between',
+    backgroundColor: DARK, borderRadius: 16,
+    padding: 18, height: 120, justifyContent: 'space-between',
+  },
+  subStatsRow: { flexDirection: 'row', gap: 10 },
+  halfCard: {
+    flex: 1, backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: BORDER,
+    padding: 16, height: 110, justifyContent: 'space-between',
+  },
+  monthCard: {
+    backgroundColor: '#F5F0EB', borderRadius: 16, borderWidth: 1, borderColor: BORDER,
+    padding: 16, height: 68, justifyContent: 'center',
   },
 
   section: { marginBottom: 24 },

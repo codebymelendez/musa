@@ -2,9 +2,10 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import {
   View, Text, Image, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Animated, Modal, KeyboardAvoidingView,
-  Platform, Share, Linking, Alert,
+  Platform, Share, Linking, Alert, Switch, ActivityIndicator,
 } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
+import * as ImagePicker from 'expo-image-picker'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
@@ -109,10 +110,11 @@ function EditFieldModal({
 // ─── settings row ─────────────────────────────────────────────────────────────
 
 function SRow({
-  icon, label, value, onPress, danger, rightBadge,
+  icon, label, subtitle, value, onPress, danger, rightBadge,
 }: {
   icon: React.ComponentProps<typeof Ionicons>['name']
   label: string
+  subtitle?: string
   value?: string
   onPress?: () => void
   danger?: boolean
@@ -127,7 +129,10 @@ function SRow({
       <View style={[styles.sRowIcon, danger && styles.sRowIconDanger]}>
         <Ionicons name={icon} size={20} color={danger ? '#C0392B' : DARK} />
       </View>
-      <Text style={[styles.sRowLabel, danger && { color: '#C0392B' }]}>{label}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.sRowLabel, danger && { color: '#C0392B' }]}>{label}</Text>
+        {subtitle ? <Text style={styles.sRowSub}>{subtitle}</Text> : null}
+      </View>
       {rightBadge ? rightBadge : null}
       {value ? <Text style={styles.sRowValue} numberOfLines={1}>{value}</Text> : null}
       {onPress && !danger && !rightBadge ? <Ionicons name="chevron-forward-outline" size={16} color="#CCCCCC" /> : null}
@@ -146,6 +151,8 @@ export default function SettingsTabScreen() {
   const [whatsapp, setWhatsapp] = useState('')
   const [instagram, setInstagram] = useState('')
   const [copied, setCopied] = useState(false)
+  const [bookingEnabled, setBookingEnabled] = useState(true)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [showEditName, setShowEditName] = useState(false)
   const [showEditWhatsapp, setShowEditWhatsapp] = useState(false)
   const [showEditInstagram, setShowEditInstagram] = useState(false)
@@ -159,6 +166,7 @@ export default function SettingsTabScreen() {
       setName(data.name ?? '')
       setWhatsapp(data.whatsapp ?? '')
       setInstagram(data.instagram ?? '')
+      setBookingEnabled(data.settings?.bookingEnabled ?? true)
       setLoadState('ready')
     } catch { setLoadState('error') }
   }, [])
@@ -195,6 +203,56 @@ export default function SettingsTabScreen() {
     if (!profile?.slug) return
     const link = `${APP_URL}/p/${profile.slug}`
     await Share.share({ message: `Reserva tu cita en ${link}`, url: link })
+  }
+
+  async function handleChangeAvatar() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!perm.granted) {
+      Alert.alert('Permiso requerido', 'Necesitamos acceso a tu galería para cambiar la foto.')
+      return
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    })
+    if (result.canceled || !result.assets[0]) return
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const localUri = result.assets[0].uri
+    setUploadingAvatar(true)
+    try {
+      const response = await fetch(localUri)
+      const blob = await response.blob()
+      const path = `avatars/${user.id}-${Date.now()}.jpg`
+      const { error: uploadError } = await supabase.storage
+        .from('staff-avatars')
+        .upload(path, blob, { contentType: 'image/jpeg', upsert: true })
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('staff-avatars')
+        .getPublicUrl(path)
+
+      await updateSettings({ avatarUrl: publicUrl })
+      setProfile(prev => prev ? { ...prev, avatarUrl: publicUrl } : prev)
+    } catch (e) {
+      console.error('[avatar upload]', e)
+      Alert.alert('Error', 'No se pudo subir la foto')
+    } finally { setUploadingAvatar(false) }
+  }
+
+  async function handleToggleBooking(val: boolean) {
+    setBookingEnabled(val)
+    try {
+      await updateSettings({ settings: { bookingEnabled: val } })
+    } catch {
+      setBookingEnabled(!val)
+      Alert.alert('Error', 'No se pudo actualizar las reservas online')
+    }
   }
 
   function handleSignOut() {
@@ -250,26 +308,38 @@ export default function SettingsTabScreen() {
 
           {/* Bento Profile Summary Section */}
           <View style={styles.bentoContainer}>
-            <TouchableOpacity 
-              style={styles.bentoProfileCard} 
-              onPress={() => setShowEditName(true)}
-              activeOpacity={0.9}
-            >
-              <View style={styles.bentoAvatar}>
-                <Text style={styles.bentoAvatarText}>
-                  {initials(name || profile.name || '?') || '?'}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
+            <View style={styles.bentoProfileCard}>
+              <TouchableOpacity
+                style={styles.bentoAvatarWrap}
+                onPress={handleChangeAvatar}
+                disabled={uploadingAvatar}
+                activeOpacity={0.78}
+              >
+                {profile.avatarUrl ? (
+                  <Image source={{ uri: profile.avatarUrl }} style={styles.bentoAvatar} />
+                ) : (
+                  <View style={styles.bentoAvatar}>
+                    <Text style={styles.bentoAvatarText}>
+                      {initials(name || profile.name || '?') || '?'}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.bentoAvatarEditBadge}>
+                  {uploadingAvatar
+                    ? <ActivityIndicator size="small" color="#fff" />
+                    : <Ionicons name="camera-outline" size={12} color="#fff" />
+                  }
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1 }}
+                onPress={() => setShowEditName(true)}
+                activeOpacity={0.9}
+              >
                 <Text style={styles.bentoProfileName}>{name || 'MUSA Studio'}</Text>
                 <Text style={styles.bentoProfileSub}>Cuenta Profesional MUSA</Text>
-                <View style={styles.bentoBadgeContainer}>
-                  <View style={styles.bentoBadge}>
-                    <Text style={styles.bentoBadgeText}>PLAN {planName.toUpperCase()}</Text>
-                  </View>
-                </View>
-              </View>
-            </TouchableOpacity>
+              </TouchableOpacity>
+            </View>
 
             <View style={styles.bentoRevenueCard}>
               <Text style={styles.bentoRevenueLabel}>ESTADO DE FACTURACIÓN</Text>
@@ -298,12 +368,38 @@ export default function SettingsTabScreen() {
             <SRow
               icon="ribbon-outline"
               label="Plan Actual"
-              onPress={() => Linking.openURL('https://getmusa.app')}
-              rightBadge={
-                <View style={styles.proBadge}>
-                  <Text style={styles.proBadgeText}>PRO</Text>
-                </View>
-              }
+              subtitle="Mejorar plan"
+              value={planName}
+              onPress={() => Linking.openURL('https://getmusa.app/pricing')}
+            />
+            <View style={styles.rowDivider} />
+            <View style={styles.sRow}>
+              <View style={styles.sRowIcon}>
+                <Ionicons name="calendar-outline" size={20} color={DARK} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sRowLabel}>Reservas Online</Text>
+                <Text style={styles.sRowSub}>
+                  {bookingEnabled ? 'Activas · Clientas pueden reservar' : 'Desactivadas · No se aceptan reservas'}
+                </Text>
+              </View>
+              <Switch
+                value={bookingEnabled}
+                onValueChange={handleToggleBooking}
+                trackColor={{ false: '#DDDDDD', true: PRIMARY }}
+                thumbColor="#fff"
+              />
+            </View>
+          </View>
+
+          {/* ─── Pagos ─── */}
+          <Text style={styles.sectionLabel}>Pagos</Text>
+          <View style={styles.card}>
+            <SRow
+              icon="card-outline"
+              label="Métodos de Pago"
+              subtitle="Próximamente"
+              onPress={() => router.push('/settings/payment-methods' as Parameters<typeof router.push>[0])}
             />
           </View>
 
@@ -469,6 +565,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(48, 38, 33, 0.05)',
   },
+  bentoAvatarWrap: {
+    position: 'relative',
+    marginRight: 14,
+  },
   bentoAvatar: {
     width: 64,
     height: 64,
@@ -476,7 +576,20 @@ const styles = StyleSheet.create({
     backgroundColor: DARK,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
+    overflow: 'hidden',
+  },
+  bentoAvatarEditBadge: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#F2EFE9',
   },
   bentoAvatarText: {
     fontSize: 24,
@@ -573,10 +686,14 @@ const styles = StyleSheet.create({
   },
   sRowIconDanger: { backgroundColor: '#FEF2F2' },
   sRowLabel: {
-    flex: 1,
     fontSize: 15,
     fontWeight: '500',
     color: DARK,
+  },
+  sRowSub: {
+    fontSize: 11,
+    color: PRIMARY,
+    marginTop: 1,
   },
   sRowValue: {
     fontSize: 13,

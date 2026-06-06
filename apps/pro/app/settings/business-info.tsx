@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View, Text, Image, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Animated, Share, Linking, Alert,
+  StyleSheet, Animated, Share, Linking, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { getSettings, updateSettings } from '../../lib/api'
-import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF } from '../../lib/utils'
+import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials } from '../../lib/utils'
 
 const APP_URL = (process.env.EXPO_PUBLIC_APP_URL ?? 'https://getmusa.app').replace(/\/$/, '')
 
@@ -38,7 +38,7 @@ export default function BusinessInfoScreen() {
   const [planName, setPlanName] = useState('')
   const [planLimits, setPlanLimits] = useState<{ maxMonthlyAppointments?: number; maxStaff?: number }>({})
 
-  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [businessName, setBusinessName] = useState('')
   const [address, setAddress] = useState('')
   const [bio, setBio] = useState('')
@@ -61,7 +61,7 @@ export default function BusinessInfoScreen() {
       setBusinessName(data.business?.name ?? '')
       setAddress(data.business?.address ?? '')
       setBio(data.bio ?? '')
-      setLogoUrl(data.business?.logoUrl ?? null)
+      setAvatarUrl(data.avatarUrl ?? null)
       setWhatsapp(data.whatsapp ?? '')
       setInstagram(data.instagram ?? '')
       setPlanName(data.business?.plan?.name ?? 'Free')
@@ -130,23 +130,29 @@ export default function BusinessInfoScreen() {
       )}
 
       {loadState === 'ready' && (
-        <>
-          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+        >
+          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Mi negocio</Text>
 
               <View style={styles.avatarSection}>
-                {logoUrl ? (
-                  <Image source={{ uri: logoUrl }} style={styles.avatarCircle} />
+                {avatarUrl ? (
+                  <Image source={{ uri: avatarUrl }} style={styles.avatarCircle} />
                 ) : (
                   <View style={styles.avatarCircle}>
-                    <Ionicons name="business-outline" size={32} color={GRAY} />
+                    <Text style={styles.avatarInitials}>
+                      {initials(businessName || 'M')}
+                    </Text>
                   </View>
                 )}
-                <TouchableOpacity style={styles.changePhotoBtn} activeOpacity={0.75}>
-                  <Text style={styles.changePhotoText}>Cambiar foto</Text>
-                </TouchableOpacity>
+                <Text style={styles.avatarHint}>
+                  Tu foto de perfil representa tu negocio.{'\n'}Cámbiala desde Ajustes.
+                </Text>
               </View>
 
               <Text style={styles.label}>Nombre del negocio</Text>
@@ -264,7 +270,7 @@ export default function BusinessInfoScreen() {
               )}
             </View>
           )}
-        </>
+        </KeyboardAvoidingView>
       )}
     </SafeAreaView>
   )
@@ -288,11 +294,11 @@ const styles = StyleSheet.create({
   avatarSection: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 18 },
   avatarCircle: {
     width: 72, height: 72, borderRadius: 36,
-    backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER,
-    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#EDE8E4', borderWidth: 1, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
-  changePhotoBtn: { paddingHorizontal: 16, height: 36, borderRadius: 18, backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  changePhotoText: { fontSize: 14, color: GRAY },
+  avatarInitials: { fontSize: 24, fontWeight: '500', color: PRIMARY },
+  avatarHint: { flex: 1, fontSize: 12, color: GRAY, lineHeight: 18 },
   label: { fontSize: 12, color: GRAY, marginBottom: 6 },
   input: {
     height: 46, borderRadius: 12, borderWidth: 1, borderColor: BORDER,

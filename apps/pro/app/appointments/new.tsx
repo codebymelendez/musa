@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Modal, FlatList, Animated, Platform, Alert,
+  StyleSheet, Modal, FlatList, Animated, Platform, Alert, KeyboardAvoidingView,
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -255,7 +255,11 @@ export default function NewAppointmentScreen() {
       {loading ? (
         <ScrollView><Skeleton /></ScrollView>
       ) : (
-        <>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+        >
           <ScrollView
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
@@ -433,7 +437,7 @@ export default function NewAppointmentScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-        </>
+        </KeyboardAvoidingView>
       )}
 
       <DatePickerModal

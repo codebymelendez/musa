@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Switch, Animated, Alert,
+  StyleSheet, Switch, Animated, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -150,10 +150,15 @@ export default function LoyaltyScreen() {
       )}
 
       {loadState === 'ready' && (
-        <>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+        >
           <ScrollView
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
             {/* ─── Configuración del programa ─── */}
             <View style={styles.card}>
@@ -296,7 +301,7 @@ export default function LoyaltyScreen() {
               </TouchableOpacity>
             )}
           </View>
-        </>
+        </KeyboardAvoidingView>
       )}
     </SafeAreaView>
   )

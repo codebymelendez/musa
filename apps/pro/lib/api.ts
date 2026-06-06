@@ -140,6 +140,8 @@ export interface ClientItem {
   email: string | null
   notes: string | null
   tags: string[]
+  birthday?: string | null
+  createdAt?: string
   appointments: AppointmentItem[]
 }
 
@@ -150,6 +152,19 @@ export async function getClients(): Promise<ClientItem[]> {
   if (res.status === 401) { await handle401(); return [] }
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json()
+}
+
+export async function getAppointmentsInRange(from: string, to: string): Promise<AppointmentItem[]> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); return [] }
+  const res = await fetch(
+    `${API_URL}/api/appointments?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+    { headers }
+  )
+  if (res.status === 401) { await handle401(); return [] }
+  if (!res.ok) return []
+  const data: AppointmentItem[] = await res.json()
+  return data.map(normalizeAppointment)
 }
 
 export async function getClientById(id: string): Promise<ClientItem | null> {
@@ -172,6 +187,21 @@ export async function updateClientNotes(id: string, notes: string): Promise<void
     method: 'PATCH',
     headers,
     body: JSON.stringify({ notes }),
+  })
+  if (res.status === 401) { await handle401(); return }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+}
+
+export async function updateClient(id: string, data: {
+  name?: string; phone?: string; email?: string | null;
+  birthday?: string | null; tags?: string[]; notes?: string;
+}): Promise<void> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); return }
+  const res = await fetch(`${API_URL}/api/clients/${id}`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify(data),
   })
   if (res.status === 401) { await handle401(); return }
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -256,6 +286,7 @@ export interface SettingsPatch {
     startHour?: number
     endHour?: number
     slotDuration?: number
+    bookingEnabled?: boolean
   }
 }
 
