@@ -30,6 +30,13 @@ function shortDate(iso: string | null): string {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
+function getGreeting(): string {
+  const h = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Caracas' })).getHours()
+  if (h >= 5 && h < 12) return 'Buenos días'
+  if (h >= 12 && h < 19) return 'Buenas tardes'
+  return 'Buenas noches'
+}
+
 // ─── skeletons ────────────────────────────────────────────────────────────────
 
 function PulseSkeleton({ height, mx = 20, mb = 14 }: { height: number; mx?: number; mb?: number }) {
@@ -174,6 +181,7 @@ export default function HomeScreen() {
   const [loyaltyProgram, setLoyaltyProgram] = useState<LoyaltyProgram | null>(null)
   const [loyaltyStats, setLoyaltyStats] = useState({ clientsWithPoints: 0, totalPoints: 0 })
   const [showAddClient, setShowAddClient] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -187,6 +195,7 @@ export default function HomeScreen() {
         getLoyaltyAccounts(),
       ])
       setUserName(sData?.name?.split(' ')[0] ?? '')
+      setAvatarUrl(sData?.avatarUrl ?? null)
       setAppointments(appts.filter(a => a.status !== 'cancelled'))
       setPromos(promoList.filter(p => !p.validUntil || new Date(p.validUntil) >= new Date()))
       setLoyaltyProgram(program)
@@ -243,10 +252,15 @@ export default function HomeScreen() {
             <Ionicons name="notifications-outline" size={20} color={DARK} />
           </TouchableOpacity>
           <View style={styles.topAvatarWrap}>
-            <Image
-              style={styles.topAvatar}
-              source={{ uri: 'https://lh3.googleusercontent.com/aida/AP1WRLstYVkWIsWwF8u17D87OStyiO7-PnPEqHmhVPItLJE4xk-CfQQjkpRdDRd_ggxp1fwPZb0OnOugSq1aOyprl-bYxU6E14iy9WP1RP0s4H9TbLEa10n9pU0PusebCwvVC6K7cJglCafZH-jPpozMs3t9kcs22kTjk7ocl8oFU1hk9WueUrEuMHpcSewQNfeCoqhwk-YWWQbACyr-JeVkVvMrRm-ZdjaZF7pACv6TxLv0baHKkVIrV9V7g-4' }}
-            />
+            {avatarUrl ? (
+              <Image style={styles.topAvatar} source={{ uri: avatarUrl }} />
+            ) : (
+              <View style={[styles.topAvatar, { backgroundColor: '#EDE8E4', alignItems: 'center', justifyContent: 'center' }]}>
+                <Text style={{ fontSize: 14, color: '#B5593E', fontWeight: '600' }}>
+                  {userName ? userName[0].toUpperCase() : 'M'}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       </View>
@@ -263,8 +277,8 @@ export default function HomeScreen() {
       >
         {/* ─── Greeting & Profile ─── */}
         <View style={styles.greetingSection}>
-          <Text style={styles.sublabel}>BIENVENIDA DE NUEVO</Text>
-          <Text style={styles.greetingName}>Elena Rodriguez</Text>
+          <Text style={styles.sublabel}>{getGreeting().toUpperCase()}</Text>
+          <Text style={styles.greetingName}>{userName || 'Bienvenida'}</Text>
         </View>
 
         {/* ─── Bento Stats Grid ─── */}
@@ -289,8 +303,8 @@ export default function HomeScreen() {
                 <Ionicons name="trending-up-outline" size={16} color={PRIMARY} />
               </View>
               <View>
-                <Text style={[styles.bentoValLarge, { fontFamily: MONO }]}>$4,280.00</Text>
-                <Text style={styles.bentoSubText}>+12.5% de la semana pasada</Text>
+                <Text style={[styles.bentoValLarge, { fontFamily: MONO }]}>—</Text>
+                <Text style={styles.bentoSubText}>Estadísticas próximamente</Text>
               </View>
             </View>
 
@@ -299,14 +313,8 @@ export default function HomeScreen() {
               {/* New Clients */}
               <View style={styles.newClientsCard}>
                 <Text style={styles.bentoLabel}>CLIENTAS NUEVAS</Text>
-                <Text style={[styles.bentoVal, { fontFamily: MONO }]}>24</Text>
-                <View style={styles.avatarStack}>
-                  <Image style={styles.stackedAvatar} source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAgWUIjcbulsYXHmw5OaizVshOWoR7VIRmTpGcas6986b8_jXHcL5VVNsCY-wu4lweY-Fhxv1ARmub17FjJjRj-c2wex2hVUr0kQTNEprN2EP__6GFXDxOzGi03rX-h-qmjIeGrffraRzCcgK9RyrETmqm4IuErcyRBEEe4uQLF27xC3dyQwz9yNUCNtRD1AJfeUVjBZH3_o19ux7E70XLLxt-LDAf3T_rz6SwFwUNTpgJMzJEpu7VZBuRYy-z0nA4OL8yIXQk3MG82' }} />
-                  <Image style={[styles.stackedAvatar, { marginLeft: -8 }]} source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuD0dRDntN6YM32Oqt4iR-gvzg9j7s1BnH2kfSjV3KT06i5WmZaew1vZ7xxAifGbYN7cxZonsCko0Yy4tEdIRorgh6Gs_pe-3Cdha9XHQSvGKqw-tvhpzq75x0sPS-9fGx70Fl5B0kNafH6AnZhF7E4TnhslOCUMITDz27AsDax4ga1zS6uog9gu7NK6m6cehn1GsJVIseHv-LFQvMH-5gZHLApx_RGmHh0BrZwcHaeNB_BNVlU7WEf9A9utjmSYhlxVGAeZJP7KZ2vY' }} />
-                  <View style={[styles.stackedAvatar, { marginLeft: -8, backgroundColor: BORDER, alignItems: 'center', justifyContent: 'center' }]}>
-                    <Text style={{ fontSize: 9, fontWeight: '700', color: DARK }}>+21</Text>
-                  </View>
-                </View>
+                <Text style={[styles.bentoVal, { fontFamily: MONO }]}>—</Text>
+                <Text style={[styles.bentoSubText, { marginTop: 4 }]}>Próximamente</Text>
               </View>
 
               {/* Appointments Today */}
@@ -371,21 +379,16 @@ export default function HomeScreen() {
         {/* ─── Pro Insights Spotlight ─── */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>RECOMENDACIONES DE NEGOCIO</Text>
-          <View style={styles.insightsCard}>
-            <Image
-              style={styles.insightsBg}
-              source={{ uri: 'https://lh3.googleusercontent.com/aida/AP1WRLsZmrST3zMRMHW5jMOoNCd8z4aztCMhjMf2nmOFugB78QhBOkmEAJvxcicofAPwAA9zFrBrfyNjacCcZYXHDoa6Do8KLa7A8wbaI6waxsSgfqJTno_VVU6JnwJ9r6c5HbriB9I236UG0_c_yEyApRVPS3foeEaVqOKFdgn3rAxHIhc4U2pLDhXaiPr3xtM71feNFKHhFRyUeMs6a92iRCpseDgWMk6iAN1EjUjL9YoiFv5np0peGSHuiTPg' }}
-              resizeMode="cover"
-            />
+          <View style={[styles.insightsCard, { backgroundColor: '#FDF0EC' }]}>
             <View style={styles.insightsOverlay}>
-              <Text style={styles.insightsTitle}>Recomendaciones MUSA</Text>
-              <Text style={styles.insightsDesc}>Tu servicio de "Maquillaje Editorial" es tendencia este mes. Considera abrir más horarios para fines de semana.</Text>
+              <Text style={[styles.insightsTitle, { color: DARK }]}>Consejo MUSA</Text>
+              <Text style={[styles.insightsDesc, { color: GRAY }]}>Comparte tu enlace de reserva con nuevas clientas y mantén tu agenda siempre actualizada.</Text>
               <TouchableOpacity
                 style={styles.insightsBtn}
-                onPress={() => router.push('/services' as Parameters<typeof router.push>[0])}
+                onPress={() => router.push('/settings' as Parameters<typeof router.push>[0])}
                 activeOpacity={0.8}
               >
-                <Text style={styles.insightsBtnText}>GESTIONAR SERVICIOS</Text>
+                <Text style={styles.insightsBtnText}>VER MI ENLACE</Text>
               </TouchableOpacity>
             </View>
           </View>

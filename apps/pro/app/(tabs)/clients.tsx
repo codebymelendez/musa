@@ -56,9 +56,7 @@ function EmptyState({ searching }: { searching: boolean }) {
 
 function ClientRow({ item, onPress }: { item: ClientItem; onPress: () => void }) {
   const count = item.appointments?.length ?? 0
-  // calculate fake total spend for visualization
-  const totalSpend = count * 95
-  
+
   return (
     <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.72}>
       <View style={styles.avatar}>
@@ -78,8 +76,7 @@ function ClientRow({ item, onPress }: { item: ClientItem; onPress: () => void })
         </View>
       </View>
       <View style={styles.rowRightCol}>
-        <Text style={[styles.rowSpend, { fontFamily: MONO }]}>${totalSpend || '0'}</Text>
-        <Text style={styles.rowCountText}>{count} Visit{count !== 1 ? 's' : 'a'}</Text>
+        <Text style={styles.rowCountText}>{count} {count !== 1 ? 'visitas' : 'visita'}</Text>
       </View>
       <Ionicons name="chevron-forward-outline" size={16} color="#CCCCCC" />
     </TouchableOpacity>
@@ -249,15 +246,14 @@ export default function ClientsScreen() {
     setShowAddModal(false)
   }
 
-  // Calculate stats
-  const portfolioValue = filtered.reduce((acc, c) => acc + ((c.appointments?.length ?? 0) * 95), 0)
+  const totalAppointments = filtered.reduce((acc, c) => acc + (c.appointments?.length ?? 0), 0)
   const activeClients = filtered.length
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Directory</Text>
-        <Text style={styles.headerSubtitle}>Manage your elite clientele with editorial precision.</Text>
+        <Text style={styles.headerTitle}>Directorio</Text>
+        <Text style={styles.headerSubtitle}>Gestiona tu clientela con precisión editorial.</Text>
       </View>
 
       <View style={styles.searchWrap}>
@@ -265,7 +261,7 @@ export default function ClientsScreen() {
           <Ionicons name="search-outline" size={18} color={GRAY} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search clients by name, phone..."
+            placeholder="Buscar por nombre o teléfono…"
             placeholderTextColor="#AAAAAA"
             value={query}
             onChangeText={setQuery}
@@ -284,12 +280,8 @@ export default function ClientsScreen() {
       {state.kind === 'ok' && (
         <View style={styles.statsBento}>
           <View style={styles.portfolioCard}>
-            <Text style={styles.bentoLabel}>VALOR DE PORTAFOLIO</Text>
-            <Text style={[styles.bentoVal, { fontFamily: MONO }]}>${portfolioValue}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-              <Ionicons name="trending-up-outline" size={14} color="#fff" />
-              <Text style={styles.bentoTrendText}>+12.5% este mes</Text>
-            </View>
+            <Text style={styles.bentoLabel}>CITAS TOTALES</Text>
+            <Text style={[styles.bentoVal, { fontFamily: MONO }]}>{totalAppointments}</Text>
           </View>
           <View style={styles.activeClientsCard}>
             <Text style={[styles.bentoLabel, { color: DARK }]}>CLIENTAS ACTIVAS</Text>

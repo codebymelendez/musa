@@ -262,10 +262,10 @@ export default function SettingsTabScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.bentoProfileName}>{name || 'MUSA Studio'}</Text>
-                <Text style={styles.bentoProfileSub}>Cuenta Profesional Enterprise</Text>
+                <Text style={styles.bentoProfileSub}>Cuenta Profesional MUSA</Text>
                 <View style={styles.bentoBadgeContainer}>
                   <View style={styles.bentoBadge}>
-                    <Text style={styles.bentoBadgeText}>PLAN PREMIUM</Text>
+                    <Text style={styles.bentoBadgeText}>PLAN {planName.toUpperCase()}</Text>
                   </View>
                 </View>
               </View>

@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import {
   getSettings, getServices, getPromotions, getLoyaltyProgram,
-  type LoyaltyProgram,
+  type LoyaltyProgram, type ServiceItem,
 } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF } from '../../lib/utils'
 
@@ -84,6 +84,7 @@ export default function BusinessScreen() {
   const [planName, setPlanName] = useState<string | null>(null)
   const [teamCount, setTeamCount] = useState(0)
   const [serviceCount, setServiceCount] = useState(0)
+  const [serviceList, setServiceList] = useState<ServiceItem[]>([])
   const [activePromoCount, setActivePromoCount] = useState(0)
   const [loyaltyProgram, setLoyaltyProgram] = useState<LoyaltyProgram | null>(null)
   const [copied, setCopied] = useState(false)
@@ -106,6 +107,7 @@ export default function BusinessScreen() {
       setPlanName(sData?.business?.plan?.name ?? null)
       setTeamCount(sData?.business?.users?.length ?? 0)
       setServiceCount(services.length)
+      setServiceList(services.slice(0, 3))
       setCity(sData?.business?.city ?? 'Caracas')
       const now = new Date()
       setActivePromoCount(
@@ -194,29 +196,26 @@ export default function BusinessScreen() {
                 </TouchableOpacity>
               </View>
               <View style={styles.servicesList}>
-                <View style={styles.serviceRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.serviceTitle}>Maquillaje de Novia Premium</Text>
-                    <Text style={styles.serviceMeta}>90 min • Aerógrafo completo y pestañas incluidas</Text>
-                  </View>
-                  <Text style={[styles.servicePrice, { fontFamily: MONO }]}>$250</Text>
-                </View>
-                <View style={styles.serviceDivider} />
-                <View style={styles.serviceRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.serviceTitle}>Preparación de Piel & Glow Editorial</Text>
-                    <Text style={styles.serviceMeta}>45 min • Hidratación profunda y drenaje linfático</Text>
-                  </View>
-                  <Text style={[styles.servicePrice, { fontFamily: MONO }]}>$120</Text>
-                </View>
-                <View style={styles.serviceDivider} />
-                <View style={styles.serviceRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.serviceTitle}>Clase Magistral Privada</Text>
-                    <Text style={styles.serviceMeta}>180 min • Técnicas personalizadas 1 a 1</Text>
-                  </View>
-                  <Text style={[styles.servicePrice, { fontFamily: MONO }]}>$450</Text>
-                </View>
+                {serviceList.length === 0 ? (
+                  <Text style={{ fontSize: 14, color: GRAY, paddingVertical: 12, textAlign: 'center' }}>
+                    Sin servicios configurados aún.
+                  </Text>
+                ) : (
+                  serviceList.map((svc, idx) => (
+                    <View key={svc.id}>
+                      {idx > 0 && <View style={styles.serviceDivider} />}
+                      <View style={styles.serviceRow}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.serviceTitle}>{svc.name}</Text>
+                          <Text style={styles.serviceMeta}>{svc.durationMin} min{svc.category ? ` • ${svc.category}` : ''}</Text>
+                        </View>
+                        <Text style={[styles.servicePrice, { fontFamily: MONO }]}>
+                          {svc.currency === 'USD' ? '$' : ''}{svc.price}
+                        </Text>
+                      </View>
+                    </View>
+                  ))
+                )}
               </View>
             </View>
 
@@ -228,19 +227,8 @@ export default function BusinessScreen() {
                   <Text style={styles.manageAllText}>Gestionar todo</Text>
                 </TouchableOpacity>
               </View>
-              <View style={styles.galleryGrid}>
-                <Image
-                  style={styles.galleryImage}
-                  source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDAEvuwzunP6L7SK2Eeq89p0MAjeLg_lWFyibOJQjSYLCM5qWQDqK5ZsHmHZcc834f1Gq5KZ_0M8LNtsWfbqvVgAXDad4G42sj6lOuUoI4zwxFG4msOLiVHL8tOWmnBls8ksYPK-wYZMG1R2KBpzKOTdAnsfLwIXfqmqqm_12KfW1Zw_iqJt8txcjDLLkAXAG0jb-EX07DXsMhbtJm4UxS_ssMxMGpYQPabBXh2jBAtAgIe6NysAdoC5cD4OMrPZwu8eSDpmj1ppLS_' }}
-                />
-                <Image
-                  style={styles.galleryImage}
-                  source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAdA5smSOMwOaZOS5NaO0VysyD_rHfWev5UBL4ryqo6cJfC0A8q-HalNr7l8L5EQQ2kE8nUnN9Hljd31aX6GJbMg8sl8vqaZIFS1kY1W85Mj8-fe7zx0tB2h0TOokq4ZgGu4UNMexQyCxjDrP2Wsek2MTk8CvGY1UMOOAkUMTIVbMVOeBf2lNNtEClxbd95rk2gmCMZj9orxs5wmneYxJlWuaCddRGzYoeVXrAFfqRkE1W4XS_YGZrvASz1QQOkrT1hvZ2mrFBCWrEW' }}
-                />
-                <Image
-                  style={styles.galleryImage}
-                  source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDZ7SM3JqG_QvUokR1FnfVIP20PNY9nJTHZG6fVGpBBKtreexEHi3H3O10q9DKzHFUgoCpFkSCjs3VaDuQrTyoCFLpXvRDOZieM_w4m82EW7Dd4ucWaITYUQ_0cE___Cs6lXVxQpMuP0b_rHgtYvsY2kpm0u_VOSpPNun5fHLcTpH_aoemwSM9ptagju8ldE5LkwjTzABw5IsCemPdsUfybRc3O-z2foQ_WZBl9nnpbdiHDme3EIwz2067ZypVhLSeBId5cyvE5IdRJ' }}
-                />
+              <View style={[styles.galleryGrid, { alignItems: 'center', justifyContent: 'center', paddingVertical: 20 }]}>
+                <Text style={{ fontSize: 14, color: GRAY, textAlign: 'center' }}>Portafolio próximamente</Text>
               </View>
             </View>
 
