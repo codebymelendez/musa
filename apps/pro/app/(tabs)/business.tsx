@@ -1,10 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import {
-  View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Animated, RefreshControl,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, RefreshControl,
 } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import {
   getSettings, getServices, getPromotions, getLoyaltyProgram,
@@ -102,12 +103,18 @@ export default function BusinessScreen() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [sData, services, promos, program] = await Promise.all([
+      const results = await Promise.allSettled([
         getSettings(),
         getServices(),
         getPromotions(),
         getLoyaltyProgram(),
       ])
+
+      const sData = results[0].status === 'fulfilled' ? results[0].value as any : null
+      const services = results[1].status === 'fulfilled' ? results[1].value as any[] : []
+      const promos = results[2].status === 'fulfilled' ? results[2].value as any[] : []
+      const program = results[3].status === 'fulfilled' ? results[3].value as any : null
+
       setBusinessName(sData?.business?.name ?? '')
       setAvatarUrl(sData?.avatarUrl ?? null)
       setSlug(sData?.slug ?? '')
@@ -117,7 +124,7 @@ export default function BusinessScreen() {
       setCity(sData?.business?.city ?? 'Caracas')
       const now = new Date()
       setActivePromoCount(
-        promos.filter(p => !p.validUntil || new Date(p.validUntil) >= now).length
+        promos.filter((p: any) => !p.validUntil || new Date(p.validUntil) >= now).length
       )
       setLoyaltyProgram(program)
     } catch { /* show what loaded */ }

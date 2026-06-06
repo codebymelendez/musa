@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  View, Text, ScrollView, TouchableOpacity,
+  View, Text, ScrollView, TouchableOpacity, FlatList,
   StyleSheet, RefreshControl, Animated,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -80,10 +80,14 @@ export default function StatsScreen() {
     setState({ kind: 'loading' })
     try {
       const { year, month } = periodToYearMonth(p)
-      const [stats, upcoming] = await Promise.all([
+      const results = await Promise.allSettled([
         getStats(year, month),
         p === 'month' ? getUpcomingAppointments() : Promise.resolve([]),
       ])
+
+      const stats = results[0].status === 'fulfilled' ? results[0].value as any : { completedAppointments: 0, monthlyRevenue: 0, yearlyRevenue: 0, totalClients: 0, avgTicket: 0, topServices: [], rescheduledThisMonth: 0, currency: 'USD' }
+      const upcoming = results[1].status === 'fulfilled' ? results[1].value as any : []
+
       setState({ kind: 'ok', stats, upcoming })
     } catch { setState({ kind: 'error' }) }
   }, [])
@@ -181,29 +185,35 @@ export default function StatsScreen() {
             {period === 'month' && upcoming.length > 0 && (
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>Próximas citas</Text>
-                {upcoming.map(apt => (
-                  <TouchableOpacity
-                    key={apt.id}
-                    style={styles.upcomingRow}
-                    onPress={() => router.push(`/appointments/${apt.id}` as Parameters<typeof router.push>[0])}
-                    activeOpacity={0.72}
-                  >
-                    <Text style={[styles.upcomingTime, { fontFamily: MONO }]}>
-                      {formatShortDate(apt.startTime)} {formatTime(apt.startTime)}
-                    </Text>
-                    <View style={styles.upcomingRight}>
-                      <Text style={styles.upcomingClient}>{apt.client.name}</Text>
-                      <Text style={styles.upcomingService}>{apt.service.name}</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-                <TouchableOpacity
-                  onPress={() => router.replace('/(tabs)/calendar' as Parameters<typeof router.replace>[0])}
-                  activeOpacity={0.7}
-                  style={styles.calendarLink}
-                >
-                  <Text style={styles.calendarLinkText}>Ver agenda completa →</Text>
-                </TouchableOpacity>
+                <FlatList
+                  data={upcoming}
+                  keyExtractor={apt => apt.id}
+                  scrollEnabled={false}
+                  renderItem={({ item: apt }) => (
+                    <TouchableOpacity
+                      style={styles.upcomingRow}
+                      onPress={() => router.push(`/appointments/${apt.id}` as Parameters<typeof router.push>[0])}
+                      activeOpacity={0.72}
+                    >
+                      <Text style={[styles.upcomingTime, { fontFamily: MONO }]}>
+                        {formatShortDate(apt.startTime)} {formatTime(apt.startTime)}
+                      </Text>
+                      <View style={styles.upcomingRight}>
+                        <Text style={styles.upcomingClient}>{apt.client.name}</Text>
+                        <Text style={styles.upcomingService}>{apt.service.name}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                  ListFooterComponent={() => (
+                    <TouchableOpacity
+                      onPress={() => router.replace('/(tabs)/calendar' as Parameters<typeof router.replace>[0])}
+                      activeOpacity={0.7}
+                      style={styles.calendarLink}
+                    >
+                      <Text style={styles.calendarLinkText}>Ver agenda completa →</Text>
+                    </TouchableOpacity>
+                  )}
+                />
               </View>
             )}
           </ScrollView>

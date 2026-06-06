@@ -6,6 +6,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import * as Haptics from 'expo-haptics'
 import { router } from 'expo-router'
 import {
   getServices, createService, deleteService,
@@ -96,6 +97,7 @@ function CreateModal({
   }
 
   async function handleCreate() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     if (!name.trim()) { Alert.alert('', 'El nombre es requerido'); return }
     setSaving(true)
     try {
@@ -249,6 +251,7 @@ export default function ServicesScreen() {
   const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false) }
 
   function handleDelete(svc: ServiceItem) {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)
     Alert.alert(
       'Eliminar servicio',
       `¿Eliminar "${svc.name}"? Esta acción no se puede deshacer.`,
