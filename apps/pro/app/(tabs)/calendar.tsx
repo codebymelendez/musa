@@ -91,10 +91,10 @@ const STATUS_LABEL: Record<AppointmentStatus, string> = {
   confirmed: 'Confirmada', pending: 'Pendiente', cancelled: 'Cancelada', completed: 'Completada',
 }
 const STATUS_COLORS: Record<AppointmentStatus, { bg: string; text: string }> = {
-  confirmed: { bg: '#E8F5E9', text: '#2E7D32' },
-  pending:   { bg: '#FFF8E1', text: '#8B6914' },
-  cancelled: { bg: '#FDECEA', text: '#C62828' },
-  completed: { bg: '#F5F5F5', text: '#757575' },
+  confirmed: { bg: 'rgba(181, 89, 62, 0.1)', text: PRIMARY },
+  pending:   { bg: 'rgba(217, 139, 115, 0.1)', text: '#D98B73' },
+  cancelled: { bg: 'rgba(155, 35, 53, 0.1)', text: '#9B2335' },
+  completed: { bg: 'rgba(45, 106, 79, 0.1)', text: '#2D6A4F' },
 }
 function StatusPill({ status }: { status: AppointmentStatus }) {
   const { bg, text } = STATUS_COLORS[status]
@@ -108,9 +108,13 @@ function StatusPill({ status }: { status: AppointmentStatus }) {
 // ─── appointment card ─────────────────────────────────────────────────────────
 
 function AppointmentCard({ item }: { item: AppointmentItem }) {
+  const isConfirmed = item.status === 'confirmed'
+  const isPending = item.status === 'pending'
+  const isCompleted = item.status === 'completed'
+  const leftColor = isConfirmed ? PRIMARY : isCompleted ? '#2D6A4F' : isPending ? '#D98B73' : '#6B2E1E'
   return (
     <TouchableOpacity
-      style={s.card}
+      style={[s.card, { borderLeftColor: leftColor }]}
       onPress={() => router.push(`/appointments/${item.id}` as Parameters<typeof router.push>[0])}
       activeOpacity={0.72}
     >
@@ -192,21 +196,31 @@ function WeekView({
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Mini 7-column grid */}
+      {/* Horizontal Date Picker Capsule strip */}
       <View style={s.weekGrid}>
         {days.map((day, i) => {
           const key       = toVenezuelaDate(day)
           const appts     = _cache.get(key) ?? []
           const hasDot    = appts.filter(a => a.status !== 'cancelled').length > 0
           const isT       = key === todayKey
-          const isSel     = key === selectedKey && !isT
+          const isSel     = key === selectedKey
+
+          // Month short representation
+          const monShort  = new Intl.DateTimeFormat('es-ES', { month: 'short' }).format(day).toUpperCase().slice(0, 3)
+          // Day name representation
+          const dayName   = WLABELS[i]
+
           return (
-            <TouchableOpacity key={i} style={s.weekCell} onPress={() => onSelectDay(day)} activeOpacity={0.7}>
-              <Text style={s.wkLabel}>{WLABELS[i]}</Text>
-              <View style={[s.wkCircle, isT && s.wkCircleToday, isSel && s.wkCircleSel]}>
-                <Text style={[s.wkNum, isT && s.wkNumToday, isSel && s.wkNumSel]}>{day.getDate()}</Text>
-              </View>
-              <View style={hasDot ? s.dot : s.dotEmpty} />
+            <TouchableOpacity
+              key={i}
+              style={[s.weekCellCapsule, (isT || isSel) && s.weekCellCapsuleActive]}
+              onPress={() => onSelectDay(day)}
+              activeOpacity={0.7}
+            >
+              <Text style={[s.wkLabelCapsule, (isT || isSel) && { color: 'rgba(255,255,255,0.7)' }]}>{monShort}</Text>
+              <Text style={[s.wkNumCapsule, (isT || isSel) && { color: '#fff' }]}>{day.getDate()}</Text>
+              <Text style={[s.wkDayNameCapsule, (isT || isSel) && { color: 'rgba(255,255,255,0.8)' }]}>{dayName}</Text>
+              {hasDot && <View style={[s.dotCapsule, (isT || isSel) && { backgroundColor: '#fff' }]} />}
             </TouchableOpacity>
           )
         })}
@@ -471,7 +485,7 @@ const s = StyleSheet.create({
   listContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 88, flexGrow: 1 },
 
   // appointment card
-  card:        { backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 1, borderColor: '#EDE8E4', paddingHorizontal: 16, paddingVertical: 14, marginBottom: 10 },
+  card:        { backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 1, borderColor: '#EDE8E4', borderLeftWidth: 3, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 10 },
   cardRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   timeText:    { fontFamily: MONO, fontSize: 14, color: DARK, letterSpacing: 0.4 },
   clientName:  { fontSize: 16, fontWeight: '500', color: DARK, marginBottom: 3 },
@@ -496,15 +510,20 @@ const s = StyleSheet.create({
   weekGrid: {
     flexDirection: 'row', paddingHorizontal: 8, paddingVertical: 12,
     backgroundColor: '#fff', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E5E0DC',
+    gap: 6,
   },
-  weekCell:      { flex: 1, alignItems: 'center', gap: 3 },
-  wkLabel:       { fontSize: 11, fontWeight: '500', color: '#AAAAAA' },
-  wkCircle:      { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  wkCircleToday: { backgroundColor: PRIMARY },
-  wkCircleSel:   { backgroundColor: '#EDE8E4' },
-  wkNum:         { fontSize: 15, fontWeight: '500', color: DARK },
-  wkNumToday:    { color: '#fff' },
-  wkNumSel:      { color: DARK },
+  weekCellCapsule: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: '#EDE8E4',
+    backgroundColor: '#fff', height: 80,
+  },
+  weekCellCapsuleActive: {
+    backgroundColor: PRIMARY, borderColor: PRIMARY,
+  },
+  wkLabelCapsule: { fontSize: 9, fontWeight: '600', color: '#AAAAAA', textTransform: 'uppercase' },
+  wkNumCapsule: { fontSize: 16, fontWeight: '500', color: DARK, marginVertical: 2 },
+  wkDayNameCapsule: { fontSize: 10, fontWeight: '500', color: '#AAAAAA' },
+  dotCapsule: { width: 4, height: 4, borderRadius: 2, backgroundColor: PRIMARY, marginTop: 4 },
 
   // shared dot
   dot:      { width: 5, height: 5, borderRadius: 3, backgroundColor: PRIMARY },

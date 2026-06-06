@@ -59,9 +59,9 @@ export default function BusinessSettingsScreen() {
       setSlug(data.slug ?? '')
       setBusinessName(data.business?.name ?? '')
       setAddress(data.business?.address ?? '')
-      setDescription(data.business?.description ?? '')
-      setWhatsapp(data.business?.whatsapp ?? '')
-      setInstagram(data.business?.instagram ?? '')
+      setDescription(data.bio ?? '')
+      setWhatsapp(data.whatsapp ?? '')
+      setInstagram(data.instagram ?? '')
       setPlanName(data.business?.plan?.name ?? 'Free')
       setPlanLimits(data.business?.plan?.limits ?? {})
       setDirty(false)
@@ -79,9 +79,9 @@ export default function BusinessSettingsScreen() {
       await updateSettings({
         businessName: businessName.trim(),
         businessAddress: address.trim(),
-        businessDescription: description.trim(),
-        businessWhatsapp: whatsapp.trim(),
-        businessInstagram: instagram.trim(),
+        bio: description.trim(),
+        whatsapp: whatsapp.trim(),
+        instagram: instagram.trim(),
       })
       setSavedMsg(true)
       setDirty(false)

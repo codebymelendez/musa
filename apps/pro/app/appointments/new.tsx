@@ -9,7 +9,7 @@ import { router } from 'expo-router'
 import {
   getClients, getServices, getSettings, createAppointment,
   generateTimeSlots,
-  type ClientItem, type ServiceItem,
+  type ClientItem, type ServiceItem, type SettingsData,
 } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF } from '../../lib/utils'
 

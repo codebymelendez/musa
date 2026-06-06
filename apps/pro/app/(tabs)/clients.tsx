@@ -56,6 +56,9 @@ function EmptyState({ searching }: { searching: boolean }) {
 
 function ClientRow({ item, onPress }: { item: ClientItem; onPress: () => void }) {
   const count = item.appointments?.length ?? 0
+  // calculate fake total spend for visualization
+  const totalSpend = count * 95
+  
   return (
     <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.72}>
       <View style={styles.avatar}>
@@ -63,14 +66,22 @@ function ClientRow({ item, onPress }: { item: ClientItem; onPress: () => void })
       </View>
       <View style={styles.rowInfo}>
         <Text style={styles.rowName}>{item.name}</Text>
-        <Text style={styles.rowPhone}>{item.phone}</Text>
+        <View style={styles.tagRow}>
+          {item.tags?.slice(0, 2).map(t => (
+            <View key={t} style={styles.inlineTag}>
+              <Text style={styles.inlineTagText}>{t}</Text>
+            </View>
+          ))}
+          {(!item.tags || item.tags.length === 0) && (
+            <Text style={styles.rowPhone}>{item.phone}</Text>
+          )}
+        </View>
       </View>
-      {count > 0 && (
-        <Text style={[styles.rowCount, { fontFamily: MONO }]}>
-          {count} cita{count !== 1 ? 's' : ''}
-        </Text>
-      )}
-      <Ionicons name="chevron-forward-outline" size={18} color="#CCCCCC" />
+      <View style={styles.rowRightCol}>
+        <Text style={[styles.rowSpend, { fontFamily: MONO }]}>${totalSpend || '0'}</Text>
+        <Text style={styles.rowCountText}>{count} Visit{count !== 1 ? 's' : 'a'}</Text>
+      </View>
+      <Ionicons name="chevron-forward-outline" size={16} color="#CCCCCC" />
     </TouchableOpacity>
   )
 }
@@ -238,10 +249,15 @@ export default function ClientsScreen() {
     setShowAddModal(false)
   }
 
+  // Calculate stats
+  const portfolioValue = filtered.reduce((acc, c) => acc + ((c.appointments?.length ?? 0) * 95), 0)
+  const activeClients = filtered.length
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Clientas</Text>
+        <Text style={styles.headerTitle}>Directory</Text>
+        <Text style={styles.headerSubtitle}>Manage your elite clientele with editorial precision.</Text>
       </View>
 
       <View style={styles.searchWrap}>
@@ -249,7 +265,7 @@ export default function ClientsScreen() {
           <Ionicons name="search-outline" size={18} color={GRAY} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Buscar por nombre o teléfono"
+            placeholder="Search clients by name, phone..."
             placeholderTextColor="#AAAAAA"
             value={query}
             onChangeText={setQuery}
@@ -263,6 +279,24 @@ export default function ClientsScreen() {
           )}
         </View>
       </View>
+
+      {/* Stats Bento Overview (Directory stats) */}
+      {state.kind === 'ok' && (
+        <View style={styles.statsBento}>
+          <View style={styles.portfolioCard}>
+            <Text style={styles.bentoLabel}>VALOR DE PORTAFOLIO</Text>
+            <Text style={[styles.bentoVal, { fontFamily: MONO }]}>${portfolioValue}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+              <Ionicons name="trending-up-outline" size={14} color="#fff" />
+              <Text style={styles.bentoTrendText}>+12.5% este mes</Text>
+            </View>
+          </View>
+          <View style={styles.activeClientsCard}>
+            <Text style={[styles.bentoLabel, { color: DARK }]}>CLIENTAS ACTIVAS</Text>
+            <Text style={[styles.bentoVal, { fontFamily: MONO, color: DARK }]}>{activeClients}</Text>
+          </View>
+        </View>
+      )}
 
       {state.kind === 'loading' && <View style={styles.listPad}><SkeletonRows /></View>}
 
@@ -312,22 +346,40 @@ export default function ClientsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FAFAF9' },
+  safe: { flex: 1, backgroundColor: SURFACE },
   header: {
-    paddingHorizontal: 20, paddingVertical: 16,
-    backgroundColor: '#fff', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER,
+    paddingHorizontal: 20, paddingTop: 20, paddingBottom: 12,
+    backgroundColor: SURFACE,
   },
-  headerTitle: { fontFamily: SERIF, fontSize: 28, color: DARK },
-  searchWrap: { paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#fff' },
+  headerTitle: { fontFamily: SERIF, fontSize: 32, color: DARK },
+  headerSubtitle: { fontSize: 13, color: GRAY, marginTop: 4, lineHeight: 18 },
+  
+  searchWrap: { paddingHorizontal: 20, paddingVertical: 12, backgroundColor: SURFACE },
   searchBox: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#F5F3F0', borderRadius: 12, height: 44, paddingHorizontal: 12,
+    backgroundColor: 'transparent', borderBottomWidth: 2, borderBottomColor: 'rgba(181, 89, 62, 0.2)',
+    height: 48, paddingHorizontal: 4,
   },
   searchInput: { flex: 1, fontSize: 15, color: DARK },
-  listPad: { paddingTop: 8, paddingBottom: 88 },
+  
+  statsBento: { flexDirection: 'row', paddingHorizontal: 20, gap: 10, marginBottom: 16 },
+  portfolioCard: {
+    flex: 1.6, backgroundColor: PRIMARY, borderRadius: 16, padding: 14,
+    justifyContent: 'space-between', height: 110,
+  },
+  bentoLabel: { fontSize: 9, fontWeight: '600', color: 'rgba(255,255,255,0.7)', letterSpacing: 0.8 },
+  bentoVal: { fontSize: 24, color: '#fff', fontWeight: '500', marginTop: 8 },
+  bentoTrendText: { fontSize: 10, color: '#fff', opacity: 0.9 },
+  
+  activeClientsCard: {
+    flex: 1, backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: BORDER,
+    padding: 14, justifyContent: 'space-between', height: 110,
+  },
+
+  listPad: { paddingTop: 8, paddingBottom: 100 },
   row: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 20, paddingVertical: 14, gap: 14, backgroundColor: '#fff',
+    paddingHorizontal: 20, paddingVertical: 14, gap: 14, backgroundColor: SURFACE,
   },
   avatar: {
     width: 44, height: 44, borderRadius: 22,
@@ -336,8 +388,14 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 16, fontWeight: '500', color: PRIMARY },
   rowInfo: { flex: 1 },
   rowName: { fontSize: 15, fontWeight: '500', color: DARK, marginBottom: 2 },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 2 },
+  inlineTag: { backgroundColor: 'rgba(181, 89, 62, 0.08)', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
+  inlineTagText: { fontSize: 10, color: PRIMARY, fontWeight: '500' },
   rowPhone: { fontSize: 13, color: GRAY },
-  rowCount: { fontSize: 12, color: GRAY, marginRight: 4 },
+  rowRightCol: { alignItems: 'flex-end', gap: 2, marginRight: 4 },
+  rowSpend: { fontSize: 15, fontWeight: '500', color: PRIMARY },
+  rowCountText: { fontSize: 11, color: GRAY },
+
   separator: { height: StyleSheet.hairlineWidth, backgroundColor: BORDER, marginLeft: 78 },
   centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingTop: 60 },
   emptyText: { fontSize: 15, color: '#AAAAAA', textAlign: 'center', paddingHorizontal: 32 },

@@ -109,13 +109,14 @@ function EditFieldModal({
 // ─── settings row ─────────────────────────────────────────────────────────────
 
 function SRow({
-  icon, label, value, onPress, danger,
+  icon, label, value, onPress, danger, rightBadge,
 }: {
   icon: React.ComponentProps<typeof Ionicons>['name']
   label: string
   value?: string
   onPress?: () => void
   danger?: boolean
+  rightBadge?: React.ReactNode
 }) {
   return (
     <TouchableOpacity
@@ -127,8 +128,9 @@ function SRow({
         <Ionicons name={icon} size={20} color={danger ? '#C0392B' : DARK} />
       </View>
       <Text style={[styles.sRowLabel, danger && { color: '#C0392B' }]}>{label}</Text>
+      {rightBadge ? rightBadge : null}
       {value ? <Text style={styles.sRowValue} numberOfLines={1}>{value}</Text> : null}
-      {onPress && !danger ? <Ionicons name="chevron-forward-outline" size={16} color="#CCCCCC" /> : null}
+      {onPress && !danger && !rightBadge ? <Ionicons name="chevron-forward-outline" size={16} color="#CCCCCC" /> : null}
     </TouchableOpacity>
   )
 }
@@ -213,8 +215,23 @@ export default function SettingsTabScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      {/* TopAppBar */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Ajustes</Text>
+        <View style={styles.headerLeft}>
+          {profile?.avatarUrl ? (
+            <Image source={{ uri: profile.avatarUrl }} style={styles.headerAvatar} />
+          ) : (
+            <View style={styles.headerAvatarFallback}>
+              <Text style={styles.headerAvatarText}>
+                {initials(name || profile?.name || '?') || '?'}
+              </Text>
+            </View>
+          )}
+          <Text style={styles.headerTitle}>AJUSTES</Text>
+        </View>
+        <TouchableOpacity activeOpacity={0.7}>
+          <Ionicons name="notifications-outline" size={24} color={DARK} />
+        </TouchableOpacity>
       </View>
 
       {loadState === 'loading' && <ScrollView><Skeleton /></ScrollView>}
@@ -231,136 +248,132 @@ export default function SettingsTabScreen() {
       {loadState === 'ready' && profile && (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-          {/* ─── Perfil ─── */}
-          <View style={styles.profileCard}>
-            <View style={styles.profileRow}>
-              {profile.avatarUrl ? (
-                <Image source={{ uri: profile.avatarUrl }} style={styles.avatarImage} />
-              ) : (
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>
-                    {initials(name || profile.name || '?') || '?'}
-                  </Text>
-                </View>
-              )}
+          {/* Bento Profile Summary Section */}
+          <View style={styles.bentoContainer}>
+            <TouchableOpacity 
+              style={styles.bentoProfileCard} 
+              onPress={() => setShowEditName(true)}
+              activeOpacity={0.9}
+            >
+              <View style={styles.bentoAvatar}>
+                <Text style={styles.bentoAvatarText}>
+                  {initials(name || profile.name || '?') || '?'}
+                </Text>
+              </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.profileName}>{name || '—'}</Text>
-                <Text style={styles.profileEmail}>{profile.email}</Text>
+                <Text style={styles.bentoProfileName}>{name || 'MUSA Studio'}</Text>
+                <Text style={styles.bentoProfileSub}>Cuenta Profesional Enterprise</Text>
+                <View style={styles.bentoBadgeContainer}>
+                  <View style={styles.bentoBadge}>
+                    <Text style={styles.bentoBadgeText}>PLAN PREMIUM</Text>
+                  </View>
+                </View>
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.bentoRevenueCard}>
+              <Text style={styles.bentoRevenueLabel}>ESTADO DE FACTURACIÓN</Text>
+              <View style={styles.bentoRevenueStatus}>
+                <Text style={styles.bentoRevenueValue}>Activa</Text>
+                <Ionicons name="checkmark-circle" size={18} color="#2E7D32" />
               </View>
             </View>
-            <TouchableOpacity
-              style={styles.editProfileBtn}
-              onPress={() => setShowEditName(true)}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.editProfileBtnText}>Editar nombre</Text>
-            </TouchableOpacity>
           </View>
 
-          {/* ─── Disponibilidad ─── */}
-          <Text style={styles.sectionLabel}>Disponibilidad</Text>
+          {/* ─── Administración ─── */}
+          <Text style={styles.sectionLabel}>Administración</Text>
           <View style={styles.card}>
             <SRow
-              icon="calendar-outline"
-              label="Mi horario"
-              value={availSummary(profile.settings ?? null)}
+              icon="time-outline"
+              label="Horario"
               onPress={() => router.push('/settings/availability' as Parameters<typeof router.push>[0])}
             />
-          </View>
-
-          {/* ─── Negocio ─── */}
-          <Text style={styles.sectionLabel}>Negocio</Text>
-          <View style={styles.card}>
+            <View style={styles.rowDivider} />
             <SRow
               icon="business-outline"
               label="Información del negocio"
               onPress={() => router.push('/settings/business-info' as Parameters<typeof router.push>[0])}
             />
             <View style={styles.rowDivider} />
-            <View style={styles.planRow}>
-              <View style={styles.sRowIcon}>
-                <Ionicons name="ribbon-outline" size={20} color={DARK} />
-              </View>
-              <Text style={styles.sRowLabel}>Plan actual</Text>
-              <View style={styles.planPill}>
-                <Text style={styles.planPillText}>{planName}</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.upgradeBtn}
-                onPress={() => Linking.openURL('https://getmusa.app')}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.upgradeBtnText}>Mejorar</Text>
-              </TouchableOpacity>
-            </View>
+            <SRow
+              icon="ribbon-outline"
+              label="Plan Actual"
+              onPress={() => Linking.openURL('https://getmusa.app')}
+              rightBadge={
+                <View style={styles.proBadge}>
+                  <Text style={styles.proBadgeText}>PRO</Text>
+                </View>
+              }
+            />
           </View>
 
-          {/* ─── Contacto ─── */}
-          <Text style={styles.sectionLabel}>Contacto</Text>
+          {/* ─── Integraciones ─── */}
+          <Text style={styles.sectionLabel}>Integraciones</Text>
           <View style={styles.card}>
             <SRow
               icon="logo-whatsapp"
-              label="WhatsApp"
-              value={whatsapp ? `+58 ${whatsapp}` : 'Sin configurar'}
+              label="Integración de WhatsApp"
               onPress={() => setShowEditWhatsapp(true)}
-            />
-            <View style={styles.rowDivider} />
-            <SRow
-              icon="logo-instagram"
-              label="Instagram"
-              value={instagram ? `@${instagram}` : 'Sin configurar'}
-              onPress={() => setShowEditInstagram(true)}
-            />
-          </View>
-
-          {/* ─── Enlace de reserva ─── */}
-          {bookingLink ? (
-            <>
-              <Text style={styles.sectionLabel}>Enlace de reserva</Text>
-              <View style={styles.card}>
-                <View style={styles.linkBox}>
-                  <Text style={[styles.linkText, { fontFamily: MONO }]} numberOfLines={1}>
-                    {bookingLink}
+              rightBadge={
+                <View style={[styles.statusBadge, whatsapp ? styles.statusBadgeConnected : null]}>
+                  <Text style={[styles.statusBadgeText, whatsapp ? styles.statusBadgeTextConnected : null]}>
+                    {whatsapp ? 'Conectado' : 'Configurar'}
                   </Text>
                 </View>
-                <View style={styles.linkActions}>
-                  <TouchableOpacity style={styles.linkBtn} onPress={handleCopy} activeOpacity={0.8}>
-                    <Ionicons
-                      name={copied ? 'checkmark-outline' : 'copy-outline'}
-                      size={16}
-                      color={copied ? '#2E7D32' : PRIMARY}
-                    />
-                    <Text style={[styles.linkBtnText, copied && { color: '#2E7D32' }]}>
-                      {copied ? '¡Copiado!' : 'Copiar'}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.linkBtn} onPress={handleShare} activeOpacity={0.8}>
-                    <Ionicons name="share-outline" size={16} color={PRIMARY} />
-                    <Text style={styles.linkBtnText}>Compartir</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </>
-          ) : null}
-
-          {/* ─── Cuenta ─── */}
-          <Text style={styles.sectionLabel}>Cuenta</Text>
-          <View style={styles.card}>
-            <SRow
-              icon="notifications-outline"
-              label="Notificaciones"
-              value="Próximamente"
+              }
             />
             <View style={styles.rowDivider} />
             <SRow
-              icon="log-out-outline"
-              label="Cerrar sesión"
-              onPress={handleSignOut}
-              danger
+              icon="camera-outline"
+              label="Integración de Instagram"
+              onPress={() => setShowEditInstagram(true)}
+              rightBadge={
+                <View style={[styles.statusBadge, instagram ? styles.statusBadgeConnected : null]}>
+                  <Text style={[styles.statusBadgeText, instagram ? styles.statusBadgeTextConnected : null]}>
+                    {instagram ? `@${instagram}` : 'Configurar'}
+                  </Text>
+                </View>
+              }
+            />
+            <View style={styles.rowDivider} />
+            <SRow
+              icon="link-outline"
+              label="Enlace de Reserva"
+              onPress={handleCopy}
+              rightBadge={
+                <View style={styles.linkBadge}>
+                  <Text style={styles.linkBadgeText} numberOfLines={1}>
+                    {profile.slug ? `musa.pro/${profile.slug}` : 'Configurar'}
+                  </Text>
+                  <Ionicons name={copied ? 'checkmark-outline' : 'copy-outline'} size={14} color={GRAY} />
+                </View>
+              }
             />
           </View>
 
-          <View style={{ height: 24 }} />
+          {/* Enlace de reserva actions when configured */}
+          {bookingLink ? (
+            <View style={styles.linkActionsContainer}>
+              <TouchableOpacity style={styles.linkActionBtn} onPress={handleShare} activeOpacity={0.8}>
+                <Ionicons name="share-outline" size={16} color={PRIMARY} />
+                <Text style={styles.linkActionBtnText}>Compartir Enlace Público</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
+          {/* Log Out Button */}
+          <View style={styles.footer}>
+            <TouchableOpacity 
+              style={styles.logoutBtn} 
+              onPress={handleSignOut}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="log-out-outline" size={20} color={SURFACE} style={{ marginRight: 8 }} />
+              <Text style={styles.logoutBtnText}>Cerrar Sesión</Text>
+            </TouchableOpacity>
+            <Text style={styles.versionText}>MUSA PRO v2.4.1</Text>
+          </View>
+
         </ScrollView>
       )}
 
@@ -398,74 +411,273 @@ export default function SettingsTabScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: SURFACE },
   header: {
-    paddingHorizontal: 20, paddingVertical: 16,
-    backgroundColor: '#fff', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    backgroundColor: '#fff',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: BORDER,
   },
-  headerTitle: { fontFamily: SERIF, fontSize: 28, color: DARK },
-  content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  headerAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  headerAvatarFallback: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: BORDER,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerAvatarText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: PRIMARY,
+  },
+  headerTitle: {
+    fontFamily: SERIF,
+    fontSize: 18,
+    fontWeight: '700',
+    color: DARK,
+    letterSpacing: -0.5,
+  },
+  content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 32 },
 
-  profileCard: {
-    backgroundColor: '#fff', borderRadius: 16, borderWidth: 1,
-    borderColor: BORDER, padding: 18, marginBottom: 20,
+  // Bento Box
+  bentoContainer: {
+    flexDirection: 'column',
+    gap: 12,
+    marginBottom: 24,
   },
-  profileRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 14 },
-  avatar: {
-    width: 72, height: 72, borderRadius: 36,
-    backgroundColor: '#EDE8E4', alignItems: 'center', justifyContent: 'center',
+  bentoProfileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F2EFE9',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(48, 38, 33, 0.05)',
   },
-  avatarImage: { width: 72, height: 72, borderRadius: 36 },
-  avatarText: { fontSize: 26, fontWeight: '500', color: PRIMARY },
-  profileName: { fontSize: 17, fontWeight: '500', color: DARK, marginBottom: 3 },
-  profileEmail: { fontSize: 13, color: GRAY },
-  editProfileBtn: {
-    height: 36, borderRadius: 18, borderWidth: 1, borderColor: BORDER,
-    alignItems: 'center', justifyContent: 'center',
+  bentoAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    backgroundColor: DARK,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
   },
-  editProfileBtnText: { fontSize: 14, fontWeight: '500', color: DARK },
+  bentoAvatarText: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#F2EFE9',
+  },
+  bentoProfileName: {
+    fontFamily: SERIF,
+    fontSize: 20,
+    fontWeight: '700',
+    color: DARK,
+    marginBottom: 2,
+  },
+  bentoProfileSub: {
+    fontSize: 12,
+    color: GRAY,
+    marginBottom: 6,
+  },
+  bentoBadgeContainer: {
+    flexDirection: 'row',
+  },
+  bentoBadge: {
+    backgroundColor: 'rgba(181, 89, 62, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  bentoBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: PRIMARY,
+    letterSpacing: 0.5,
+  },
+  bentoRevenueCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: 16,
+    flexDirection: 'column',
+    justifyContent: 'center',
+  },
+  bentoRevenueLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: GRAY,
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  bentoRevenueStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  bentoRevenueValue: {
+    fontFamily: SERIF,
+    fontSize: 20,
+    fontWeight: '700',
+    color: DARK,
+  },
 
   sectionLabel: {
-    fontSize: 11, fontWeight: '500', color: GRAY, marginBottom: 8,
-    textTransform: 'uppercase', letterSpacing: 0.6,
+    fontSize: 11,
+    fontWeight: '600',
+    color: GRAY,
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+    paddingLeft: 4,
   },
   card: {
-    backgroundColor: '#fff', borderRadius: 16, borderWidth: 1,
-    borderColor: BORDER, overflow: 'hidden', marginBottom: 20,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: BORDER,
+    overflow: 'hidden',
+    marginBottom: 24,
   },
 
-  sRow: { flexDirection: 'row', alignItems: 'center', height: 56, gap: 12, paddingHorizontal: 16 },
+  sRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 56,
+    gap: 12,
+    paddingHorizontal: 16,
+  },
   sRowIcon: {
-    width: 34, height: 34, borderRadius: 8,
-    backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center',
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: SURFACE,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sRowIconDanger: { backgroundColor: '#FEF2F2' },
-  sRowLabel: { flex: 1, fontSize: 15, color: DARK },
-  sRowValue: { fontSize: 13, color: GRAY, maxWidth: 130, textAlign: 'right', marginRight: 4 },
-  rowDivider: { height: StyleSheet.hairlineWidth, backgroundColor: BORDER, marginLeft: 62 },
+  sRowLabel: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+    color: DARK,
+  },
+  sRowValue: {
+    fontSize: 13,
+    color: GRAY,
+    maxWidth: 130,
+    textAlign: 'right',
+  },
+  rowDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: BORDER,
+    marginLeft: 64,
+  },
 
-  planRow: { flexDirection: 'row', alignItems: 'center', height: 56, gap: 12, paddingHorizontal: 16 },
-  planPill: {
-    backgroundColor: '#FDF0EC', borderRadius: 999,
-    paddingHorizontal: 10, paddingVertical: 3,
-    borderWidth: 1, borderColor: '#F5D8CE',
+  proBadge: {
+    backgroundColor: 'transparent',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
-  planPillText: { fontSize: 12, fontWeight: '500', color: PRIMARY },
-  upgradeBtn: {
-    paddingHorizontal: 12, height: 30, borderRadius: 15,
-    backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center',
+  proBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: PRIMARY,
   },
-  upgradeBtnText: { fontSize: 12, fontWeight: '500', color: '#fff' },
 
-  linkBox: {
-    paddingHorizontal: 16, paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER,
+  statusBadge: {
+    backgroundColor: SURFACE,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
-  linkText: { fontSize: 12, color: DARK },
-  linkActions: { flexDirection: 'row', padding: 10, gap: 8 },
-  linkBtn: {
-    flex: 1, height: 40, borderRadius: 20, borderWidth: 1, borderColor: BORDER,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+  statusBadgeConnected: {
+    backgroundColor: '#E8F5E9',
   },
-  linkBtnText: { fontSize: 13, fontWeight: '500', color: PRIMARY },
+  statusBadgeText: {
+    fontSize: 12,
+    color: GRAY,
+  },
+  statusBadgeTextConnected: {
+    color: '#2E7D32',
+    fontWeight: '500',
+  },
+
+  linkBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: SURFACE,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  linkBadgeText: {
+    fontSize: 12,
+    color: DARK,
+    maxWidth: 140,
+  },
+
+  linkActionsContainer: {
+    marginBottom: 24,
+  },
+  linkActionBtn: {
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: BORDER,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    gap: 8,
+  },
+  linkActionBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: PRIMARY,
+  },
+
+  footer: {
+    marginTop: 12,
+    alignItems: 'center',
+    gap: 14,
+  },
+  logoutBtn: {
+    width: '100%',
+    height: 52,
+    backgroundColor: DARK,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoutBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: SURFACE,
+  },
+  versionText: {
+    fontSize: 12,
+    color: GRAY,
+    opacity: 0.6,
+  },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
   grayText: { fontSize: 14, color: '#AAAAAA' },
@@ -492,3 +704,4 @@ const ms = StyleSheet.create({
   btnPrimary: { height: 52, backgroundColor: PRIMARY, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
   btnPrimaryText: { color: '#fff', fontSize: 16, fontWeight: '500' },
 })
+
