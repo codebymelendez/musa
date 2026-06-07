@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import {
-  View, Text, Image, ScrollView, TouchableOpacity, TextInput,
+  View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Animated, Modal, KeyboardAvoidingView,
   Platform, Share, Linking, Alert, Switch, ActivityIndicator,
 } from 'react-native'
@@ -8,6 +8,7 @@ import * as Clipboard from 'expo-clipboard'
 import * as ImagePicker from 'expo-image-picker'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { getSettings, updateSettings, type SettingsData } from '../../lib/api'

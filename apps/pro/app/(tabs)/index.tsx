@@ -2,10 +2,11 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Animated, RefreshControl, Modal, TextInput,
-  KeyboardAvoidingView, Platform, Alert, Image,
+  KeyboardAvoidingView, Platform, Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import {
   getSettings, getAppointments, getPromotions, getStats, getClients, getAppointmentsInRange,
@@ -197,7 +198,7 @@ export default function HomeScreen() {
       const weekTo = new Date().toISOString()
       const todayStr = toVenezuelaDate(new Date())
 
-      const [sData, appts, promoList, program, accounts, statsData, clients, weekAppts] = await Promise.all([
+      const results = await Promise.allSettled([
         getSettings(),
         getAppointments(todayStr),
         getPromotions(),
@@ -207,22 +208,32 @@ export default function HomeScreen() {
         getClients().catch(() => [] as ClientItem[]),
         getAppointmentsInRange(weekFrom, weekTo).catch(() => [] as AppointmentItem[]),
       ])
+
+      const sData = results[0].status === 'fulfilled' ? results[0].value as any : null
+      const appts = results[1].status === 'fulfilled' ? results[1].value as any[] : []
+      const promoList = results[2].status === 'fulfilled' ? results[2].value as any[] : []
+      const program = results[3].status === 'fulfilled' ? results[3].value as any : null
+      const accounts = results[4].status === 'fulfilled' ? results[4].value as any[] : []
+      const statsData = results[5].status === 'fulfilled' ? results[5].value as any : null
+      const clients = results[6].status === 'fulfilled' ? results[6].value as any[] : []
+      const weekAppts = results[7].status === 'fulfilled' ? results[7].value as any[] : []
+
       setUserName(sData?.name?.split(' ')[0] ?? '')
       setAvatarUrl(sData?.avatarUrl ?? null)
-      setAppointments(appts.filter(a => a.status !== 'cancelled'))
-      setPromos(promoList.filter(p => !p.validUntil || new Date(p.validUntil) >= new Date()))
+      setAppointments(appts.filter((a: any) => a.status !== 'cancelled'))
+      setPromos(promoList.filter((p: any) => !p.validUntil || new Date(p.validUntil) >= new Date()))
       setLoyaltyProgram(program)
-      const withPts = accounts.filter(a => a.totalPoints > 0)
+      const withPts = accounts.filter((a: any) => a.totalPoints > 0)
       setLoyaltyStats({
         clientsWithPoints: withPts.length,
-        totalPoints: withPts.reduce((s, a) => s + a.totalPoints, 0),
+        totalPoints: withPts.reduce((s: number, a: any) => s + a.totalPoints, 0),
       })
       if (statsData) setMonthlyRevenue(statsData.monthlyRevenue)
       const wRev = weekAppts
-        .filter(a => a.status === 'completed')
-        .reduce((sum, a) => sum + (a.payment?.isPaid ? a.payment.amount : a.service.price), 0)
+        .filter((a: any) => a.status === 'completed')
+        .reduce((sum: number, a: any) => sum + (a.payment?.isPaid ? a.payment.amount : a.service.price), 0)
       setWeeklyRevenue(wRev)
-      setNewClientsCount(clients.filter(c => (c.createdAt ?? '').slice(0, 10) >= firstDayStr).length)
+      setNewClientsCount(clients.filter((c: any) => (c.createdAt ?? '').slice(0, 10) >= firstDayStr).length)
     } catch { /* show what loaded */ }
     finally { setLoading(false) }
   }, [])

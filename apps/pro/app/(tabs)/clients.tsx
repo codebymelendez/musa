@@ -6,6 +6,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import * as Haptics from 'expo-haptics'
 import { router } from 'expo-router'
 import { getClients, createClient, type ClientItem } from '../../lib/api'
 import { PRIMARY, DARK, BORDER, GRAY, MONO, SERIF, SURFACE, initials } from '../../lib/utils'
@@ -110,6 +111,7 @@ function AddClientModal({
   }
 
   async function handleCreate() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     if (!name.trim()) { Alert.alert('', 'El nombre es requerido'); return }
     if (!phone.trim()) { Alert.alert('', 'El teléfono es requerido'); return }
     setSaving(true)
@@ -322,7 +324,10 @@ export default function ClientsScreen() {
       {/* FAB */}
       <TouchableOpacity
         style={styles.fab}
-        onPress={() => setShowAddModal(true)}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+          setShowAddModal(true)
+        }}
         activeOpacity={0.85}
       >
         <Ionicons name="add" size={28} color="#fff" />

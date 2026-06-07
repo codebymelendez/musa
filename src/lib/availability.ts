@@ -65,7 +65,7 @@ export async function detectConflictingAppointments(
     .gt("endTime", startTime.toISOString())
     .order("startTime", { ascending: true });
 
-  return (data ?? []).map((apt) => ({
+  return (data ?? []).map((apt: any) => ({
     ...apt,
     client: Array.isArray(apt.client) ? apt.client[0] : apt.client,
   }));

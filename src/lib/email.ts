@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const FROM = "MUSA <bienvenida@getmusa.app>";
 
 export async function sendEmail({
@@ -13,7 +13,13 @@ export async function sendEmail({
   html: string;
 }) {
   try {
-    await resend.emails.send({ from: FROM, to, subject, html });
+    if (resend) {
+      await resend.emails.send({ from: FROM, to, subject, html });
+    } else {
+      console.warn("⚠️ RESEND_API_KEY no configurado. El correo se mostraría así:");
+      console.log(`Para: ${to}`);
+      console.log(`Asunto: ${subject}`);
+    }
   } catch (error) {
     console.error("[email send error]", error);
   }

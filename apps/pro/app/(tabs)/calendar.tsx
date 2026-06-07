@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  View, Text, ScrollView, TouchableOpacity,
+  View, Text, ScrollView, TouchableOpacity, FlatList,
   RefreshControl, Animated, StyleSheet, Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -421,7 +421,14 @@ export default function CalendarScreen() {
           {state.kind === 'loading' && <SkeletonCards />}
           {state.kind === 'error'   && <ErrorState onRetry={() => load(date)} />}
           {state.kind === 'ok' && state.data.length === 0 && <EmptyDay />}
-          {state.kind === 'ok' && state.data.map(item => <AppointmentCard key={item.id} item={item} />)}
+          {state.kind === 'ok' && state.data.length > 0 && (
+            <FlatList
+              data={state.data}
+              keyExtractor={item => item.id}
+              scrollEnabled={false}
+              renderItem={({ item }) => <AppointmentCard item={item} />}
+            />
+          )}
         </ScrollView>
       )}
 

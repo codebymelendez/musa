@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Normalizar relaciones one-to-one
-  let accounts = (data ?? []).map((a) => ({
+  let accounts = (data ?? []).map((a: any) => ({
     ...a,
     client: Array.isArray(a.client) ? a.client[0] : a.client,
     program: Array.isArray(a.program) ? a.program[0] : a.program,
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
   if (search) {
     const lower = search.toLowerCase();
     accounts = accounts.filter(
-      (a) =>
+      (a: any) =>
         a.client?.name?.toLowerCase().includes(lower) ||
         a.client?.phone?.includes(search)
     );
