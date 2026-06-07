@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import {
-  getAppointments, toVenezuelaDate,
+  getAppointments, toVenezuelaDate, getSettings, getBusinessTZ,
   type AppointmentItem, type AppointmentStatus,
 } from '../../lib/api'
 
@@ -32,9 +32,9 @@ function formatWeekday(d: Date): string {
 function formatFullDate(d: Date): string {
   return new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).format(d)
 }
-function formatTime(iso: string): string {
+function formatTime(iso: string, tz = 'America/Caracas'): string {
   return new Intl.DateTimeFormat('es-VE', {
-    hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Caracas',
+    hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz,
   }).format(new Date(iso))
 }
 function isToday(d: Date): boolean {
@@ -107,7 +107,7 @@ function StatusPill({ status }: { status: AppointmentStatus }) {
 
 // ─── appointment card ─────────────────────────────────────────────────────────
 
-function AppointmentCard({ item }: { item: AppointmentItem }) {
+function AppointmentCard({ item, tz = 'America/Caracas' }: { item: AppointmentItem; tz?: string }) {
   const isConfirmed = item.status === 'confirmed'
   const isPending = item.status === 'pending'
   const isCompleted = item.status === 'completed'
@@ -119,7 +119,7 @@ function AppointmentCard({ item }: { item: AppointmentItem }) {
       activeOpacity={0.72}
     >
       <View style={s.cardRow}>
-        <Text style={s.timeText}>{formatTime(item.startTime)} — {formatTime(item.endTime)}</Text>
+        <Text style={s.timeText}>{formatTime(item.startTime, tz)} — {formatTime(item.endTime, tz)}</Text>
         <StatusPill status={item.status} />
       </View>
       <Text style={s.clientName}>{item.client?.name ?? 'Sin nombre'}</Text>
@@ -177,9 +177,9 @@ const WLABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
 // ─── week view ────────────────────────────────────────────────────────────────
 
 function WeekView({
-  weekStart, selectedDate, cacheVersion, onSelectDay,
+  weekStart, selectedDate, cacheVersion, onSelectDay, businessTz,
 }: {
-  weekStart: Date; selectedDate: Date; cacheVersion: number; onSelectDay: (d: Date) => void
+  weekStart: Date; selectedDate: Date; cacheVersion: number; onSelectDay: (d: Date) => void; businessTz: string
 }) {
   const todayKey    = toVenezuelaDate(new Date())
   const selectedKey = toVenezuelaDate(selectedDate)
@@ -238,7 +238,7 @@ function WeekView({
             <Text style={s.groupLabel}>
               {cap(new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }).format(day))}
             </Text>
-            {appts.map(item => <AppointmentCard key={item.id} item={item} />)}
+            {appts.map(item => <AppointmentCard key={item.id} item={item} tz={businessTz} />)}
           </View>
         ))}
       </ScrollView>
@@ -308,6 +308,13 @@ export default function CalendarScreen() {
   const [state,        setState]        = useState<ScreenState>({ kind: 'loading' })
   const [refreshing,   setRefreshing]   = useState(false)
   const [cacheVersion, setCacheVersion] = useState(0)
+  const [businessTz,   setBusinessTz]   = useState('America/Caracas')
+
+  useEffect(() => {
+    getSettings()
+      .then(s => { setBusinessTz(getBusinessTZ(s)) })
+      .catch(() => {})
+  }, [])
 
   const load = useCallback(async (d: Date, force = false) => {
     const key = toVenezuelaDate(d)
@@ -426,7 +433,7 @@ export default function CalendarScreen() {
               data={state.data}
               keyExtractor={item => item.id}
               scrollEnabled={false}
-              renderItem={({ item }) => <AppointmentCard item={item} />}
+              renderItem={({ item }) => <AppointmentCard item={item} tz={businessTz} />}
             />
           )}
         </ScrollView>
@@ -434,7 +441,7 @@ export default function CalendarScreen() {
 
       {/* ── week view ── */}
       {view === 'week' && (
-        <WeekView weekStart={weekStart} selectedDate={date} cacheVersion={cacheVersion} onSelectDay={selectDay} />
+        <WeekView weekStart={weekStart} selectedDate={date} cacheVersion={cacheVersion} onSelectDay={selectDay} businessTz={businessTz} />
       )}
 
       {/* ── month view ── */}

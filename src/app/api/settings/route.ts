@@ -23,6 +23,7 @@ const updateSchema = z.object({
       currency: z.string().optional(),
       bookingEnabled: z.boolean().optional(),
       paymentMethods: z.array(z.string()).optional(),
+      timezone: z.string().optional(),
     })
     .optional(),
 });
@@ -198,7 +199,18 @@ export async function PATCH(req: NextRequest) {
           ...(settings.currency && { currency: settings.currency }),
           ...(settings.bookingEnabled !== undefined && { bookingEnabled: settings.bookingEnabled }),
           ...(settings.paymentMethods !== undefined && { paymentMethods: JSON.stringify(settings.paymentMethods) }),
+          ...(settings.timezone && { timezone: settings.timezone }),
         }, { onConflict: 'userId', ignoreDuplicates: false });
+
+      if (settings.timezone) {
+        const { data: cu } = await admin
+          .from('User').select('businessId').eq('id', session.userId).single();
+        if (cu?.businessId) {
+          await admin.from('Business')
+            .update({ timezone: settings.timezone })
+            .eq('id', cu.businessId);
+        }
+      }
     }
 
     // Leer el usuario actualizado con admin client

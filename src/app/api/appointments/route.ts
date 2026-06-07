@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase-server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { checkAppointmentLimit } from "@/lib/limits";
 import { getBlocksInRange, isSlotBlocked } from "@/lib/availability";
+import { dayRangeUTC, DEFAULT_TZ } from "@/lib/utils";
 
 const createSchema = z.object({
   clientId: z.string(),
@@ -26,11 +27,13 @@ export async function GET(req: NextRequest) {
   let endFilter: string;
 
   if (date) {
-    // Venezuela = UTC-4 → medianoche local = 04:00 UTC del mismo día de calendario
-    const start = new Date(`${date}T04:00:00.000Z`); // medianoche Venezuela
-    const end   = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1); // fin del día Venezuela
-    startFilter = start.toISOString();
-    endFilter   = end.toISOString();
+    const { data: ps } = await createAdminClient()
+      .from('ProfessionalSettings')
+      .select('timezone')
+      .eq('userId', session.userId)
+      .maybeSingle();
+    const tz = ps?.timezone ?? DEFAULT_TZ;
+    ({ start: startFilter, end: endFilter } = dayRangeUTC(date, tz));
   } else if (from && to) {
     startFilter = new Date(from).toISOString();
     endFilter = new Date(to).toISOString();

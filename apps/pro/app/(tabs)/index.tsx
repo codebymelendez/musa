@@ -10,7 +10,7 @@ import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import {
   getSettings, getAppointments, getPromotions, getStats, getClients, getAppointmentsInRange,
-  getLoyaltyProgram, getLoyaltyAccounts, createClient, toVenezuelaDate, normalizeISODate,
+  getLoyaltyProgram, getLoyaltyAccounts, createClient, toVenezuelaDate, normalizeISODate, getBusinessTZ,
   type AppointmentItem, type PromotionItem, type LoyaltyProgram, type ClientItem,
 } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, capitalize, formatTime, formatMoney } from '../../lib/utils'
@@ -31,8 +31,8 @@ function shortDate(iso: string | null): string {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
-function getGreeting(): string {
-  const h = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Caracas' })).getHours()
+function getGreeting(tz: string): string {
+  const h = new Date(new Date().toLocaleString('en-US', { timeZone: tz })).getHours()
   if (h >= 5 && h < 12) return 'Buenos días'
   if (h >= 12 && h < 19) return 'Buenas tardes'
   return 'Buenas noches'
@@ -186,6 +186,7 @@ type QuickAction = {
 export default function HomeScreen() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [businessTz, setBusinessTz] = useState('America/Caracas')
   const [userName, setUserName] = useState('')
   const [appointments, setAppointments] = useState<AppointmentItem[]>([])
   const [promos, setPromos] = useState<PromotionItem[]>([])
@@ -200,7 +201,7 @@ export default function HomeScreen() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const venezNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Caracas' }))
+      const venezNow = new Date(new Date().toLocaleString('en-US', { timeZone: businessTz }))
       const year = venezNow.getFullYear()
       const month = venezNow.getMonth() + 1
       const firstDayStr = `${year}-${String(month).padStart(2, '0')}-01`
@@ -228,6 +229,7 @@ export default function HomeScreen() {
       const clients = results[6].status === 'fulfilled' ? results[6].value as any[] : []
       const weekAppts = results[7].status === 'fulfilled' ? results[7].value as any[] : []
 
+      setBusinessTz(getBusinessTZ(sData))
       setUserName(sData?.name?.split(' ')[0] ?? '')
       setAvatarUrl(sData?.avatarUrl ?? null)
       setAppointments(appts.filter((a: any) => a.status !== 'cancelled'))
@@ -326,7 +328,7 @@ export default function HomeScreen() {
       >
         {/* ─── Greeting & Profile ─── */}
         <View style={styles.greetingSection}>
-          <Text style={styles.sublabel}>{getGreeting().toUpperCase()}</Text>
+          <Text style={styles.sublabel}>{getGreeting(businessTz).toUpperCase()}</Text>
           <Text style={styles.greetingName}>{userName || 'Bienvenida'}</Text>
         </View>
 

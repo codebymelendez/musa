@@ -1,17 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
-import { generateTimeSlots, VE_UTC_OFFSET_H } from "@/lib/utils";
+import { generateTimeSlots, dayRangeUTC, DEFAULT_TZ } from "@/lib/utils";
 import { ProfessionalSettings } from "@/types";
 import { getBlocksInRange } from "@/lib/availability";
-
-/** Rango UTC que cubre un día completo en Venezuela (UTC-4).
- *  Para "2026-05-26": start = T04:00Z, end = T03:59:59.999Z del día siguiente. */
-function veDayRange(dateParam: string): { start: Date; end: Date } {
-  const start = new Date(`${dateParam}T00:00:00.000Z`);
-  start.setUTCHours(VE_UTC_OFFSET_H, 0, 0, 0); // medianoche Venezuela = 04:00 UTC
-  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
-  return { start, end };
-}
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -69,8 +60,9 @@ export async function GET(req: NextRequest, { params }: Params) {
     // Slots disponibles
     let slots = null;
     if (dateParam && serviceId) {
-      const selectedDate = new Date(dateParam); // YYYY-MM-DD → UTC midnight (uso solo para generateTimeSlots)
-      const { start, end } = veDayRange(dateParam); // rango Venezuela correcto
+      const selectedDate = new Date(dateParam);
+      const bizTz = rawSettings?.timezone ?? DEFAULT_TZ;
+      const { start, end } = dayRangeUTC(dateParam, bizTz);
 
       const services = user.services || [];
       const selectedService = services.find((s: any) => s.id === serviceId);
@@ -84,8 +76,8 @@ export async function GET(req: NextRequest, { params }: Params) {
         .select('startTime, endTime, service:Service(durationMin)')
         .eq('userId', user.id)
         .not('status', 'in', '(cancelled,no_show)')
-        .gte('startTime', start.toISOString())
-        .lte('startTime', end.toISOString());
+        .gte('startTime', start)
+        .lte('startTime', end);
 
       if (appointmentsError) {
         console.error("[fetch appointments error]", appointmentsError);
@@ -99,11 +91,12 @@ export async function GET(req: NextRequest, { params }: Params) {
           endTime: a.endTime,
           durationMin: a.service?.durationMin || 0,
         })),
-        selectedService.durationMin
+        selectedService.durationMin,
+        bizTz
       );
 
       // Excluir slots bloqueados por la profesional
-      const activeBlocks = await getBlocksInRange(user.id, start, end);
+      const activeBlocks = await getBlocksInRange(user.id, new Date(start), new Date(end));
       if (activeBlocks.length > 0) {
         slots = rawSlots.map((slot) => {
           if (!slot.available) return slot;

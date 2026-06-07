@@ -10,7 +10,7 @@ import {
 import { useAppointments } from "@/hooks/useAppointments";
 import { useAvailabilityBlocks } from "@/hooks/useAvailabilityBlocks";
 import { Appointment, AvailabilityBlock } from "@/types";
-import { weekRange, formatTimeES } from "@/lib/utils";
+import { weekRangeUTC, parseSupa, formatTimeES, DEFAULT_TZ } from "@/lib/utils";
 import BlockTimeModal from "@/components/calendar/BlockTimeModal";
 import NewAppointmentModal from "@/components/appointments/NewAppointmentModal";
 
@@ -18,18 +18,16 @@ const DAY_ABBR = ["DOM", "LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB"];
 const HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
 const HOUR_HEIGHT = 80;
 
-function getWeekDays(baseDate: Date): Date[] {
-  const { start } = weekRange(baseDate);
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(start);
-    d.setDate(start.getDate() + i);
-    return d;
-  });
+function getWeekDays(weekStart: string): Date[] {
+  const base = new Date(weekStart);
+  return Array.from({ length: 7 }, (_, i) =>
+    new Date(base.getTime() + i * 86_400_000)
+  );
 }
 
 function positionStyle(apt: Appointment): React.CSSProperties {
-  const start = new Date(apt.startTime);
-  const end   = new Date(apt.endTime);
+  const start = parseSupa(apt.startTime);
+  const end   = parseSupa(apt.endTime);
   const startHour = start.getHours() + start.getMinutes() / 60;
   const endHour   = end.getHours()   + end.getMinutes()   / 60;
   return {
@@ -42,8 +40,8 @@ function positionStyle(apt: Appointment): React.CSSProperties {
 }
 
 function blockPositionStyle(block: AvailabilityBlock): React.CSSProperties {
-  const start     = new Date(block.startTime);
-  const end       = new Date(block.endTime);
+  const start     = parseSupa(block.startTime);
+  const end       = parseSupa(block.endTime);
   const startHour = Math.max(start.getHours() + start.getMinutes() / 60, HOURS[0]);
   const endHour   = Math.min(end.getHours()   + end.getMinutes()   / 60, HOURS[HOURS.length - 1] + 1);
   return {
@@ -60,16 +58,27 @@ export default function Calendar() {
   const [baseDate, setBaseDate]     = useState(new Date());
   const [showBlockModal, setShowBlockModal]               = useState(false);
   const [showNewAppointmentModal, setShowNewAppointmentModal] = useState(false);
-
-  const weekDays = getWeekDays(baseDate);
-  const { appointments, loading, fetchByRange } = useAppointments();
-  const { blocks, fetchBlocks } = useAvailabilityBlocks();
-  const { start, end } = weekRange(baseDate);
+  const [businessTz, setBusinessTz] = useState(DEFAULT_TZ);
 
   useEffect(() => {
-    fetchByRange(start.toISOString(), end.toISOString());
-    fetchBlocks(start.toISOString(), end.toISOString());
-  }, [baseDate, fetchByRange, fetchBlocks]);
+    fetch('/api/settings')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        const tz = data?.settings?.timezone ?? DEFAULT_TZ;
+        setBusinessTz(tz);
+      })
+      .catch(() => {});
+  }, []);
+
+  const { start, end } = weekRangeUTC(baseDate, businessTz);
+  const weekDays = getWeekDays(start);
+  const { appointments, loading, fetchByRange } = useAppointments();
+  const { blocks, fetchBlocks } = useAvailabilityBlocks();
+
+  useEffect(() => {
+    fetchByRange(start, end);
+    fetchBlocks(start, end);
+  }, [baseDate, businessTz, fetchByRange, fetchBlocks]);
 
   const todayStr = new Date().toDateString();
   const weekNum  = Math.ceil(
@@ -81,7 +90,7 @@ export default function Calendar() {
 
   const aptsByDay: Record<number, Appointment[]> = {};
   for (const apt of appointments) {
-    const d      = new Date(apt.startTime);
+    const d      = parseSupa(apt.startTime);
     const colIdx = d.getDay() === 0 ? 6 : d.getDay() - 1;
     if (!aptsByDay[colIdx]) aptsByDay[colIdx] = [];
     aptsByDay[colIdx].push(apt);
@@ -89,8 +98,8 @@ export default function Calendar() {
 
   const blocksByDay: Record<number, AvailabilityBlock[]> = {};
   for (const block of blocks) {
-    const bStart = new Date(block.startTime);
-    const bEnd   = new Date(block.endTime);
+    const bStart = parseSupa(block.startTime);
+    const bEnd   = parseSupa(block.endTime);
     weekDays.forEach((day, colIdx) => {
       const dayStart = new Date(day); dayStart.setHours(0, 0, 0, 0);
       const dayEnd   = new Date(day); dayEnd.setHours(23, 59, 59, 999);
@@ -375,7 +384,7 @@ export default function Calendar() {
         <BlockTimeModal
           defaultDate={baseDate}
           onClose={() => setShowBlockModal(false)}
-          onCreated={() => fetchBlocks(start.toISOString(), end.toISOString())}
+          onCreated={() => fetchBlocks(start, end)}
         />
       )}
       {showNewAppointmentModal && (
@@ -383,7 +392,7 @@ export default function Calendar() {
           onClose={() => setShowNewAppointmentModal(false)}
           onCreated={() => {
             setShowNewAppointmentModal(false);
-            fetchByRange(start.toISOString(), end.toISOString());
+            fetchByRange(start, end);
           }}
         />
       )}

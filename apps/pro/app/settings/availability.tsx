@@ -22,6 +22,16 @@ const DAYS = [
 
 const SLOT_OPTIONS = [15, 30, 45, 60, 90]
 
+const TIMEZONE_OPTIONS = [
+  { label: 'Venezuela',  value: 'America/Caracas' },
+  { label: 'Colombia',   value: 'America/Bogota' },
+  { label: 'Perú',       value: 'America/Lima' },
+  { label: 'México',     value: 'America/Mexico_City' },
+  { label: 'Argentina',  value: 'America/Argentina/Buenos_Aires' },
+  { label: 'España',     value: 'Europe/Madrid' },
+  { label: 'UTC',        value: 'UTC' },
+]
+
 // ─── skeleton ─────────────────────────────────────────────────────────────────
 
 function Skeleton() {
@@ -101,6 +111,7 @@ export default function AvailabilityScreen() {
   const [startHour, setStartHour] = useState(800)
   const [endHour, setEndHour] = useState(1700)
   const [slotDuration, setSlotDuration] = useState(30)
+  const [timezone, setTimezone] = useState('America/Caracas')
   const [saving, setSaving] = useState(false)
   const [savedMsg, setSavedMsg] = useState(false)
 
@@ -117,6 +128,7 @@ export default function AvailabilityScreen() {
         setStartHour(s.startHour ?? 800)
         setEndHour(s.endHour ?? 1700)
         setSlotDuration(s.slotDuration ?? 30)
+        setTimezone(s.timezone ?? 'America/Caracas')
       }
       setLoadState('ready')
     } catch { setLoadState('error') }
@@ -133,7 +145,7 @@ export default function AvailabilityScreen() {
   async function save() {
     setSaving(true)
     try {
-      await updateSettings({ settings: { workDays, startHour, endHour, slotDuration } })
+      await updateSettings({ settings: { workDays, startHour, endHour, slotDuration, timezone } })
       setSavedMsg(true)
       setTimeout(() => setSavedMsg(false), 2000)
     } catch { /* silently fail */ }
@@ -219,6 +231,28 @@ export default function AvailabilityScreen() {
                 })}
               </View>
             </View>
+
+            {/* Timezone */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Zona horaria</Text>
+              <View style={styles.pillsRow}>
+                {TIMEZONE_OPTIONS.map(({ label, value }) => {
+                  const active = timezone === value
+                  return (
+                    <TouchableOpacity
+                      key={value}
+                      style={[styles.tzPill, active && styles.dayPillActive]}
+                      onPress={() => setTimezone(value)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.dayPillText, active && styles.dayPillTextActive]}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
+            </View>
           </ScrollView>
 
           {/* Fixed bottom button */}
@@ -272,6 +306,10 @@ const styles = StyleSheet.create({
   dayPillTextActive: { color: '#fff' },
   slotPill: {
     paddingHorizontal: 16, height: 36, borderRadius: 18,
+    backgroundColor: '#EDE8E4', alignItems: 'center', justifyContent: 'center',
+  },
+  tzPill: {
+    paddingHorizontal: 14, height: 36, borderRadius: 18,
     backgroundColor: '#EDE8E4', alignItems: 'center', justifyContent: 'center',
   },
   hoursRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },

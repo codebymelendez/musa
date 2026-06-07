@@ -87,16 +87,16 @@ export function generateTimeSlots(
   date: Date,
   settings: ProfessionalSettings,
   bookedTimes: { startTime: string; endTime: string; durationMin: number }[],
-  serviceDuration: number
+  serviceDuration: number,
+  tz: string = DEFAULT_TZ
 ): TimeSlot[] {
   const slots: TimeSlot[] = [];
   const { startHour, endHour, slotDuration, workDays } = settings;
 
-  // ── Verificar día laborable usando la fecha en Venezuela (UTC-4) ──────────
-  // Obtenemos el día de la semana interpretando la fecha en Venezuela, no en UTC.
-  // Tomamos el UTC-date y le restamos 4 h para ver qué día es en Venezuela.
-  const veDate = new Date(date.getTime() - VE_UTC_OFFSET_H * 60 * 60 * 1000);
-  const dayOfWeek = veDate.getUTCDay(); // 0=Dom … 6=Sáb en hora Venezuela
+  // ── Verificar día laborable usando la timezone del negocio ──────────────
+  const offsetH = getUTCOffsetHours(tz);
+  const veDate = new Date(date.getTime() - offsetH * 60 * 60 * 1000);
+  const dayOfWeek = veDate.getUTCDay();
   if (!workDays.includes(dayOfWeek)) return [];
 
   // Convertir HHmm o Hour simple a minutos totales desde medianoche
@@ -120,7 +120,7 @@ export function generateTimeSlots(
   // Ejemplo: "2026-05-26" → new Date("2026-05-26") = 2026-05-26T00:00:00.000Z (UTC)
   // Medianoche Venezuela de ese mismo día = 2026-05-26T04:00:00.000Z
   const veMidnightUTC = new Date(date);
-  veMidnightUTC.setUTCHours(VE_UTC_OFFSET_H, 0, 0, 0);
+  veMidnightUTC.setUTCHours(offsetH, 0, 0, 0);
 
   // Inicio y fin de jornada en UTC
   let current  = new Date(veMidnightUTC.getTime() + startTotalMinutes * 60_000);
@@ -142,7 +142,7 @@ export function generateTimeSlots(
     const isPast = current.getTime() < now.getTime() - 5 * 60_000;
 
     // Hora visible en Venezuela para el campo `time` (HH:MM local)
-    const veHour   = (current.getUTCHours()   - VE_UTC_OFFSET_H + 24) % 24;
+    const veHour   = (current.getUTCHours()   - offsetH + 24) % 24;
     const veMinute = current.getUTCMinutes();
     const hh = String(veHour).padStart(2, "0");
     const mm = String(veMinute).padStart(2, "0");
@@ -192,4 +192,92 @@ export function statusLabel(status: string): string {
     cancelled: "Cancelado",
   };
   return map[status] ?? status;
+}
+
+// ─── DEFAULT_TZ ───────────────────────────────────────────────────────────────
+export const DEFAULT_TZ = 'America/Caracas';
+
+// ─── parseSupa ────────────────────────────────────────────────────────────────
+// Supabase devuelve TIMESTAMP(3) sin Z ("2026-06-09T13:00:00").
+// new Date() sin Z lo interpreta como hora local del browser → desfase de N horas.
+// parseSupa fuerza interpretación UTC, igual que normalizeISODate en la app móvil.
+export function parseSupa(dateStr: string): Date {
+  if (!dateStr) return new Date(NaN);
+  if (dateStr.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(dateStr)) {
+    return new Date(dateStr);
+  }
+  return new Date(dateStr.replace(' ', 'T') + 'Z');
+}
+
+// ─── getUTCOffsetHours ────────────────────────────────────────────────────────
+// Horas que hay que SUMAR a UTC midnight para obtener medianoche local en `tz`.
+// Venezuela (UTC-4) → 4.  España verano (UTC+2) → -2.  India (UTC+5:30) → -5.5.
+// Misma convención que VE_UTC_OFFSET_H para mantener compatibilidad.
+// Nota: refleja el offset en el momento de la llamada; no cubre días de cambio de DST.
+export function getUTCOffsetHours(tz: string): number {
+  const now    = new Date();
+  const utcStr = now.toLocaleString('sv-SE', { timeZone: 'UTC' });
+  const tzStr  = now.toLocaleString('sv-SE', { timeZone: tz });
+  const utcMs  = new Date(utcStr.replace(' ', 'T') + 'Z').getTime();
+  const tzMs   = new Date(tzStr.replace(' ', 'T')  + 'Z').getTime();
+  return (utcMs - tzMs) / 3_600_000;
+}
+
+// ─── toLocalDate ──────────────────────────────────────────────────────────────
+// Retorna "YYYY-MM-DD" del Date interpretado en la timezone dada.
+export function toLocalDate(date: Date, tz: string): string {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: tz }).format(date);
+}
+
+// ─── dayRangeUTC ─────────────────────────────────────────────────────────────
+// Dado "YYYY-MM-DD" (fecha local en tz), retorna el rango UTC completo de ese día:
+//   start = medianoche local en UTC  (ISO con Z)
+//   end   = 23:59:59.999 local en UTC (ISO con Z)
+// Ejemplo: dayRangeUTC("2026-06-09", "America/Caracas")
+//   → { start: "2026-06-09T04:00:00.000Z", end: "2026-06-10T03:59:59.999Z" }
+export function dayRangeUTC(
+  dateStr: string,
+  tz: string
+): { start: string; end: string } {
+  const offsetH = getUTCOffsetHours(tz);
+  const baseMs  = new Date(`${dateStr}T00:00:00.000Z`).getTime();
+  const startMs = baseMs + offsetH * 3_600_000;
+  return {
+    start: new Date(startMs).toISOString(),
+    end:   new Date(startMs + 86_400_000 - 1).toISOString(),
+  };
+}
+
+// ─── weekRangeUTC ─────────────────────────────────────────────────────────────
+// Retorna el rango lunes–domingo de la semana que contiene `date`, en UTC,
+// calculado según la timezone del negocio.
+// Ejemplo: weekRangeUTC(new Date("2026-06-09T15:00:00Z"), "America/Caracas")
+//   → { start: "2026-06-08T04:00:00.000Z", end: "2026-06-15T03:59:59.999Z" }
+export function weekRangeUTC(
+  date: Date,
+  tz: string
+): { start: string; end: string } {
+  const localStr  = toLocalDate(date, tz);
+  const [y, mo, d] = localStr.split('-').map(Number);
+  const pivot      = new Date(Date.UTC(y, mo - 1, d));
+  const dow        = pivot.getUTCDay();
+  const toMonday   = dow === 0 ? -6 : 1 - dow;
+  const monday     = new Date(pivot.getTime() + toMonday * 86_400_000);
+  const sunday     = new Date(monday.getTime() + 6       * 86_400_000);
+  const { start }  = dayRangeUTC(monday.toISOString().slice(0, 10), tz);
+  const { end }    = dayRangeUTC(sunday.toISOString().slice(0, 10), tz);
+  return { start, end };
+}
+
+// ─── formatDateTZ ─────────────────────────────────────────────────────────────
+// Parsea un string de Supabase con parseSupa y formatea en la timezone dada.
+// locale fijo 'es-VE' — solo cambia la zona horaria, no el idioma.
+export function formatDateTZ(
+  dateStr: string,
+  tz: string,
+  opts: Intl.DateTimeFormatOptions = {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  }
+): string {
+  return parseSupa(dateStr).toLocaleDateString('es-VE', { ...opts, timeZone: tz });
 }

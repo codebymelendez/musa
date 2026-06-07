@@ -16,26 +16,26 @@ export function initials(name: string): string {
   return name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')
 }
 
-export function formatTime(iso: string): string {
+export function formatTime(iso: string, tz = 'America/Caracas'): string {
   return new Intl.DateTimeFormat('es-VE', {
     hour: '2-digit', minute: '2-digit', hour12: false,
-    timeZone: 'America/Caracas',
+    timeZone: tz,
   }).format(new Date(iso))
 }
 
-export function formatDate(iso: string): string {
+export function formatDate(iso: string, tz = 'America/Caracas'): string {
   return capitalize(
     new Intl.DateTimeFormat('es-ES', {
       weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-      timeZone: 'America/Caracas',
+      timeZone: tz,
     }).format(new Date(iso))
   )
 }
 
-export function formatShortDate(iso: string): string {
+export function formatShortDate(iso: string, tz = 'America/Caracas'): string {
   return new Intl.DateTimeFormat('es-ES', {
     day: 'numeric', month: 'short',
-    timeZone: 'America/Caracas',
+    timeZone: tz,
   }).format(new Date(iso))
 }
 

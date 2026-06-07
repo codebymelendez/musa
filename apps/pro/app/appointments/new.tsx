@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import {
   getClients, getServices, getSettings, createAppointment,
-  generateTimeSlots,
+  generateTimeSlots, getBusinessTZ,
   type ClientItem, type ServiceItem, type SettingsData,
 } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO } from '../../lib/utils'
@@ -22,14 +22,27 @@ function addDays(date: Date, n: number): Date {
   return d
 }
 
-function makeSlotISO(date: Date, slot: string): string {
+function getOffsetH(tz: string): number {
+  const now    = new Date()
+  const utcStr = now.toLocaleString('sv-SE', { timeZone: 'UTC' })
+  const tzStr  = now.toLocaleString('sv-SE', { timeZone: tz })
+  const utcMs  = new Date(utcStr.replace(' ', 'T') + 'Z').getTime()
+  const tzMs   = new Date(tzStr.replace(' ', 'T')  + 'Z').getTime()
+  return (utcMs - tzMs) / 3_600_000
+}
+
+function makeSlotISO(date: Date, slot: string, offsetH: number): string {
   const [h, m] = slot.split(':').map(Number)
-  const y = date.getFullYear()
+  const y  = date.getFullYear()
   const mo = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
+  const d  = String(date.getDate()).padStart(2, '0')
   const hs = String(h).padStart(2, '0')
   const ms = String(m).padStart(2, '0')
-  return `${y}-${mo}-${d}T${hs}:${ms}:00-04:00`
+  const absH = Math.abs(offsetH)
+  const sign = offsetH >= 0 ? '-' : '+'
+  const oh = String(Math.floor(absH)).padStart(2, '0')
+  const om = String(Math.round((absH % 1) * 60)).padStart(2, '0')
+  return `${y}-${mo}-${d}T${hs}:${ms}:00${sign}${oh}:${om}`
 }
 
 function addMinutesToISO(iso: string, mins: number): string {
@@ -70,6 +83,7 @@ export default function NewAppointmentScreen() {
   const [services, setServices] = useState<ServiceItem[]>([])
   const [settingsData, setSettingsData] = useState<SettingsData | null>(null)
   const [slots, setSlots] = useState<string[]>([])
+  const [businessTz, setBusinessTz] = useState('America/Caracas')
 
   // form state
   const [clientQuery, setClientQuery] = useState('')
@@ -94,6 +108,7 @@ export default function NewAppointmentScreen() {
       setClients(cls)
       setServices(svcs)
       setSettingsData(sdata)
+      setBusinessTz(getBusinessTZ(sdata))
       if (sdata?.settings) {
         const { startHour, endHour, slotDuration } = sdata.settings
         setSlots(generateTimeSlots(startHour, endHour, slotDuration))
@@ -131,7 +146,8 @@ export default function NewAppointmentScreen() {
 
     setCreating(true)
     try {
-      const startISO = makeSlotISO(selectedDate, selectedSlot)
+      const offsetH = getOffsetH(businessTz)
+      const startISO = makeSlotISO(selectedDate, selectedSlot, offsetH)
       const endISO = addMinutesToISO(startISO, selectedService.durationMin)
       const result = await createAppointment({
         clientId: clientId,

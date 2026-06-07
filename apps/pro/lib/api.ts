@@ -300,7 +300,12 @@ export interface SettingsData {
     currency: string
     bookingEnabled: boolean
     paymentMethods: string[]
+    timezone: string
   } | null
+}
+
+export function getBusinessTZ(settings: SettingsData | null): string {
+  return settings?.settings?.timezone ?? 'America/Caracas'
 }
 
 export async function getSettings(): Promise<SettingsData | null> {
@@ -327,6 +332,7 @@ export interface SettingsPatch {
     slotDuration?: number
     bookingEnabled?: boolean
     paymentMethods?: string[]
+    timezone?: string
   }
 }
 
