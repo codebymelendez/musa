@@ -19,15 +19,19 @@ const MONTH_NAMES = [
 ]
 
 export function formatDateSpanish(isoDate: string): string {
-  const [year, month, day] = isoDate.split('-').map(Number)
+  if (!isoDate) return ''
+  const cleanDate = isoDate.split('T')[0]
+  const [year, month, day] = cleanDate.split('-').map(Number)
+  if (isNaN(year) || isNaN(month) || isNaN(day)) return isoDate
   return `${day} de ${MONTH_NAMES[month - 1]} de ${year}`
 }
 
 export default function DatePickerModal({
   visible, value, onConfirm, onCancel, title = 'Seleccionar fecha', minDate, maxDate,
 }: DatePickerModalProps) {
-  const markedDates = value
-    ? { [value]: { selected: true, selectedColor: PRIMARY } }
+  const cleanValue = value ? value.split('T')[0] : null
+  const markedDates = cleanValue
+    ? { [cleanValue]: { selected: true, selectedColor: PRIMARY } }
     : {}
 
   return (
@@ -36,7 +40,7 @@ export default function DatePickerModal({
         <TouchableOpacity style={styles.card} activeOpacity={1} onPress={() => {}}>
           <Text style={styles.title}>{title}</Text>
           <Calendar
-            current={value ?? undefined}
+            current={cleanValue ?? undefined}
             markedDates={markedDates}
             minDate={minDate}
             maxDate={maxDate}

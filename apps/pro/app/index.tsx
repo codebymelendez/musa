@@ -17,5 +17,5 @@ export default function Index() {
 
   if (session === null) return null
 
-  return session ? <Redirect href="/(tabs)/calendar" /> : <Redirect href="/(auth)/login" />
+  return session ? <Redirect href="/" /> : <Redirect href="/(auth)/login" />
 }

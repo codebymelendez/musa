@@ -145,7 +145,8 @@ function Skeleton() {
 const AVAILABLE_TAGS = ['VIP', 'Nueva', 'Regular', 'Frecuente']
 
 function formatBirthday(iso: string): string {
-  const parts = iso.split('-')
+  const clean = iso.split('T')[0]
+  const parts = clean.split('-')
   if (parts.length < 3) return iso
   return `${parts[2]}/${parts[1]}/${parts[0]}`
 }
@@ -185,7 +186,7 @@ function EditClientModal({
     setEmail(client.email ?? '')
     setSelectedTags(client.tags ?? [])
     setNotes(client.notes ?? '')
-    setBirthday(client.birthday ?? null)
+    setBirthday(client.birthday ? client.birthday.split('T')[0] : null)
   }, [visible, client])
 
   function toggleTag(tag: string) {
