@@ -59,8 +59,11 @@ async function getPublicPromotions(): Promise<PublicPromotion[]> {
       .from("Promotion")
       .select(`
         id, title, discount, validUntil,
-        business:Business(name, city),
-        owner:User!inner(name, slug)
+        business:Business(
+          name,
+          city,
+          owner:User(name, slug, appRole)
+        )
       `)
       .eq("isActive", true)
       .or(`validFrom.is.null,validFrom.lte.${today}`)
@@ -68,11 +71,19 @@ async function getPublicPromotions(): Promise<PublicPromotion[]> {
       .order("createdAt", { ascending: false })
       .limit(8);
 
-    return (data ?? []).map((p: any) => ({
-      ...p,
-      business: Array.isArray(p.business) ? p.business[0] : p.business,
-      owner: Array.isArray(p.owner) ? p.owner[0] : p.owner,
-    }));
+    return (data ?? []).map((p: any) => {
+      const business = Array.isArray(p.business) ? p.business[0] : p.business;
+      const owners = business?.owner ? (Array.isArray(business.owner) ? business.owner : [business.owner]) : [];
+      const owner = owners.find((u: any) => u.appRole === "owner") || owners[0] || null;
+      return {
+        id: p.id,
+        title: p.title,
+        discount: p.discount,
+        validUntil: p.validUntil,
+        business: business ? { name: business.name, city: business.city } : null,
+        owner: owner ? { name: owner.name, slug: owner.slug } : null,
+      };
+    });
   } catch {
     return [];
   }
