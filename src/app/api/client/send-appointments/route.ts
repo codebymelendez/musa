@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     .from("Client")
     .select("id, name, phone");
 
-  const matched = (allClients ?? []).filter((c) => {
+  const matched = (allClients ?? []).filter((c: any) => {
     const d = c.phone.replace(/\D/g, "");
     return d === digitsInput || d.endsWith(digitsInput) || digitsInput.endsWith(d);
   });
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ sent: false, noAppointments: true });
   }
 
-  const clientIds = matched.map((c) => c.id);
+  const clientIds = matched.map((c: any) => c.id);
   const clientName = matched[0].name ?? "";
 
   // ── Buscar citas activas/futuras ──────────────────────────────────────────
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Formatear y enviar WhatsApp ───────────────────────────────────────────
-  const formatted = appointments.map((appt) => {
+  const formatted = appointments.map((appt: any) => {
     const start = new Date(appt.startTime);
     const user = Array.isArray(appt.user) ? appt.user[0] : appt.user;
     const service = Array.isArray(appt.service) ? appt.service[0] : appt.service;

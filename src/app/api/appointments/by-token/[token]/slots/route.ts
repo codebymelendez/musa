@@ -98,7 +98,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       if (slotStart.getHours() >= endHour) break;
 
       const hasConflict = existingAppointments?.some(
-        (existing) =>
+        (existing: any) =>
           slotStart < new Date(existing.endTime) && slotEnd > new Date(existing.startTime)
       );
 

@@ -68,7 +68,7 @@ async function getPublicPromotions(): Promise<PublicPromotion[]> {
       .order("createdAt", { ascending: false })
       .limit(8);
 
-    return (data ?? []).map((p) => ({
+    return (data ?? []).map((p: any) => ({
       ...p,
       business: Array.isArray(p.business) ? p.business[0] : p.business,
       owner: Array.isArray(p.owner) ? p.owner[0] : p.owner,
@@ -110,7 +110,7 @@ async function getFeaturedProfessionals(): Promise<FeaturedUser[]> {
         .eq("appRole", "owner")
         .order("createdAt", { ascending: false })
         .limit(8);
-      return (recent ?? []).map((u) => ({
+      return (recent ?? []).map((u: any) => ({
         ...u,
         business: Array.isArray(u.business) ? u.business[0] : u.business,
       }));
@@ -122,12 +122,12 @@ async function getFeaturedProfessionals(): Promise<FeaturedUser[]> {
       .in("id", topIds);
 
     return (users ?? [])
-      .map((u) => ({
+      .map((u: any) => ({
         ...u,
         business: Array.isArray(u.business) ? u.business[0] : u.business,
         sortOrder: topIds.indexOf(u.id),
       }))
-      .sort((a, b) => a.sortOrder - b.sortOrder);
+      .sort((a: any, b: any) => a.sortOrder - b.sortOrder);
   } catch {
     return [];
   }
@@ -152,11 +152,11 @@ async function getFeaturedBusinesses(): Promise<FeaturedUser[]> {
       .limit(50);
 
     const list = (users ?? [])
-      .filter((u) => {
+      .filter((u: any) => {
         const svcs = Array.isArray(u.services) ? u.services : [];
         return svcs.some((s: { isActive: boolean; price: number }) => s.isActive && s.price > 0);
       })
-      .map((u) => ({
+      .map((u: any) => ({
         ...u,
         business: Array.isArray(u.business) ? u.business[0] : u.business,
       }))
@@ -164,7 +164,7 @@ async function getFeaturedBusinesses(): Promise<FeaturedUser[]> {
 
     // AurisGlam siempre en primer lugar
     const aurisIdx = list.findIndex(
-      (u) =>
+      (u: any) =>
         u.slug?.toLowerCase().includes("aurisglam") ||
         u.name?.toLowerCase().includes("aurisglam"),
     );

@@ -81,10 +81,10 @@ export async function GET(req: NextRequest) {
     const results = clientAppointments || [];
     const now = new Date();
     const upcoming = results.filter(
-      (a) => new Date(a.startTime) >= now && a.status !== "cancelled"
+      (a: any) => new Date(a.startTime) >= now && a.status !== "cancelled"
     );
     const past = results.filter(
-      (a) => new Date(a.startTime) < now || a.status === "cancelled"
+      (a: any) => new Date(a.startTime) < now || a.status === "cancelled"
     );
 
     return NextResponse.json({ clientName: displayName, upcoming, past, total: results.length });

@@ -36,8 +36,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ accounts: [], eligible: [] });
     }
 
-    const clientIds = clients.map((c) => c.id);
-    const businessIds = [...new Set(clients.map((c) => c.businessId).filter(Boolean))];
+    const clientIds = clients.map((c: any) => c.id);
+    const businessIds = [...new Set(clients.map((c: any) => c.businessId).filter(Boolean))];
 
     // Buscar cuentas de fidelización existentes
     const { data: accounts } = await supabase
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
 
     // Para cuentas donde programId está null (datos legados), hacer lookup por businessId
     const normalizedAccounts = await Promise.all(
-      (accounts ?? []).map(async (a) => {
+      (accounts ?? []).map(async (a: any) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let program: any = Array.isArray(a.program) ? a.program[0] : a.program;
         if (!program && a.businessId) {
@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
 
     // IDs de negocios donde ya tiene cuenta
     const enrolledBusinessIds = new Set(
-      normalized.map((a) => {
+      normalized.map((a: any) => {
         const biz = a.business as { id: string } | null;
         return biz?.id;
       }).filter(Boolean)
@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
     // Buscar negocios donde tiene citas pero aún no está inscrita
     let eligible: { businessId: string; businessName: string }[] = [];
     if (businessIds.length > 0) {
-      const unenrolledBizIds = businessIds.filter((id) => id && !enrolledBusinessIds.has(id));
+      const unenrolledBizIds = businessIds.filter((id) => id && !enrolledBusinessIds.has(id as string));
       if (unenrolledBizIds.length > 0) {
         const { data: activePrograms } = await supabase
           .from("LoyaltyProgram")
@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
           .in("businessId", unenrolledBizIds)
           .eq("isActive", true);
 
-        eligible = (activePrograms ?? []).map((p) => {
+        eligible = (activePrograms ?? []).map((p: any) => {
           const biz = Array.isArray(p.Business) ? p.Business[0] : p.Business;
           return {
             businessId: p.businessId,

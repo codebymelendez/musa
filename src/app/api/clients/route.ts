@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Limitamos citas a 5 por cliente en JS (para imitar Prisma 'take: 5')
-    const processedClients = (clients || []).map(client => ({
+    const processedClients = (clients || []).map((client: any) => ({
       ...client,
       appointments: (client.appointments || [])
         .sort((a: any, b: any) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())

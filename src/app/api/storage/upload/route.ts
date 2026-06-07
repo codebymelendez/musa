@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   try {
-    const formData = await req.formData();
+    const formData = await req.formData() as any;
     const file = formData.get("file") as File | null;
     const bucket = formData.get("bucket") as string | null;
     const path   = formData.get("path")   as string | null;

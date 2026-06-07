@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
 
     console.log(`[client verify] Buscando: ${phone} (${normalizedPhone}). Coincidencias en DB: ${matchedClients?.length || 0}`);
 
-    const client = matchedClients?.find(c => {
+    const client = matchedClients?.find((c: any) => {
        const cPhone = c.phone.replace(/\D/g, "");
        const match = cPhone.includes(normalizedPhone) || 
                      normalizedPhone.includes(cPhone) || 

@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Format one-to-one relations which Supabase might return as an array
-    const formattedAppointments = (appointments || []).map(apt => ({
+    const formattedAppointments = (appointments || []).map((apt: any) => ({
       ...apt,
       client: Array.isArray(apt.client) ? apt.client[0] : apt.client,
       service: Array.isArray(apt.service) ? apt.service[0] : apt.service,

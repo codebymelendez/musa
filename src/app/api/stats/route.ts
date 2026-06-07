@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
 
     const appointments = completedAppointments || [];
 
-    const monthlyRevenue = appointments.reduce((sum, apt: any) => {
+    const monthlyRevenue = appointments.reduce((sum: number, apt: any) => {
       if (apt.payment?.isPaid) return sum + (apt.payment.amount || 0);
       return sum;
     }, 0);
@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
     const paidPayments = appointments.filter((a: any) => a.payment?.isPaid);
     const avgTicket =
       paidPayments.length > 0
-        ? paidPayments.reduce((s, a: any) => s + (a.payment?.amount ?? 0), 0) /
+        ? paidPayments.reduce((s: number, a: any) => s + (a.payment?.amount ?? 0), 0) /
           paidPayments.length
         : 0;
 
@@ -81,7 +81,7 @@ export async function GET(req: NextRequest) {
 
     const yearlyRevenue = (yearPayments || [])
       .filter((p: any) => p.appointment) // Asegurar que el join fue exitoso
-      .reduce((s, p) => s + (p.amount || 0), 0);
+      .reduce((s: number, p: any) => s + (p.amount || 0), 0);
 
     // ── Reprogramaciones del mes ──────────────────────────────────────────────
     const { count: rescheduledThisMonth } = await adminSupabase
