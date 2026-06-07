@@ -63,8 +63,8 @@ async function getPublicPromotions(): Promise<PublicPromotion[]> {
         owner:User!inner(name, slug)
       `)
       .eq("isActive", true)
-      .lte("validFrom", now)
-      .gte("validUntil", now)
+      .or(`validFrom.is.null,validFrom.lte.${now}`)
+      .or(`validUntil.is.null,validUntil.gte.${now}`)
       .order("createdAt", { ascending: false })
       .limit(8);
 
