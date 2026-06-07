@@ -1,22 +1,42 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Linking, ActivityIndicator, Platform,
+  View, Text, ScrollView, TouchableOpacity, TextInput, Switch,
+  StyleSheet, Linking, ActivityIndicator, Platform, Alert, KeyboardAvoidingView,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, router } from 'expo-router'
 import {
-  getAppointmentById, triggerAppointmentAction, completeAppointment,
-  type AppointmentItem, type AppointmentStatus,
+  getAppointmentById, triggerAppointmentAction, completeAppointment, registerPayment,
+  type AppointmentItem, type AppointmentStatus, type AppointmentPayment,
 } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, formatTime, formatDate, formatMoney } from '../../lib/utils'
+
+// ─── constants ────────────────────────────────────────────────────────────────
+
+const PAYMENT_METHODS = [
+  { id: 'efectivo_usd',  label: 'Efectivo USD',  icon: 'cash-outline' },
+  { id: 'efectivo_bs',   label: 'Efectivo Bs',   icon: 'cash-outline' },
+  { id: 'pago_movil',    label: 'Pago Móvil',    icon: 'phone-portrait-outline' },
+  { id: 'zelle',         label: 'Zelle',         icon: 'swap-horizontal-outline' },
+  { id: 'transferencia', label: 'Transferencia', icon: 'swap-horizontal-outline' },
+  { id: 'otro',          label: 'Otro',          icon: 'ellipsis-horizontal-outline' },
+] as const
+
+const METHOD_LABEL: Record<string, string> = {
+  efectivo_bs:  'Efectivo Bs.',
+  efectivo_usd: 'Efectivo USD',
+  pago_movil:   'Pago Móvil',
+  zelle:        'Zelle',
+  transferencia:'Transferencia',
+  otro:         'Otro',
+}
 
 // ─── status pill ──────────────────────────────────────────────────────────────
 
 const STATUS_LABEL: Record<AppointmentStatus, string> = {
   confirmed: 'Confirmada', pending: 'Pendiente',
-  cancelled: 'Cancelada', completed: 'Completada',
+  cancelled: 'Cancelada',  completed: 'Completada',
 }
 const STATUS_COLORS: Record<AppointmentStatus, { bg: string; text: string }> = {
   confirmed: { bg: '#E8F5E9', text: '#2E7D32' },
@@ -34,7 +54,7 @@ function StatusPill({ status }: { status: AppointmentStatus }) {
   )
 }
 
-// ─── section ──────────────────────────────────────────────────────────────────
+// ─── section label ────────────────────────────────────────────────────────────
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -57,14 +77,55 @@ function DetailSkeleton() {
   )
 }
 
-// ─── payment method label ─────────────────────────────────────────────────────
+// ─── payment summary — Estado B ───────────────────────────────────────────────
 
-const METHOD_LABEL: Record<string, string> = {
-  efectivo_bs: 'Efectivo Bs.',
-  efectivo_usd: 'Efectivo USD',
-  pago_movil: 'Pago Móvil',
-  zelle: 'Zelle',
-  otro: 'Otro',
+function PaymentSummary({
+  payment,
+  onEdit,
+}: {
+  payment: AppointmentPayment
+  onEdit?: () => void
+}) {
+  const isBs = payment.currency === 'Bs'
+  const formattedAmount = isBs
+    ? `Bs. ${payment.amount.toFixed(2)}`
+    : `$${payment.amount.toFixed(2)} USD`
+
+  return (
+    <View style={ps.card}>
+      <View style={ps.topRow}>
+        <Text style={ps.registeredLabel}>COBRO REGISTRADO</Text>
+        <Ionicons name="checkmark-circle-outline" size={20} color="#27AE60" />
+      </View>
+
+      <Text style={[ps.amount, { fontFamily: MONO }]}>{formattedAmount}</Text>
+      <Text style={ps.method}>{METHOD_LABEL[payment.method] ?? payment.method}</Text>
+
+      <View style={ps.statusRow}>
+        {payment.isPaid ? (
+          <Text style={ps.paidText}>Pagado ✓</Text>
+        ) : (
+          <Text style={ps.pendingText}>Pendiente de cobro</Text>
+        )}
+      </View>
+
+      {payment.paidAt ? (
+        <Text style={[ps.paidAt, { fontFamily: MONO }]}>
+          {formatDate(payment.paidAt)} · {formatTime(payment.paidAt)}
+        </Text>
+      ) : null}
+
+      {payment.notes ? (
+        <Text style={ps.notes}>{payment.notes}</Text>
+      ) : null}
+
+      {onEdit && (
+        <TouchableOpacity style={ps.editBtn} onPress={onEdit} activeOpacity={0.8}>
+          <Text style={ps.editBtnText}>Editar cobro</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  )
 }
 
 // ─── screen ───────────────────────────────────────────────────────────────────
@@ -78,6 +139,16 @@ export default function AppointmentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const [state, setState] = useState<State>({ kind: 'loading' })
   const [acting, setActing] = useState(false)
+  const insets = useSafeAreaInsets()
+
+  // Payment form state
+  const [amount, setAmount] = useState('')
+  const [currency, setCurrency] = useState<'USD' | 'Bs'>('USD')
+  const [method, setMethod] = useState<string | null>(null)
+  const [isPaid, setIsPaid] = useState(true)
+  const [payNotes, setPayNotes] = useState('')
+  const [editingPayment, setEditingPayment] = useState(false)
+  const [registering, setRegistering] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -85,6 +156,14 @@ export default function AppointmentDetailScreen() {
     try {
       const data = await getAppointmentById(id)
       setState(data ? { kind: 'ok', data } : { kind: 'error' })
+      if (data && !data.payment) {
+        setAmount(data.service?.price ? String(data.service.price) : '')
+        setCurrency('USD')
+        setMethod(null)
+        setIsPaid(true)
+        setPayNotes('')
+        setEditingPayment(false)
+      }
     } catch {
       setState({ kind: 'error' })
     }
@@ -92,19 +171,84 @@ export default function AppointmentDetailScreen() {
 
   useEffect(() => { load() }, [load])
 
-  async function doAction(action: 'confirm' | 'cancel' | 'complete') {
+  function startEditPayment(payment: AppointmentPayment) {
+    setAmount(String(payment.amount))
+    setCurrency((payment.currency === 'Bs' ? 'Bs' : 'USD') as 'USD' | 'Bs')
+    setMethod(payment.method)
+    setIsPaid(payment.isPaid)
+    setPayNotes(payment.notes ?? '')
+    setEditingPayment(true)
+  }
+
+  async function doAction(action: 'confirm' | 'cancel') {
     if (!id) return
     setActing(true)
     try {
-      if (action === 'complete') await completeAppointment(id)
-      else await triggerAppointmentAction(id, action)
+      await triggerAppointmentAction(id, action)
       await load()
     } catch {
-      // non-blocking — could show a toast here
+      // non-blocking
     } finally {
       setActing(false)
     }
   }
+
+  async function handleRegisterPayment(apt: AppointmentItem) {
+    if (!id) return
+    const parsedAmount = parseFloat(amount.replace(',', '.'))
+    if (!parsedAmount || parsedAmount <= 0) {
+      Alert.alert('', 'El monto debe ser mayor a 0')
+      return
+    }
+    if (!method) {
+      Alert.alert('', 'Selecciona un método de pago')
+      return
+    }
+    setRegistering(true)
+    try {
+      const updated = await registerPayment(id, {
+        amount: parsedAmount,
+        method,
+        currency,
+        isPaid,
+        notes: payNotes.trim() || undefined,
+        completeAppointment: apt.status === 'confirmed' && !editingPayment,
+      })
+      if (updated) {
+        setState({ kind: 'ok', data: updated })
+        setEditingPayment(false)
+      }
+    } catch {
+      Alert.alert('Error', 'No se pudo registrar el cobro. Intenta de nuevo.')
+    } finally {
+      setRegistering(false)
+    }
+  }
+
+  function handleCompleteOnly() {
+    Alert.alert(
+      'Completar sin cobro',
+      '¿Completar la cita sin registrar el cobro?\n\nPodrás añadirlo más tarde.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Completar',
+          onPress: async () => {
+            if (!id) return
+            setActing(true)
+            try {
+              await completeAppointment(id)
+              await load()
+            } catch {
+              Alert.alert('Error', 'No se pudo completar la cita')
+            } finally { setActing(false) }
+          },
+        },
+      ]
+    )
+  }
+
+  const symbol = currency === 'Bs' ? 'Bs.' : '$'
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -117,7 +261,7 @@ export default function AppointmentDetailScreen() {
         >
           <Ionicons name="chevron-back-outline" size={24} color={DARK} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Cita</Text>
+        <Text style={styles.headerTitle}>Detalle de cita</Text>
         <View style={styles.backBtn} />
       </View>
 
@@ -136,6 +280,7 @@ export default function AppointmentDetailScreen() {
 
       {state.kind === 'ok' && (() => {
         const apt = state.data
+
         if (!apt.client || !apt.service) {
           return (
             <View style={styles.centerState}>
@@ -146,126 +291,270 @@ export default function AppointmentDetailScreen() {
             </View>
           )
         }
+
+        const showPaymentForm = apt.status === 'confirmed' && (!apt.payment || editingPayment)
+        const showPaymentSummary = !!apt.payment && !showPaymentForm
+
         return (
-          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-            {/* Client card */}
-            <View style={styles.card}>
-              <Text style={styles.clientName}>{apt.client?.name ?? 'Sin nombre'}</Text>
-              {apt.client?.phone ? (
-                <TouchableOpacity
-                  style={styles.phoneRow}
-                  onPress={() => Linking.openURL(`tel:${apt.client?.phone}`)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="call-outline" size={16} color={PRIMARY} />
-                  <Text style={styles.phoneText}>{apt.client?.phone}</Text>
-                </TouchableOpacity>
-              ) : null}
-              <View style={styles.divider} />
-              <Text style={styles.serviceLabel}>{apt.service?.name ?? 'Sin servicio'}</Text>
-              <View style={styles.metaRow}>
-                <Text style={styles.metaText}>{apt.service?.durationMin ?? 0} min</Text>
-                <Text style={styles.metaDot}>·</Text>
-                <Text style={[styles.metaText, { fontFamily: MONO }]}>
-                  {formatMoney(apt.service?.price ?? 0, apt.service?.currency ?? 'USD')}
-                </Text>
-              </View>
-            </View>
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+          >
+            <ScrollView
+              contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
 
-            {/* Date & time */}
-            <Section title="Fecha y hora">
+              {/* 1. Client card */}
               <View style={styles.card}>
-                <Text style={styles.dateText}>{formatDate(apt.startTime)}</Text>
-                <View style={styles.timeRow}>
-                  <Text style={styles.timeText}>{formatTime(apt.startTime)} — {formatTime(apt.endTime)}</Text>
-                  <StatusPill status={apt.status} />
-                </View>
-              </View>
-            </Section>
-
-            {/* Notes */}
-            {apt.notes ? (
-              <Section title="Notas">
-                <View style={styles.card}>
-                  <Text style={styles.notesText}>{apt.notes}</Text>
-                </View>
-              </Section>
-            ) : null}
-
-            {/* Payment */}
-            {apt.payment ? (
-              <Section title="Pago">
-                <View style={styles.card}>
-                  <View style={styles.payRow}>
-                    <Text style={styles.metaText}>
-                      {METHOD_LABEL[apt.payment.method] ?? apt.payment.method}
-                    </Text>
-                    <Text style={[styles.payAmount, { fontFamily: MONO }]}>
-                      {formatMoney(apt.payment.amount)}
-                    </Text>
-                  </View>
-                  <Text style={[styles.metaText, { marginTop: 4, color: apt.payment.isPaid ? '#2E7D32' : GRAY }]}>
-                    {apt.payment.isPaid ? '✓ Pagado' : 'Pendiente de pago'}
+                <Text style={styles.clientName}>{apt.client.name}</Text>
+                {apt.client.phone ? (
+                  <TouchableOpacity
+                    style={styles.phoneRow}
+                    onPress={() => Linking.openURL(`tel:${apt.client!.phone}`)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="call-outline" size={16} color={PRIMARY} />
+                    <Text style={styles.phoneText}>{apt.client.phone}</Text>
+                  </TouchableOpacity>
+                ) : null}
+                <View style={styles.divider} />
+                <Text style={styles.serviceLabel}>{apt.service.name}</Text>
+                <View style={styles.metaRow}>
+                  <Text style={styles.metaText}>{apt.service.durationMin} min</Text>
+                  <Text style={styles.metaDot}>·</Text>
+                  <Text style={[styles.metaText, { fontFamily: MONO }]}>
+                    {formatMoney(apt.service.price, apt.service.currency)}
                   </Text>
                 </View>
+              </View>
+
+              {/* 2. Date & time */}
+              <Section title="Fecha y hora">
+                <View style={styles.card}>
+                  <Text style={styles.dateText}>{formatDate(apt.startTime)}</Text>
+                  <View style={styles.timeRow}>
+                    <Text style={[styles.timeText, { fontFamily: MONO }]}>
+                      {formatTime(apt.startTime)} — {formatTime(apt.endTime)}
+                    </Text>
+                    <StatusPill status={apt.status} />
+                  </View>
+                </View>
               </Section>
-            ) : null}
 
-            {/* Actions */}
-            {apt.status === 'pending' && (
-              <View style={styles.actions}>
-                <TouchableOpacity
-                  style={[styles.btnPrimary, acting && styles.btnDisabled]}
-                  onPress={() => doAction('confirm')}
-                  disabled={acting}
-                  activeOpacity={0.85}
-                >
-                  {acting ? <ActivityIndicator color="#fff" size="small" /> : (
-                    <Text style={styles.btnPrimaryText}>Confirmar cita</Text>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.btnDanger, acting && styles.btnDisabled]}
-                  onPress={() => doAction('cancel')}
-                  disabled={acting}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.btnDangerText}>Cancelar cita</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+              {/* 3. Notes */}
+              {apt.notes ? (
+                <Section title="Notas">
+                  <View style={styles.card}>
+                    <Text style={styles.notesText}>{apt.notes}</Text>
+                  </View>
+                </Section>
+              ) : null}
 
-            {apt.status === 'confirmed' && (
-              <View style={styles.actions}>
-                <TouchableOpacity
-                  style={[styles.btnPrimary, acting && styles.btnDisabled]}
-                  onPress={() => doAction('complete')}
-                  disabled={acting}
-                  activeOpacity={0.85}
-                >
-                  {acting ? <ActivityIndicator color="#fff" size="small" /> : (
-                    <Text style={styles.btnPrimaryText}>Marcar como completada</Text>
+              {/* 4. Payment section */}
+              {apt.status !== 'cancelled' && (
+                <>
+                  {showPaymentSummary && apt.payment && (
+                    <Section title="Cobro">
+                      <PaymentSummary
+                        payment={apt.payment}
+                        onEdit={apt.status === 'confirmed'
+                          ? () => startEditPayment(apt.payment!)
+                          : undefined
+                        }
+                      />
+                    </Section>
                   )}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.btnDanger, acting && styles.btnDisabled]}
-                  onPress={() => doAction('cancel')}
-                  disabled={acting}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.btnDangerText}>Cancelar cita</Text>
-                </TouchableOpacity>
+
+                  {showPaymentForm && (
+                    <Section title={editingPayment ? 'Editar cobro' : 'Registrar cobro'}>
+                      <View style={styles.formCard}>
+
+                        {/* Amount row */}
+                        <Text style={pf.label}>MONTO COBRADO</Text>
+                        <View style={pf.amountRow}>
+                          <Text style={[pf.currencySymbol, { fontFamily: MONO }]}>{symbol}</Text>
+                          <TextInput
+                            style={[pf.amountInput, { fontFamily: MONO }]}
+                            value={amount}
+                            onChangeText={setAmount}
+                            keyboardType="decimal-pad"
+                            placeholder={apt.service.price ? String(apt.service.price) : '0.00'}
+                            placeholderTextColor="#CCCCCC"
+                          />
+                        </View>
+
+                        {/* Currency pills */}
+                        <View style={pf.currencyRow}>
+                          {(['USD', 'Bs'] as const).map(c => (
+                            <TouchableOpacity
+                              key={c}
+                              style={[pf.currencyPill, currency === c && pf.currencyPillActive]}
+                              onPress={() => setCurrency(c)}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={[pf.currencyPillText, currency === c && pf.currencyPillTextActive]}>
+                                {c}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+
+                        {/* Payment method grid */}
+                        <Text style={[pf.label, { marginTop: 16 }]}>MÉTODO DE PAGO</Text>
+                        <View style={pf.methodGrid}>
+                          {PAYMENT_METHODS.map(m => {
+                            const active = method === m.id
+                            return (
+                              <TouchableOpacity
+                                key={m.id}
+                                style={[pf.methodPill, active && pf.methodPillActive]}
+                                onPress={() => setMethod(m.id)}
+                                activeOpacity={0.78}
+                              >
+                                <Ionicons
+                                  name={m.icon as React.ComponentProps<typeof Ionicons>['name']}
+                                  size={14}
+                                  color={active ? '#fff' : DARK}
+                                />
+                                <Text style={[pf.methodPillText, active && pf.methodPillTextActive]}>
+                                  {m.label}
+                                </Text>
+                              </TouchableOpacity>
+                            )
+                          })}
+                        </View>
+
+                        {/* isPaid switch */}
+                        <View style={pf.switchRow}>
+                          <Text style={pf.switchLabel}>Marcar como pagado</Text>
+                          <Switch
+                            value={isPaid}
+                            onValueChange={setIsPaid}
+                            trackColor={{ false: '#EDE8E4', true: PRIMARY }}
+                            thumbColor="#fff"
+                          />
+                        </View>
+                        {!isPaid && (
+                          <Text style={pf.switchHint}>Puedes marcarlo como pagado más tarde</Text>
+                        )}
+
+                        {/* Notes */}
+                        <Text style={[pf.label, { marginTop: 16 }]}>
+                          NOTAS{' '}
+                          <Text style={{ color: '#AAAAAA', textTransform: 'none', fontSize: 11, fontWeight: '400' }}>
+                            (opcional)
+                          </Text>
+                        </Text>
+                        <TextInput
+                          style={pf.notesInput}
+                          value={payNotes}
+                          onChangeText={v => setPayNotes(v.slice(0, 200))}
+                          multiline
+                          placeholder="Observaciones del cobro..."
+                          placeholderTextColor="#AAAAAA"
+                          textAlignVertical="top"
+                        />
+
+                        {/* Primary CTA */}
+                        <TouchableOpacity
+                          style={[pf.primaryBtn, registering && pf.btnDisabled]}
+                          onPress={() => handleRegisterPayment(apt)}
+                          disabled={registering || acting}
+                          activeOpacity={0.85}
+                        >
+                          {registering
+                            ? <ActivityIndicator color="#fff" size="small" />
+                            : (
+                              <Text style={pf.primaryBtnText}>
+                                {editingPayment
+                                  ? 'Actualizar cobro'
+                                  : 'Completar cita y registrar cobro'}
+                              </Text>
+                            )
+                          }
+                        </TouchableOpacity>
+
+                        {/* Secondary — complete without payment */}
+                        {!editingPayment && (
+                          <TouchableOpacity
+                            style={[pf.secondaryBtn, (acting || registering) && pf.btnDisabled]}
+                            onPress={handleCompleteOnly}
+                            disabled={acting || registering}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={pf.secondaryBtnText}>Completar cita sin registrar pago</Text>
+                          </TouchableOpacity>
+                        )}
+
+                        {/* Cancel edit */}
+                        {editingPayment && (
+                          <TouchableOpacity
+                            style={[pf.secondaryBtn]}
+                            onPress={() => setEditingPayment(false)}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={pf.secondaryBtnText}>Cancelar edición</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </Section>
+                  )}
+                </>
+              )}
+
+              {/* 5. Action buttons */}
+              <View style={styles.actions}>
+                {apt.status === 'pending' && (
+                  <>
+                    <TouchableOpacity
+                      style={[styles.btnPrimary, acting && styles.btnDisabled]}
+                      onPress={() => doAction('confirm')}
+                      disabled={acting}
+                      activeOpacity={0.85}
+                    >
+                      {acting
+                        ? <ActivityIndicator color="#fff" size="small" />
+                        : <Text style={styles.btnPrimaryText}>Confirmar cita</Text>
+                      }
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.btnOutline, acting && styles.btnDisabled]}
+                      onPress={() => doAction('cancel')}
+                      disabled={acting}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.btnOutlineText}>Cancelar cita</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+
+                {apt.status === 'confirmed' && (
+                  <TouchableOpacity
+                    style={[styles.btnOutline, acting && styles.btnDisabled]}
+                    onPress={() => doAction('cancel')}
+                    disabled={acting || registering}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.btnOutlineText}>Cancelar cita</Text>
+                  </TouchableOpacity>
+                )}
               </View>
-            )}
-          </ScrollView>
+
+            </ScrollView>
+          </KeyboardAvoidingView>
         )
       })()}
     </SafeAreaView>
   )
 }
 
+// ─── styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FAFAF9' },
+  safe: { flex: 1, backgroundColor: SURFACE },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 8, paddingVertical: 12,
@@ -273,8 +562,12 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 17, fontWeight: '500', color: DARK },
-  content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
+  content: { paddingHorizontal: 20, paddingTop: 20 },
   card: {
+    backgroundColor: '#fff', borderRadius: 16, borderWidth: 1,
+    borderColor: BORDER, padding: 18, marginBottom: 12,
+  },
+  formCard: {
     backgroundColor: '#fff', borderRadius: 16, borderWidth: 1,
     borderColor: BORDER, padding: 18, marginBottom: 12,
   },
@@ -287,31 +580,123 @@ const styles = StyleSheet.create({
   metaText: { fontSize: 14, color: GRAY },
   metaDot: { fontSize: 14, color: BORDER },
   section: { marginBottom: 4 },
-  sectionTitle: { fontSize: 13, fontWeight: '500', color: GRAY, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionTitle: {
+    fontSize: 13, fontWeight: '500', color: GRAY,
+    marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5,
+  },
   dateText: { fontSize: 15, fontWeight: '500', color: DARK, marginBottom: 8 },
   timeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  timeText: { fontFamily: SERIF, fontSize: 15, color: DARK },
+  timeText: { fontSize: 15, color: DARK },
   notesText: { fontSize: 15, color: DARK, lineHeight: 22 },
-  payRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  payAmount: { fontSize: 17, color: DARK },
-  actions: { marginTop: 8, gap: 10 },
+  actions: { gap: 10, marginTop: 8 },
   btnPrimary: {
     height: 52, backgroundColor: PRIMARY, borderRadius: 26,
     alignItems: 'center', justifyContent: 'center',
   },
   btnPrimaryText: { color: '#fff', fontSize: 16, fontWeight: '500' },
-  btnDanger: {
-    height: 52, borderRadius: 26, borderWidth: 1.5,
-    borderColor: '#C62828', alignItems: 'center', justifyContent: 'center',
+  btnOutline: {
+    height: 52, borderRadius: 26, borderWidth: 1.5, borderColor: DARK,
+    alignItems: 'center', justifyContent: 'center',
   },
-  btnDangerText: { color: '#C62828', fontSize: 16, fontWeight: '500' },
+  btnOutlineText: { color: DARK, fontSize: 15, fontWeight: '500' },
   btnDisabled: { opacity: 0.55 },
+  pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
+  pillText: { fontSize: 12, fontWeight: '500' },
   centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingTop: 60 },
   errorText: { fontSize: 15, color: GRAY, textAlign: 'center' },
   retryBtn: { height: 48, paddingHorizontal: 32, backgroundColor: PRIMARY, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
   retryText: { color: '#fff', fontSize: 15, fontWeight: '500' },
-  pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
-  pillText: { fontSize: 12, fontWeight: '500' },
   skeletonWrap: { gap: 12 },
   skeletonLine: { height: 16, backgroundColor: '#F0EDE9', borderRadius: 6 },
+})
+
+// ─── payment form styles ──────────────────────────────────────────────────────
+
+const pf = StyleSheet.create({
+  label: {
+    fontSize: 11, fontWeight: '600', color: GRAY,
+    letterSpacing: 0.8, marginBottom: 10, textTransform: 'uppercase',
+  },
+  amountRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12,
+  },
+  currencySymbol: {
+    fontSize: 24, color: PRIMARY, lineHeight: 40,
+  },
+  amountInput: {
+    flex: 1, fontSize: 32, color: DARK, padding: 0,
+    borderBottomWidth: 1.5, borderBottomColor: BORDER,
+  },
+  currencyRow: {
+    flexDirection: 'row', gap: 8, marginBottom: 4,
+  },
+  currencyPill: {
+    paddingHorizontal: 20, paddingVertical: 7, borderRadius: 20,
+    backgroundColor: '#EDE8E4',
+  },
+  currencyPillActive: { backgroundColor: PRIMARY },
+  currencyPillText: { fontSize: 13, fontWeight: '600', color: '#666' },
+  currencyPillTextActive: { color: '#fff' },
+  methodGrid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 8,
+  },
+  methodPill: {
+    width: '47%', height: 44, borderRadius: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 12,
+    backgroundColor: '#fff', borderWidth: 1, borderColor: '#EDE8E4',
+  },
+  methodPillActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  methodPillText: { fontSize: 12, color: DARK, flexShrink: 1 },
+  methodPillTextActive: { color: '#fff' },
+  switchRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginTop: 16, height: 44,
+  },
+  switchLabel: { fontSize: 15, fontWeight: '500', color: DARK },
+  switchHint: { fontSize: 12, color: '#AAAAAA', marginTop: 4, marginBottom: 4 },
+  notesInput: {
+    minHeight: 60, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
+    padding: 12, fontSize: 14, color: DARK, backgroundColor: SURFACE, marginBottom: 4,
+  },
+  primaryBtn: {
+    height: 52, backgroundColor: PRIMARY, borderRadius: 26,
+    alignItems: 'center', justifyContent: 'center', marginTop: 16,
+  },
+  primaryBtnText: { color: '#fff', fontSize: 15, fontWeight: '500' },
+  secondaryBtn: {
+    height: 44, borderRadius: 22, borderWidth: 1, borderColor: DARK,
+    alignItems: 'center', justifyContent: 'center', marginTop: 10,
+  },
+  secondaryBtnText: { fontSize: 13, fontWeight: '500', color: DARK },
+  btnDisabled: { opacity: 0.55 },
+})
+
+// ─── payment summary styles ───────────────────────────────────────────────────
+
+const ps = StyleSheet.create({
+  card: {
+    backgroundColor: '#EAF4EA', borderRadius: 16,
+    borderWidth: 1, borderColor: '#C8E6C9', padding: 16, marginBottom: 12,
+  },
+  topRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10,
+  },
+  registeredLabel: {
+    fontSize: 11, fontWeight: '600', color: '#27AE60', letterSpacing: 1, textTransform: 'uppercase',
+  },
+  amount: { fontSize: 36, color: DARK, marginBottom: 4 },
+  method: { fontSize: 13, color: '#666', marginBottom: 8 },
+  statusRow: { marginBottom: 6 },
+  paidText: { fontSize: 14, fontWeight: '500', color: '#27AE60' },
+  pendingText: { fontSize: 14, fontWeight: '500', color: '#E67E22' },
+  paidAt: { fontSize: 12, color: '#666', marginBottom: 6 },
+  notes: { fontSize: 13, color: GRAY, fontStyle: 'italic', marginTop: 4 },
+  editBtn: {
+    marginTop: 12, height: 36, borderRadius: 18,
+    borderWidth: 1, borderColor: '#27AE60',
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  editBtnText: { fontSize: 13, fontWeight: '500', color: '#27AE60' },
 })

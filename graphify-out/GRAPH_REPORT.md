@@ -1,30 +1,30 @@
-# Graph Report - .  (2026-06-06)
+# Graph Report - .  (2026-06-07)
 
 ## Corpus Check
-- 15 files · ~152,280 words
+- 36 files · ~155,689 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1209 nodes · 1390 edges · 296 communities (85 shown, 211 thin omitted)
-- Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 69 edges (avg confidence: 0.85)
+- 1246 nodes · 1538 edges · 277 communities (87 shown, 190 thin omitted)
+- Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 76 edges (avg confidence: 0.84)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
-- [[_COMMUNITY_Package Dependencies|Package Dependencies]]
-- [[_COMMUNITY_Appointment Scheduling|Appointment Scheduling]]
-- [[_COMMUNITY_API Layer & Auth|API Layer & Auth]]
-- [[_COMMUNITY_Mobile Dependencies|Mobile Dependencies]]
-- [[_COMMUNITY_App Config & Icons|App Config & Icons]]
-- [[_COMMUNITY_Web Dependencies|Web Dependencies]]
-- [[_COMMUNITY_PWA & Notifications|PWA & Notifications]]
-- [[_COMMUNITY_Settings & Profile|Settings & Profile]]
-- [[_COMMUNITY_Supabase Auth & Email|Supabase Auth & Email]]
-- [[_COMMUNITY_Date & Revenue Metrics|Date & Revenue Metrics]]
-- [[_COMMUNITY_Community 10|Community 10]]
-- [[_COMMUNITY_Community 11|Community 11]]
-- [[_COMMUNITY_Community 12|Community 12]]
-- [[_COMMUNITY_Community 13|Community 13]]
-- [[_COMMUNITY_Community 14|Community 14]]
+- [[_COMMUNITY_Appointment & Client Screens|Appointment & Client Screens]]
+- [[_COMMUNITY_App Shell & Auth|App Shell & Auth]]
+- [[_COMMUNITY_Pro App Dependencies|Pro App Dependencies]]
+- [[_COMMUNITY_API Client Core|API Client Core]]
+- [[_COMMUNITY_Pro App Config|Pro App Config]]
+- [[_COMMUNITY_Client App Config|Client App Config]]
+- [[_COMMUNITY_Services Management API|Services Management API]]
+- [[_COMMUNITY_New Appointment Flow|New Appointment Flow]]
+- [[_COMMUNITY_EAS Build Config|EAS Build Config]]
+- [[_COMMUNITY_Web Marketing & SEO|Web Marketing & SEO]]
+- [[_COMMUNITY_Calendar & Date Utils|Calendar & Date Utils]]
+- [[_COMMUNITY_Appointments API & Availability|Appointments API & Availability]]
+- [[_COMMUNITY_Client Portal Auth|Client Portal Auth]]
+- [[_COMMUNITY_Settings & Configuration|Settings & Configuration]]
+- [[_COMMUNITY_Web Homepage & Discovery|Web Homepage & Discovery]]
 - [[_COMMUNITY_Community 15|Community 15]]
 - [[_COMMUNITY_Community 16|Community 16]]
 - [[_COMMUNITY_Community 17|Community 17]]
@@ -80,21 +80,22 @@
 - [[_COMMUNITY_Community 67|Community 67]]
 - [[_COMMUNITY_Community 68|Community 68]]
 - [[_COMMUNITY_Community 69|Community 69]]
+- [[_COMMUNITY_Community 70|Community 70]]
+- [[_COMMUNITY_Community 71|Community 71]]
+- [[_COMMUNITY_Community 72|Community 72]]
 - [[_COMMUNITY_Community 73|Community 73]]
 - [[_COMMUNITY_Community 74|Community 74]]
-- [[_COMMUNITY_Community 77|Community 77]]
 - [[_COMMUNITY_Community 78|Community 78]]
 - [[_COMMUNITY_Community 79|Community 79]]
 - [[_COMMUNITY_Community 81|Community 81]]
 - [[_COMMUNITY_Community 82|Community 82]]
 - [[_COMMUNITY_Community 83|Community 83]]
-- [[_COMMUNITY_Community 84|Community 84]]
+- [[_COMMUNITY_Community 85|Community 85]]
+- [[_COMMUNITY_Community 86|Community 86]]
 - [[_COMMUNITY_Community 87|Community 87]]
 - [[_COMMUNITY_Community 88|Community 88]]
-- [[_COMMUNITY_Community 90|Community 90]]
-- [[_COMMUNITY_Community 91|Community 91]]
+- [[_COMMUNITY_Community 89|Community 89]]
 - [[_COMMUNITY_Community 92|Community 92]]
-- [[_COMMUNITY_Community 93|Community 93]]
 - [[_COMMUNITY_Community 94|Community 94]]
 - [[_COMMUNITY_Community 95|Community 95]]
 - [[_COMMUNITY_Community 96|Community 96]]
@@ -102,7 +103,7 @@
 - [[_COMMUNITY_Community 98|Community 98]]
 - [[_COMMUNITY_Community 99|Community 99]]
 - [[_COMMUNITY_Community 100|Community 100]]
-- [[_COMMUNITY_Community 102|Community 102]]
+- [[_COMMUNITY_Community 101|Community 101]]
 - [[_COMMUNITY_Community 103|Community 103]]
 - [[_COMMUNITY_Community 104|Community 104]]
 - [[_COMMUNITY_Community 105|Community 105]]
@@ -131,8 +132,8 @@
 - [[_COMMUNITY_Community 131|Community 131]]
 - [[_COMMUNITY_Community 132|Community 132]]
 - [[_COMMUNITY_Community 133|Community 133]]
-- [[_COMMUNITY_Community 134|Community 134]]
-- [[_COMMUNITY_Community 135|Community 135]]
+- [[_COMMUNITY_Community 136|Community 136]]
+- [[_COMMUNITY_Community 137|Community 137]]
 - [[_COMMUNITY_Community 138|Community 138]]
 - [[_COMMUNITY_Community 139|Community 139]]
 - [[_COMMUNITY_Community 140|Community 140]]
@@ -186,8 +187,6 @@
 - [[_COMMUNITY_Community 188|Community 188]]
 - [[_COMMUNITY_Community 189|Community 189]]
 - [[_COMMUNITY_Community 190|Community 190]]
-- [[_COMMUNITY_Community 191|Community 191]]
-- [[_COMMUNITY_Community 192|Community 192]]
 - [[_COMMUNITY_Community 193|Community 193]]
 - [[_COMMUNITY_Community 194|Community 194]]
 - [[_COMMUNITY_Community 195|Community 195]]
@@ -195,11 +194,12 @@
 - [[_COMMUNITY_Community 197|Community 197]]
 - [[_COMMUNITY_Community 198|Community 198]]
 - [[_COMMUNITY_Community 199|Community 199]]
-- [[_COMMUNITY_Community 200|Community 200]]
 - [[_COMMUNITY_Community 201|Community 201]]
 - [[_COMMUNITY_Community 202|Community 202]]
 - [[_COMMUNITY_Community 203|Community 203]]
 - [[_COMMUNITY_Community 204|Community 204]]
+- [[_COMMUNITY_Community 205|Community 205]]
+- [[_COMMUNITY_Community 206|Community 206]]
 - [[_COMMUNITY_Community 207|Community 207]]
 - [[_COMMUNITY_Community 208|Community 208]]
 - [[_COMMUNITY_Community 209|Community 209]]
@@ -207,6 +207,7 @@
 - [[_COMMUNITY_Community 211|Community 211]]
 - [[_COMMUNITY_Community 212|Community 212]]
 - [[_COMMUNITY_Community 213|Community 213]]
+- [[_COMMUNITY_Community 214|Community 214]]
 - [[_COMMUNITY_Community 215|Community 215]]
 - [[_COMMUNITY_Community 216|Community 216]]
 - [[_COMMUNITY_Community 217|Community 217]]
@@ -257,7 +258,6 @@
 - [[_COMMUNITY_Community 262|Community 262]]
 - [[_COMMUNITY_Community 263|Community 263]]
 - [[_COMMUNITY_Community 264|Community 264]]
-- [[_COMMUNITY_Community 265|Community 265]]
 - [[_COMMUNITY_Community 266|Community 266]]
 - [[_COMMUNITY_Community 267|Community 267]]
 - [[_COMMUNITY_Community 268|Community 268]]
@@ -269,36 +269,18 @@
 - [[_COMMUNITY_Community 274|Community 274]]
 - [[_COMMUNITY_Community 275|Community 275]]
 - [[_COMMUNITY_Community 276|Community 276]]
-- [[_COMMUNITY_Community 277|Community 277]]
-- [[_COMMUNITY_Community 278|Community 278]]
-- [[_COMMUNITY_Community 279|Community 279]]
-- [[_COMMUNITY_Community 280|Community 280]]
-- [[_COMMUNITY_Community 281|Community 281]]
-- [[_COMMUNITY_Community 282|Community 282]]
-- [[_COMMUNITY_Community 284|Community 284]]
-- [[_COMMUNITY_Community 285|Community 285]]
-- [[_COMMUNITY_Community 286|Community 286]]
-- [[_COMMUNITY_Community 287|Community 287]]
-- [[_COMMUNITY_Community 288|Community 288]]
-- [[_COMMUNITY_Community 289|Community 289]]
-- [[_COMMUNITY_Community 290|Community 290]]
-- [[_COMMUNITY_Community 291|Community 291]]
-- [[_COMMUNITY_Community 292|Community 292]]
-- [[_COMMUNITY_Community 293|Community 293]]
-- [[_COMMUNITY_Community 294|Community 294]]
-- [[_COMMUNITY_Community 295|Community 295]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `authHeaders()` - 29 edges
-2. `handle401()` - 29 edges
-3. `Musa Project (CLAUDE.md)` - 25 edges
-4. `SERIF` - 20 edges
-5. `MUSA Mobile Architecture (MOBILE.md)` - 18 edges
-6. `MONO` - 17 edges
-7. `expo` - 16 edges
-8. `expo` - 16 edges
-9. `compilerOptions` - 16 edges
-10. `HomeScreen()` - 15 edges
+1. `createAdminClient` - 41 edges
+2. `authHeaders()` - 30 edges
+3. `handle401()` - 30 edges
+4. `Musa Project (CLAUDE.md)` - 25 edges
+5. `SERIF` - 21 edges
+6. `getSession` - 20 edges
+7. `MUSA Mobile Architecture (MOBILE.md)` - 18 edges
+8. `MONO` - 17 edges
+9. `createClient()` - 17 edges
+10. `expo` - 16 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `Expo Router (File-Based Routing)` --semantically_similar_to--> `Next.js App Router (src/app/)`  [INFERRED] [semantically similar]
@@ -315,291 +297,303 @@
 ## Import Cycles
 - None detected.
 
-## Communities (296 total, 211 thin omitted)
+## Communities (277 total, 190 thin omitted)
 
-### Community 0 - "Package Dependencies"
-Cohesion: 0.04
-Nodes (48): dependencies, expo, expo-auth-session, expo-dev-client, expo-notifications, expo-router, expo-secure-store, expo-web-browser (+40 more)
-
-### Community 1 - "Appointment Scheduling"
-Cohesion: 0.08
-Nodes (43): addDays(), NewAppointmentScreen(), ClientDetailScreen(), Loyalty Reward Redemption Flow, Promotion Broadcast Push Flow, Team Plan Feature Gate Pattern, broadcastPromotion API Function, createAppointment API Function (+35 more)
-
-### Community 2 - "API Layer & Auth"
-Cohesion: 0.10
-Nodes (29): API_URL, AppointmentClient, AppointmentPayment, AppointmentService, authHeaders(), broadcastPromotion(), completeAppointment(), createPromotion() (+21 more)
-
-### Community 3 - "Mobile Dependencies"
+### Community 0 - "Appointment & Client Screens"
 Cohesion: 0.06
-Nodes (34): dependencies, bcryptjs, clsx, expo, expo-clipboard, expo-router, @headlessui/react, @heroicons/react (+26 more)
+Nodes (51): AppointmentDetailScreen(), addDays(), NewAppointmentScreen(), ClientDetailScreen(), 401 Auto-Redirect to Login Pattern, Loyalty Reward Redemption Flow, Promotion Broadcast Push Flow, Team Plan Feature Gate Pattern (+43 more)
 
-### Community 4 - "App Config & Icons"
+### Community 1 - "App Shell & Auth"
+Cohesion: 0.04
+Nodes (40): RootLayout, EmailLoginScreen(), styles, secureStorage, supabase, dependencies, bcryptjs, clsx (+32 more)
+
+### Community 2 - "Pro App Dependencies"
+Cohesion: 0.05
+Nodes (37): dependencies, expo, expo-auth-session, expo-clipboard, expo-dev-client, expo-haptics, expo-image, expo-image-picker (+29 more)
+
+### Community 3 - "API Client Core"
+Cohesion: 0.11
+Nodes (27): API_URL, AppointmentClient, AppointmentService, authHeaders(), completeAppointment(), deletePromotion(), findLoyaltyAccountByClientId(), getAppointmentById() (+19 more)
+
+### Community 4 - "Pro App Config"
 Cohesion: 0.06
 Nodes (33): foregroundImage, adaptiveIcon, package, versionCode, projectId, typedRoutes, expo, android (+25 more)
 
-### Community 5 - "Web Dependencies"
-Cohesion: 0.06
-Nodes (33): dependencies, expo, expo-auth-session, expo-clipboard, expo-dev-client, expo-image-picker, expo-notifications, expo-router (+25 more)
-
-### Community 6 - "PWA & Notifications"
+### Community 5 - "Client App Config"
 Cohesion: 0.06
 Nodes (31): foregroundImage, adaptiveIcon, package, versionCode, projectId, typedRoutes, expo, android (+23 more)
 
-### Community 7 - "Settings & Profile"
-Cohesion: 0.10
-Nodes (21): getSettings(), SettingsData, updateSettings(), capitalize(), formatDate(), formatShortDate(), initials(), MONO (+13 more)
-
-### Community 8 - "Supabase Auth & Email"
+### Community 6 - "Services Management API"
 Cohesion: 0.09
-Nodes (18): EmailLoginScreen(), styles, secureStorage, supabase, hhmmToDisplay(), hhmmToParts(), partsToHhmm(), authHeaders Internal Helper (+10 more)
+Nodes (20): createService(), deleteService(), getServices(), ServiceItem, updateService(), capitalize(), formatDate(), formatMoney() (+12 more)
 
-### Community 9 - "Date & Revenue Metrics"
-Cohesion: 0.10
-Nodes (19): toVenezuelaDate(), weekRange, addDays(), _cache, chunk(), MONO, monthCells(), MonthView() (+11 more)
+### Community 7 - "New Appointment Flow"
+Cohesion: 0.09
+Nodes (19): DateMode, MONTH_NAMES, styles, EditClientModal(), DatePickerModalProps, formatDateSpanish(), MONTH_NAMES, styles (+11 more)
 
-### Community 10 - "Community 10"
+### Community 8 - "EAS Build Config"
 Cohesion: 0.10
 Nodes (24): buildType, serviceAccountKeyPath, track, build, development, preview, production, cli (+16 more)
 
-### Community 11 - "Community 11"
+### Community 9 - "Web Marketing & SEO"
 Cohesion: 0.11
 Nodes (23): ISR Incremental Static Regeneration 60s Homepage, Musa Mobile App Store Distribution iOS and Android, App Store Google Play CTA Section, FAQPage JSON-LD Schema, FeaturedBusinessesRow Async Server Component, FeaturedCard Component, FeaturedProfessionalsRow Async Server Component, getFeaturedBusinesses complete profile filter AurisGlam pin (+15 more)
 
-### Community 12 - "Community 12"
+### Community 10 - "Calendar & Date Utils"
 Cohesion: 0.11
-Nodes (15): createService(), deleteService(), getServices(), ServiceItem, updateService(), formatMoney(), DURATION_OPTIONS, LoadState (+7 more)
+Nodes (17): toVenezuelaDate(), weekRange, addDays(), _cache, chunk(), MONO, monthCells(), MonthView() (+9 more)
 
-### Community 13 - "Community 13"
+### Community 11 - "Appointments API & Availability"
+Cohesion: 0.13
+Nodes (19): createSchema, GET, POST, detectConflictingAppointments, getBlocksInRange, isSlotBlocked, checkAppointmentLimit, hhmmToDisplay() (+11 more)
+
+### Community 12 - "Client Portal Auth"
+Cohesion: 0.15
+Nodes (15): GET, GET, getClientSession, createAdminClient, buildAppointmentLookupMultipleMsg, buildAppointmentLookupSingleMsg, normalizePhone, sendWhatsAppMessage (+7 more)
+
+### Community 13 - "Settings & Configuration"
+Cohesion: 0.11
+Nodes (14): getSettings(), SettingsData, updateSettings(), MONO, APP_URL, LoadState, styles, APP_URL (+6 more)
+
+### Community 14 - "Web Homepage & Discovery"
 Cohesion: 0.12
 Nodes (15): FAQ_ITEMS, FAQ_JSON_LD, FeaturedBusinessesRow(), FeaturedProfessionalsRow(), FeaturedUser, getFeaturedBusinesses(), getFeaturedProfessionals(), getPublicPromotions() (+7 more)
 
-### Community 14 - "Community 14"
-Cohesion: 0.11
-Nodes (11): DateMode, MONTH_NAMES, styles, ClientItem, createAppointment(), generateTimeSlots(), getClients(), modalStyles (+3 more)
-
 ### Community 15 - "Community 15"
+Cohesion: 0.10
+Nodes (20): dependencies, expo, expo-auth-session, expo-dev-client, expo-notifications, expo-router, expo-secure-store, expo-web-browser (+12 more)
+
+### Community 16 - "Community 16"
+Cohesion: 0.18
+Nodes (16): DELETE(), GET(), getBusinessId(), normalizePhone(), Params, PATCH(), updateSchema, GET (+8 more)
+
+### Community 17 - "Community 17"
 Cohesion: 0.10
 Nodes (19): compilerOptions, allowJs, esModuleInterop, incremental, isolatedModules, jsx, lib, module (+11 more)
 
-### Community 16 - "Community 16"
+### Community 18 - "Community 18"
 Cohesion: 0.13
 Nodes (18): buildType, serviceAccountKeyPath, track, build, development, preview, production, cli (+10 more)
 
-### Community 17 - "Community 17"
+### Community 19 - "Community 19"
 Cohesion: 0.14
 Nodes (18): Next.js Agent Rules (AGENTS.md), /auth/callback Route, src/lib/auth.ts (getSession wrapper), Client Booking Flow (POST /api/public/[slug]/book), Environment Variables (.env), middleware.ts (Edge Auth Middleware), Musa Project (CLAUDE.md), src/lib/notifications.ts (Push Notifications) (+10 more)
 
-### Community 18 - "Community 18"
+### Community 20 - "Community 20"
+Cohesion: 0.12
+Nodes (11): METHOD_LABEL, pf, ps, State, STATUS_COLORS, STATUS_LABEL, styles, AppointmentPayment (+3 more)
+
+### Community 21 - "Community 21"
 Cohesion: 0.20
 Nodes (17): Adobe Illustrator 29.0.0, Cream Color #f2e8d5, Dark Brown Color #34271e, Musa iOS Apple Touch Icon, Musa Wordmark / Logotype Paths, Cream/Ivory (#f2e8d5), Dark Brown (#34271e), Stylized Letter M Monogram (+9 more)
 
-### Community 19 - "Community 19"
+### Community 22 - "Community 22"
 Cohesion: 0.14
 Nodes (17): Supabase Auth Guard — session check on root layout, Venezuela Timezone (UTC-4) — formatTime/toVenezuelaDate, AppointmentItem Interface — with client/service/payment, ClientItem Interface — with appointments[], SettingsData Interface — user/business/professionalSettings, StatsData Interface — revenue/appointments/topServices, Appointment Detail Screen — Confirm/Cancel/Complete, Availability Settings Screen — WorkDays/Hours/Slots (+9 more)
 
-### Community 20 - "Community 20"
+### Community 23 - "Community 23"
 Cohesion: 0.12
 Nodes (16): Next.js App Router (src/app/), Tailwind CSS 4 (PostCSS Plugin), VAPID Keys (Web Push), deploy-client.yml GitHub Actions Workflow (EAS), deploy-pro.yml GitHub Actions Workflow (EAS), deploy-web.yml GitHub Actions Workflow, Expo EAS (Cloud Builds), Expo Router (File-Based Routing) (+8 more)
 
-### Community 21 - "Community 21"
-Cohesion: 0.15
-Nodes (7): AVAILABLE_TAGS, State, styles, AppointmentStatus, LoyaltyAccount, LoyaltyProgram, updateClientNotes()
+### Community 24 - "Community 24"
+Cohesion: 0.14
+Nodes (8): AVAILABLE_TAGS, METHOD_LABEL, State, STATUS_COLORS, STATUS_LABEL, styles, LoyaltyAccount, LoyaltyProgram
 
-### Community 22 - "Community 22"
+### Community 25 - "Community 25"
 Cohesion: 0.14
 Nodes (14): Owner-Only API Gate Pattern appRole owner check, Row Level Security Pattern Supabase, Migration Enable RLS on Core Tables, RLS Business table public SELECT plus staff write, RLS Invitation table staff ALL, RLS Plan table public SELECT, RLS Promotion table public SELECT plus staff ALL, RLS User table public SELECT plus self UPDATE (+6 more)
 
-### Community 23 - "Community 23"
+### Community 26 - "Community 26"
 Cohesion: 0.14
 Nodes (8): Client, Payment, Plan, Service, AppRole, Invitation, ProfessionalSettings, User
 
-### Community 24 - "Community 24"
-Cohesion: 0.17
-Nodes (6): METHOD_LABEL, State, styles, statusColor, statusLabel, ClientItem Type
-
-### Community 25 - "Community 25"
+### Community 27 - "Community 27"
 Cohesion: 0.15
 Nodes (12): VirtualViewNativeComponent Mock, config, { getDefaultConfig }, path, workspaceRoot, VirtualViewNativeComponent Stub (null export), npm Workspaces Monorepo — apps/* + packages/*, config (+4 more)
 
-### Community 26 - "Community 26"
+### Community 28 - "Community 28"
 Cohesion: 0.21
 Nodes (13): Dark Fill Color #32261D, Light Fill Color #F2E8D7, Letter A Stroke Form (Bottom Right Path), Letter M Form (Left Path), Letter S Curve Form (Middle Right Path), Letter U Arch Form (Upper Right Path), Musa Monogram (Light Variant), Musa Monogram (Dark Variant) (+5 more)
 
-### Community 27 - "Community 27"
+### Community 29 - "Community 29"
 Cohesion: 0.15
 Nodes (12): Appointment Table, Business Table, Client Table, PostgreSQL Database Schema (Supabase), src/lib/limits.ts (Plan Limits), Plan Table (Subscription Tiers), PushSubscription Table, PushSubscription DB Migration (FCM + platform column) (+4 more)
 
-### Community 28 - "Community 28"
+### Community 30 - "Community 30"
 Cohesion: 0.19
 Nodes (11): Name Matching NFD normalize diacritic strip, Phone Suffix Normalization and Matching Logic, POST api client verify, POST, Rate Limit 3 req per min on Forgot Password, signClientToken, rateLimit in-memory IP rate limiter, RateLimitOptions (+3 more)
 
-### Community 29 - "Community 29"
+### Community 31 - "Community 31"
 Cohesion: 0.15
 Nodes (8): ClientUpdate, appointmentSchema, appointmentStatusSchema, AppointmentUpdateInput, appointmentUpdateSchema, ClientInput, clientSchema, clientUpdateSchema
 
-### Community 30 - "Community 30"
-Cohesion: 0.18
-Nodes (10): schema, updateSchema, GET, POST, createClient(), sendEmail, createClient, DELETE (+2 more)
-
-### Community 31 - "Community 31"
-Cohesion: 0.29
-Nodes (10): Params, POST, DELETE(), GET(), getBusinessId(), normalizePhone(), Params, PATCH() (+2 more)
-
 ### Community 32 - "Community 32"
+Cohesion: 0.18
+Nodes (10): inviteTeamMember(), TeamInvitation, TeamMember, initials(), ClientRow(), ProfileScreen(), formatJoinDate(), LoadState (+2 more)
+
+### Community 33 - "Community 33"
+Cohesion: 0.20
+Nodes (8): broadcastPromotion(), createPromotion(), formatDisplayDate(), LoadState, PromoCard(), promoStatus(), promoStyles, STATUS_CONFIG
+
+### Community 34 - "Community 34"
+Cohesion: 0.18
+Nodes (7): getAppointments(), normalizeISODate(), CLIENT_TAGS, isPromoActive(), ms, QuickAction, styles
+
+### Community 35 - "Community 35"
 Cohesion: 0.17
 Nodes (7): getStats(), getUpcomingAppointments(), StatsData, Period, PERIODS, State, styles
 
-### Community 33 - "Community 33"
+### Community 36 - "Community 36"
+Cohesion: 0.20
+Nodes (9): Params, POST, Appointment Action API Route — confirm/cancel with auth, Client by ID API Route — GET/PATCH/DELETE, Dual-Mode Auth — Bearer token (mobile) + SSR cookies (web), Mobile Architecture — Expo SDK 54, EAS, React Native 0.81.5, MOBILE.md — Mobile Architecture Constitution, signOut (+1 more)
+
+### Community 37 - "Community 37"
 Cohesion: 0.22
 Nodes (11): AppointmentStatus — confirmed/pending/cancelled/completed, Plan Limits — maxMonthlyAppointments, maxClients, Shared TypeScript Types — single source of truth, API Package Index (placeholder), Core Package Index (placeholder), Appointment Type Definition, Business Type Definition, Client Type Definition (+3 more)
 
-### Community 34 - "Community 34"
-Cohesion: 0.22
-Nodes (6): formatDisplayDate(), LoadState, PromoCard(), promoStatus(), promoStyles, STATUS_CONFIG
-
-### Community 35 - "Community 35"
+### Community 38 - "Community 38"
 Cohesion: 0.22
 Nodes (11): Musa App Icon (Apple Touch Icon), Musa Monogram Logo (M+A), PWA Home Screen Icon Asset, Musa Brand Identity, Cream Ivory Foreground Color, Dark Brown Background Color, Luxury Beauty Wellness Aesthetic, Serif Elegant Typography Style (+3 more)
 
-### Community 36 - "Community 36"
+### Community 39 - "Community 39"
 Cohesion: 0.24
 Nodes (10): My Appointments Screen — GET /api/client/bookings, Explore Professionals Screen — GET /api/public/businesses, Entry Redirect — checks musa_client_token, Authenticated Fetch Wrapper apiFetch(), Client JWT Auth — verifyClient/getClientToken/clearClientToken, Public Read-Only Supabase Client (apps/client), Loyalty Points Screen — JWT payload data, Identity Verification Screen — POST /api/client/verify (+2 more)
 
-### Community 37 - "Community 37"
-Cohesion: 0.20
-Nodes (5): getAppointments(), CLIENT_TAGS, ms, QuickAction, styles
-
-### Community 38 - "Community 38"
-Cohesion: 0.22
-Nodes (7): inviteTeamMember(), TeamInvitation, TeamMember, formatJoinDate(), LoadState, MemberRow(), teamStyles
-
-### Community 39 - "Community 39"
-Cohesion: 0.22
-Nodes (8): compilerOptions, paths, strict, extends, include, @musa/types, @musa/validators, @shared/*
-
 ### Community 40 - "Community 40"
-Cohesion: 0.25
-Nodes (9): Module-Level Appointment Cache Pattern, toVenezuelaDate Helper Function, CalendarScreen(), cap(), capitalize(), formatFullDate(), formatWeekday(), isToday() (+1 more)
+Cohesion: 0.24
+Nodes (8): schema, getOwnerAndPromo(), patchSchema, sendEmail, createClient, DELETE, Params, PATCH
 
 ### Community 41 - "Community 41"
-Cohesion: 0.22
-Nodes (9): Aesthetic Prohibitions (No Gradients, No MD3, No Generic SaaS), Cormorant Font (Editorial Typography), DM Mono Font (Numeric Typography), DM Sans Font (UI Base Typography), Heroicons (Exclusive Icon Library), MUSA Design Rules & Visual System (MUSA_DESIGN_RULES.md), MUSA Primary Color (#B5593E), Quiet Containers / Bento Grids Pattern (+1 more)
+Cohesion: 0.20
+Nodes (10): devDependencies, eslint, eslint-config-next, tailwindcss, @tailwindcss/postcss, @types/bcryptjs, @types/node, @types/react-native (+2 more)
 
 ### Community 42 - "Community 42"
 Cohesion: 0.22
 Nodes (8): compilerOptions, paths, strict, extends, include, @musa/types, @musa/validators, @shared/*
 
 ### Community 43 - "Community 43"
+Cohesion: 0.25
+Nodes (9): Module-Level Appointment Cache Pattern, toVenezuelaDate Helper Function, CalendarScreen(), cap(), capitalize(), formatFullDate(), formatWeekday(), isToday() (+1 more)
+
+### Community 44 - "Community 44"
+Cohesion: 0.22
+Nodes (9): Aesthetic Prohibitions (No Gradients, No MD3, No Generic SaaS), Cormorant Font (Editorial Typography), DM Mono Font (Numeric Typography), DM Sans Font (UI Base Typography), Heroicons (Exclusive Icon Library), MUSA Design Rules & Visual System (MUSA_DESIGN_RULES.md), MUSA Primary Color (#B5593E), Quiet Containers / Bento Grids Pattern (+1 more)
+
+### Community 45 - "Community 45"
+Cohesion: 0.22
+Nodes (8): compilerOptions, paths, strict, extends, include, @musa/types, @musa/validators, @shared/*
+
+### Community 46 - "Community 46"
 Cohesion: 0.22
 Nodes (8): dependencies, @musa/types, zod, main, name, private, types, version
 
-### Community 44 - "Community 44"
-Cohesion: 0.25
-Nodes (8): AppointmentDetailScreen(), 401 Auto-Redirect to Login Pattern, completeAppointment API Function, getAppointmentById API Function, getAppointments API Function, getClientById API Function, handle401 Internal Helper, normalizeISODate Helper Function
-
-### Community 46 - "Community 46"
+### Community 48 - "Community 48"
 Cohesion: 0.29
 Nodes (6): AuthLayout(), Expo Router Route Type Definitions, EAS Build Configuration, IoniconName, TABS, TabsLayout()
 
-### Community 47 - "Community 47"
+### Community 49 - "Community 49"
+Cohesion: 0.25
+Nodes (8): devDependencies, @babel/core, typescript, @types/react, devDependencies, @babel/core, @types/react, typescript
+
+### Community 50 - "Community 50"
 Cohesion: 0.25
 Nodes (5): getPromotions(), APP_URL, skStyles, styles, Business
 
-### Community 48 - "Community 48"
-Cohesion: 0.25
-Nodes (4): createAdminClient, createSchema, createSchema, POST
+### Community 51 - "Community 51"
+Cohesion: 0.29
+Nodes (7): scripts, android, build:preview, build:prod, dev, ios, start
 
-### Community 49 - "Community 49"
-Cohesion: 0.33
-Nodes (6): Appointment Action API Route — confirm/cancel with auth, Client by ID API Route — GET/PATCH/DELETE, Dual-Mode Auth — Bearer token (mobile) + SSR cookies (web), Mobile Architecture — Expo SDK 54, EAS, React Native 0.81.5, MOBILE.md — Mobile Architecture Constitution, signOut
-
-### Community 50 - "Community 50"
+### Community 52 - "Community 52"
 Cohesion: 0.62
 Nodes (7): Musa Brand Monogram (M), Dark Brown Background Color (#3B2A1E approx), Cream/Ivory Foreground Color (#F0E6D3 approx), Rounded Rectangle Icon Shape, PWA Manifest, PWA Icon PNG 192px, PWA Icon PNG 512px
 
-### Community 51 - "Community 51"
+### Community 53 - "Community 53"
+Cohesion: 0.47
+Nodes (5): createSchema, GET, normalizePhone(), POST, checkClientLimit
+
+### Community 54 - "Community 54"
 Cohesion: 0.40
 Nodes (6): Zod Validation — shared input validation web + mobile, Service Type Definition, User Type Definition, Appointment Zod Schema Validators, Client Zod Schema Validators, Validators Package Index
 
-### Community 52 - "Community 52"
-Cohesion: 0.47
-Nodes (5): getOwnerAndPromo(), patchSchema, DELETE, Params, PATCH
-
-### Community 53 - "Community 53"
+### Community 55 - "Community 55"
 Cohesion: 0.33
 Nodes (6): Index Appointment clientId, Index Appointment userId startTime, Index Client businessId, Index Promotion businessId, Index Service businessId, Migration Performance Indexes
 
-### Community 54 - "Community 54"
+### Community 56 - "Community 56"
+Cohesion: 0.33
+Nodes (4): LoadState, Method, METHODS, styles
+
+### Community 57 - "Community 57"
 Cohesion: 0.33
 Nodes (5): main, name, private, types, version
 
-### Community 55 - "Community 55"
-Cohesion: 0.40
-Nodes (4): main, name, private, version
-
-### Community 56 - "Community 56"
-Cohesion: 0.40
-Nodes (4): main, name, private, version
-
-### Community 57 - "Community 57"
-Cohesion: 0.80
-Nodes (5): Musa Deployment Stack, Next.js Framework, Next.js Logo, Vercel Logo, Vercel Deployment Platform
-
 ### Community 58 - "Community 58"
 Cohesion: 0.40
-Nodes (4): Auto Business and FREE Plan Creation Logic, GET, PATCH, updateSchema
+Nodes (4): main, name, private, version
 
 ### Community 59 - "Community 59"
 Cohesion: 0.40
 Nodes (4): main, name, private, version
 
 ### Community 60 - "Community 60"
+Cohesion: 0.40
+Nodes (4): main, name, private, version
+
+### Community 61 - "Community 61"
+Cohesion: 0.80
+Nodes (5): Musa Deployment Stack, Next.js Framework, Next.js Logo, Vercel Logo, Vercel Deployment Platform
+
+### Community 62 - "Community 62"
+Cohesion: 0.40
+Nodes (4): main, name, private, version
+
+### Community 63 - "Community 63"
+Cohesion: 0.50
+Nodes (4): PaymentSummary(), formatTime(), AppointmentCard(), formatTime()
+
+### Community 64 - "Community 64"
 Cohesion: 0.67
 Nodes (4): MUSA Luxury Beauty Brand Identity, src/lib/clientAuth.ts (Client JWT Auth), AsyncStorage (Mobile Session Persistence), MUSA Client App (Clientas)
 
-### Community 61 - "Community 61"
+### Community 65 - "Community 65"
 Cohesion: 0.50
 Nodes (4): AccountDetail, ClientLoyaltyAccount, LoyaltyRedemption, LoyaltyTransaction
 
-### Community 62 - "Community 62"
+### Community 67 - "Community 67"
 Cohesion: 0.67
 Nodes (3): Brand Color: Dark Brown Background (#34271E), MUSA Client Adaptive Icon, MUSA Serif Monogram Logo
 
-### Community 63 - "Community 63"
+### Community 68 - "Community 68"
 Cohesion: 0.67
 Nodes (3): MUSA Client Splash Screen, MUSA Calligraphic Serif M Monogram, Warm Luxury Palette: Dark Brown + Cream
 
-### Community 65 - "Community 65"
+### Community 70 - "Community 70"
 Cohesion: 0.67
 Nodes (3): getClientToken Function, SecureStore with AsyncStorage Fallback Pattern, verifyClient Function
 
-### Community 67 - "Community 67"
-Cohesion: 0.67
-Nodes (3): formatTime(), AppointmentCard(), formatTime()
-
-### Community 68 - "Community 68"
+### Community 72 - "Community 72"
 Cohesion: 0.67
 Nodes (3): AppState Auto-Refresh Listener, SecureStorage Adapter Hybrid AsyncStorage SecureStore, Supabase Client React Native Expo
 
 ## Knowledge Gaps
-- **684 isolated node(s):** `middleware`, `generateStaticParams`, `generateMetadata`, `GET`, `PATCH` (+679 more)
+- **686 isolated node(s):** `middleware`, `generateStaticParams`, `generateMetadata`, `GET`, `PATCH` (+681 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **211 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **190 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `createClient()` connect `Community 30` to `API Layer & Auth`, `Community 37`, `Community 14`, `Community 52`, `Community 28`, `Community 31`?**
-  _High betweenness centrality (0.074) - this node is a cross-community bridge._
-- **Why does `dependencies` connect `Mobile Dependencies` to `Supabase Auth & Email`, `Package Dependencies`?**
+- **Why does `dependencies` connect `App Shell & Auth` to `Community 15`?**
   _High betweenness centrality (0.073) - this node is a cross-community bridge._
-- **Why does `supabase` connect `Supabase Auth & Email` to `API Layer & Auth`, `Mobile Dependencies`?**
-  _High betweenness centrality (0.071) - this node is a cross-community bridge._
+- **Why does `supabase` connect `App Shell & Auth` to `API Client Core`, `Settings & Configuration`?**
+  _High betweenness centrality (0.072) - this node is a cross-community bridge._
+- **Why does `createAdminClient` connect `Client Portal Auth` to `Community 66`, `Community 36`, `Community 73`, `Web Marketing & SEO`, `Appointments API & Availability`, `Web Homepage & Discovery`, `Community 16`, `Community 53`, `Community 30`?**
+  _High betweenness centrality (0.067) - this node is a cross-community bridge._
 - **What connects `middleware`, `generateStaticParams`, `generateMetadata` to the rest of the system?**
-  _686 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `Package Dependencies` be split into smaller, more focused modules?**
-  _Cohesion score 0.04081632653061224 - nodes in this community are weakly interconnected._
-- **Should `Appointment Scheduling` be split into smaller, more focused modules?**
-  _Cohesion score 0.0753045404208195 - nodes in this community are weakly interconnected._
-- **Should `API Layer & Auth` be split into smaller, more focused modules?**
-  _Cohesion score 0.10241820768136557 - nodes in this community are weakly interconnected._
+  _688 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `Appointment & Client Screens` be split into smaller, more focused modules?**
+  _Cohesion score 0.06196078431372549 - nodes in this community are weakly interconnected._
+- **Should `App Shell & Auth` be split into smaller, more focused modules?**
+  _Cohesion score 0.044444444444444446 - nodes in this community are weakly interconnected._
+- **Should `Pro App Dependencies` be split into smaller, more focused modules?**
+  _Cohesion score 0.05263157894736842 - nodes in this community are weakly interconnected._

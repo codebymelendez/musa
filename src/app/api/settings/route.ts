@@ -22,6 +22,7 @@ const updateSchema = z.object({
       slotDuration: z.number().min(15).max(120).optional(),
       currency: z.string().optional(),
       bookingEnabled: z.boolean().optional(),
+      paymentMethods: z.array(z.string()).optional(),
     })
     .optional(),
 });
@@ -58,7 +59,11 @@ export async function GET(req: NextRequest) {
       businessId: user.businessId,
       business: user.business,
       settings: s
-        ? { ...s, workDays: JSON.parse(s.workDays || "[1,2,3,4,5]") }
+        ? {
+            ...s,
+            workDays: JSON.parse(s.workDays || "[1,2,3,4,5]"),
+            paymentMethods: s.paymentMethods ? JSON.parse(s.paymentMethods) : [],
+          }
         : null,
     };
 
@@ -192,6 +197,7 @@ export async function PATCH(req: NextRequest) {
           ...(settings.slotDuration !== undefined && { slotDuration: settings.slotDuration }),
           ...(settings.currency && { currency: settings.currency }),
           ...(settings.bookingEnabled !== undefined && { bookingEnabled: settings.bookingEnabled }),
+          ...(settings.paymentMethods !== undefined && { paymentMethods: JSON.stringify(settings.paymentMethods) }),
         }, { onConflict: 'userId', ignoreDuplicates: false });
     }
 
@@ -206,7 +212,11 @@ export async function PATCH(req: NextRequest) {
     const result = {
       ...updated,
       settings: s
-        ? { ...s, workDays: JSON.parse(s.workDays || "[1,2,3,4,5]") }
+        ? {
+            ...s,
+            workDays: JSON.parse(s.workDays || "[1,2,3,4,5]"),
+            paymentMethods: s.paymentMethods ? JSON.parse(s.paymentMethods) : [],
+          }
         : null,
     };
 

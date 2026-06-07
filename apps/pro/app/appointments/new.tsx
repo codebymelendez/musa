@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Modal, FlatList, Animated, Platform, Alert, KeyboardAvoidingView,
+  StyleSheet, Animated, Platform, Alert, KeyboardAvoidingView,
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -11,7 +11,8 @@ import {
   generateTimeSlots,
   type ClientItem, type ServiceItem, type SettingsData,
 } from '../../lib/api'
-import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF } from '../../lib/utils'
+import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO } from '../../lib/utils'
+import DatePickerModal from '../../components/DatePickerModal'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -35,11 +36,6 @@ function addMinutesToISO(iso: string, mins: number): string {
   return new Date(new Date(iso).getTime() + mins * 60_000).toISOString()
 }
 
-const MONTH_NAMES = [
-  'Enero','Febrero','Marzo','Abril','Mayo','Junio',
-  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre',
-]
-
 // ─── skeleton ─────────────────────────────────────────────────────────────────
 
 function Skeleton() {
@@ -60,96 +56,6 @@ function Skeleton() {
   )
 }
 
-// ─── date picker modal ────────────────────────────────────────────────────────
-
-function DatePickerModal({
-  visible, selected, onSelect, onClose,
-}: {
-  visible: boolean; selected: Date; onSelect: (d: Date) => void; onClose: () => void
-}) {
-  const [viewMonth, setViewMonth] = useState(() => {
-    const d = new Date()
-    return { year: d.getFullYear(), month: d.getMonth() }
-  })
-
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
-  const year = viewMonth.year
-  const month = viewMonth.month
-  const firstDay = new Date(year, month, 1).getDay()
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
-
-  const cells: (number | null)[] = []
-  for (let i = 0; i < firstDay; i++) cells.push(null)
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
-
-  function prevMonth() {
-    setViewMonth(({ year: y, month: m }) =>
-      m === 0 ? { year: y - 1, month: 11 } : { year: y, month: m - 1 }
-    )
-  }
-  function nextMonth() {
-    setViewMonth(({ year: y, month: m }) =>
-      m === 11 ? { year: y + 1, month: 0 } : { year: y, month: m + 1 }
-    )
-  }
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
-        <View style={styles.calModal} onStartShouldSetResponder={() => true}>
-          <View style={styles.calHeader}>
-            <TouchableOpacity onPress={prevMonth} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="chevron-back-outline" size={20} color={DARK} />
-            </TouchableOpacity>
-            <Text style={styles.calMonthTitle}>
-              {MONTH_NAMES[month]} {year}
-            </Text>
-            <TouchableOpacity onPress={nextMonth} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="chevron-forward-outline" size={20} color={DARK} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.calDayLabels}>
-            {['D','L','M','X','J','V','S'].map(d => (
-              <Text key={d} style={styles.calDayLabel}>{d}</Text>
-            ))}
-          </View>
-
-          <View style={styles.calGrid}>
-            {cells.map((day, idx) => {
-              if (!day) return <View key={`e${idx}`} style={styles.calCell} />
-              const cellDate = new Date(year, month, day)
-              cellDate.setHours(0, 0, 0, 0)
-              const isPast = cellDate < today
-              const isSelected =
-                selected.getFullYear() === year &&
-                selected.getMonth() === month &&
-                selected.getDate() === day
-              return (
-                <TouchableOpacity
-                  key={day}
-                  style={[styles.calCell, isSelected && styles.calCellSelected]}
-                  onPress={() => { if (!isPast) { onSelect(cellDate); onClose() } }}
-                  disabled={isPast}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[
-                    styles.calCellText,
-                    isPast && { color: '#CCCCCC' },
-                    isSelected && { color: '#fff' },
-                  ]}>{day}</Text>
-                </TouchableOpacity>
-              )
-            })}
-          </View>
-        </View>
-      </TouchableOpacity>
-    </Modal>
-  )
-}
-
 // ─── screen ───────────────────────────────────────────────────────────────────
 
 type DateMode = 'today' | 'tomorrow' | 'pick'
@@ -157,6 +63,7 @@ type DateMode = 'today' | 'tomorrow' | 'pick'
 export default function NewAppointmentScreen() {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const tomorrow = addDays(today, 1)
+  const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 
   const [loading, setLoading] = useState(true)
   const [clients, setClients] = useState<ClientItem[]>([])
@@ -171,14 +78,14 @@ export default function NewAppointmentScreen() {
   const [showClientList, setShowClientList] = useState(false)
   const [selectedService, setSelectedService] = useState<ServiceItem | null>(null)
   const [dateMode, setDateMode] = useState<DateMode>('today')
-  const [pickedDate, setPickedDate] = useState<Date>(today)
+  const [pickedDate, setPickedDate] = useState<string>(todayISO)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
   const [notes, setNotes] = useState('')
   const [creating, setCreating] = useState(false)
 
   const insets = useSafeAreaInsets()
-  const selectedDate = dateMode === 'today' ? today : dateMode === 'tomorrow' ? tomorrow : pickedDate
+  const selectedDate = dateMode === 'today' ? today : dateMode === 'tomorrow' ? tomorrow : new Date(pickedDate + 'T00:00:00')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -372,9 +279,7 @@ export default function NewAppointmentScreen() {
                 <TouchableOpacity style={styles.pickedDateRow} onPress={() => setShowDatePicker(true)} activeOpacity={0.8}>
                   <Ionicons name="calendar-outline" size={16} color={PRIMARY} />
                   <Text style={[styles.pickedDateText, { fontFamily: MONO }]}>
-                    {pickedDate.getDate().toString().padStart(2, '0')}/
-                    {(pickedDate.getMonth() + 1).toString().padStart(2, '0')}/
-                    {pickedDate.getFullYear()}
+                    {pickedDate.split('-').reverse().join('/')}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -442,9 +347,11 @@ export default function NewAppointmentScreen() {
 
       <DatePickerModal
         visible={showDatePicker}
-        selected={pickedDate}
-        onSelect={d => { setPickedDate(d); setSelectedSlot(null) }}
-        onClose={() => setShowDatePicker(false)}
+        value={pickedDate}
+        onConfirm={dateStr => { setPickedDate(dateStr); setSelectedSlot(null); setShowDatePicker(false) }}
+        onCancel={() => setShowDatePicker(false)}
+        title="Elegir fecha"
+        minDate={todayISO}
       />
     </SafeAreaView>
   )
@@ -535,21 +442,4 @@ const styles = StyleSheet.create({
   },
   btnPrimaryText: { color: '#fff', fontSize: 16, fontWeight: '500' },
   grayText: { fontSize: 14, color: '#AAAAAA' },
-  // date picker modal
-  modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.45)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  calModal: {
-    width: 320, backgroundColor: '#fff', borderRadius: 20,
-    padding: 20, borderWidth: 1, borderColor: BORDER,
-  },
-  calHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  calMonthTitle: { fontSize: 16, fontWeight: '500', color: DARK },
-  calDayLabels: { flexDirection: 'row', marginBottom: 8 },
-  calDayLabel: { flex: 1, textAlign: 'center', fontSize: 12, color: GRAY, fontWeight: '500' },
-  calGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  calCell: { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
-  calCellSelected: { backgroundColor: PRIMARY, borderRadius: 999 },
-  calCellText: { fontSize: 14, color: DARK },
 })

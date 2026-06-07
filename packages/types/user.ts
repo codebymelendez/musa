@@ -27,6 +27,7 @@ export interface ProfessionalSettings {
   endHour: number
   slotDuration: number
   currency: string
+  paymentMethods?: string | null
   createdAt: string
   updatedAt: string
 }

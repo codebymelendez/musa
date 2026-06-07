@@ -52,7 +52,12 @@ export interface AppointmentService {
 }
 
 export interface AppointmentPayment {
-  amount: number; method: string; isPaid: boolean
+  amount: number
+  method: string
+  currency: string
+  isPaid: boolean
+  notes?: string | null
+  paidAt?: string | null
 }
 
 export interface AppointmentItem {
@@ -116,6 +121,39 @@ export async function triggerAppointmentAction(id: string, action: 'confirm' | '
   })
   if (res.status === 401) { await handle401(); return }
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
+}
+
+export async function registerPayment(
+  appointmentId: string,
+  data: {
+    amount: number
+    method: string
+    currency: string
+    isPaid: boolean
+    notes?: string
+    completeAppointment: boolean
+  }
+): Promise<AppointmentItem | null> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); return null }
+  const body: Record<string, unknown> = {
+    ...(data.completeAppointment && { status: 'completed' }),
+    payment: {
+      amount: data.amount,
+      method: data.method,
+      currency: data.currency,
+      isPaid: data.isPaid,
+      ...(data.notes && { notes: data.notes }),
+    },
+  }
+  const res = await fetch(`${API_URL}/api/appointments/${appointmentId}`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (res.status === 401) { await handle401(); return null }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return getAppointmentById(appointmentId)
 }
 
 // 'complete' is not on the action endpoint — uses PATCH instead
@@ -261,6 +299,7 @@ export interface SettingsData {
     slotDuration: number  // minutes
     currency: string
     bookingEnabled: boolean
+    paymentMethods: string[]
   } | null
 }
 
@@ -287,6 +326,7 @@ export interface SettingsPatch {
     endHour?: number
     slotDuration?: number
     bookingEnabled?: boolean
+    paymentMethods?: string[]
   }
 }
 
@@ -421,7 +461,7 @@ export async function createPromotion(data: {
 }
 
 export async function createClient(data: {
-  name: string; phone: string; email?: string; notes?: string; tags?: string[];
+  name: string; phone: string; email?: string; notes?: string; tags?: string[]; birthday?: string;
 }): Promise<ClientItem> {
   const headers = await authHeaders()
   if (!headers) { await handle401(); throw new Error('No auth') }

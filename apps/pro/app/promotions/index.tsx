@@ -12,6 +12,7 @@ import {
   type PromotionItem,
 } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF } from '../../lib/utils'
+import DatePickerModal, { formatDateSpanish } from '../../components/DatePickerModal'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -110,13 +111,17 @@ function CreateModal({
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [discount, setDiscount] = useState('')
-  const [validFrom, setValidFrom] = useState('')
-  const [validUntil, setValidUntil] = useState('')
+  const [validFrom, setValidFrom] = useState<string | null>(null)
+  const [validUntil, setValidUntil] = useState<string | null>(null)
+  const [showFromPicker, setShowFromPicker] = useState(false)
+  const [showUntilPicker, setShowUntilPicker] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  const today = new Date().toISOString().split('T')[0]
 
   function reset() {
     setTitle(''); setDescription(''); setDiscount('')
-    setValidFrom(''); setValidUntil('')
+    setValidFrom(null); setValidUntil(null)
   }
 
   async function handleCreate() {
@@ -128,8 +133,8 @@ function CreateModal({
         title: title.trim(),
         description: description.trim() || undefined,
         discount: parseFloat(discount) || 0,
-        validFrom: parseDisplayDate(validFrom) ?? undefined,
-        validUntil: parseDisplayDate(validUntil) ?? undefined,
+        validFrom: validFrom ? `${validFrom}T00:00:00` : undefined,
+        validUntil: validUntil ? `${validUntil}T23:59:59` : undefined,
       })
       reset()
       onCreated(p)
@@ -147,8 +152,11 @@ function CreateModal({
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <TouchableOpacity style={promoStyles.overlay} activeOpacity={1} onPress={onClose} />
+      <KeyboardAvoidingView
+        style={{ flex: 1, justifyContent: 'flex-end' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={onClose} />
         <Animated.View style={[promoStyles.sheet, { transform: [{ translateY: slideAnim }] }]}>
           <View style={promoStyles.sheetHandle} />
           <Text style={promoStyles.sheetTitle}>Nueva promoción</Text>
@@ -171,15 +179,29 @@ function CreateModal({
             <View style={promoStyles.datesInputRow}>
               <View style={{ flex: 1 }}>
                 <Text style={promoStyles.label}>Fecha inicio</Text>
-                <TextInput style={promoStyles.input} value={validFrom}
-                  onChangeText={v => setValidFrom(formatDateInput(v))}
-                  placeholder="DD/MM/YYYY" placeholderTextColor="#AAAAAA" keyboardType="number-pad" />
+                <TouchableOpacity
+                  style={promoStyles.dateBtn}
+                  onPress={() => setShowFromPicker(true)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="calendar-outline" size={16} color={PRIMARY} />
+                  <Text style={[promoStyles.dateBtnText, !validFrom && { color: '#AAAAAA' }]} numberOfLines={1}>
+                    {validFrom ? formatDateSpanish(validFrom) : 'Sin fecha'}
+                  </Text>
+                </TouchableOpacity>
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={promoStyles.label}>Fecha fin</Text>
-                <TextInput style={promoStyles.input} value={validUntil}
-                  onChangeText={v => setValidUntil(formatDateInput(v))}
-                  placeholder="DD/MM/YYYY" placeholderTextColor="#AAAAAA" keyboardType="number-pad" />
+                <TouchableOpacity
+                  style={promoStyles.dateBtn}
+                  onPress={() => setShowUntilPicker(true)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="calendar-outline" size={16} color={PRIMARY} />
+                  <Text style={[promoStyles.dateBtnText, !validUntil && { color: '#AAAAAA' }]} numberOfLines={1}>
+                    {validUntil ? formatDateSpanish(validUntil) : 'Sin fecha'}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -191,6 +213,23 @@ function CreateModal({
           </ScrollView>
         </Animated.View>
       </KeyboardAvoidingView>
+
+      <DatePickerModal
+        visible={showFromPicker}
+        value={validFrom}
+        onConfirm={date => { setValidFrom(date); setShowFromPicker(false) }}
+        onCancel={() => setShowFromPicker(false)}
+        title="Fecha de inicio"
+        minDate={today}
+      />
+      <DatePickerModal
+        visible={showUntilPicker}
+        value={validUntil}
+        onConfirm={date => { setValidUntil(date); setShowUntilPicker(false) }}
+        onCancel={() => setShowUntilPicker(false)}
+        title="Fecha de fin"
+        minDate={validFrom ?? today}
+      />
     </Modal>
   )
 }
@@ -365,9 +404,7 @@ const promoStyles = StyleSheet.create({
     width: 56, height: 56, borderRadius: 28,
     backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center',
   },
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
   sheet: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
     paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40, maxHeight: '90%',
   },
@@ -382,6 +419,12 @@ const promoStyles = StyleSheet.create({
     paddingHorizontal: 14, fontSize: 15, color: DARK, backgroundColor: SURFACE,
   },
   datesInputRow: { flexDirection: 'row', gap: 12, marginTop: 14 },
+  dateBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    height: 46, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
+    paddingHorizontal: 10, backgroundColor: SURFACE,
+  },
+  dateBtnText: { flex: 1, fontSize: 13, color: DARK },
   toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 },
   toggleLabel: { fontSize: 15, color: DARK, fontWeight: '500' },
   btnPrimary: { height: 52, backgroundColor: PRIMARY, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },

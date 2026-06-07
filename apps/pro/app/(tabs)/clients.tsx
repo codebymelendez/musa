@@ -10,6 +10,7 @@ import * as Haptics from 'expo-haptics'
 import { router } from 'expo-router'
 import { getClients, createClient, type ClientItem } from '../../lib/api'
 import { PRIMARY, DARK, BORDER, GRAY, MONO, SERIF, SURFACE, initials } from '../../lib/utils'
+import DatePickerModal, { formatDateSpanish } from '../../components/DatePickerModal'
 
 // ─── skeleton ─────────────────────────────────────────────────────────────────
 
@@ -96,12 +97,16 @@ function AddClientModal({
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
+  const [birthday, setBirthday] = useState<string | null>(null)
+  const [showBirthdayPicker, setShowBirthdayPicker] = useState(false)
   const [notes, setNotes] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
 
+  const today = new Date().toISOString().split('T')[0]
+
   function reset() {
-    setName(''); setPhone(''); setEmail(''); setNotes(''); setSelectedTags([])
+    setName(''); setPhone(''); setEmail(''); setBirthday(null); setNotes(''); setSelectedTags([])
   }
 
   function toggleTag(tag: string) {
@@ -122,6 +127,7 @@ function AddClientModal({
         email: email.trim() || undefined,
         notes: notes.trim() || undefined,
         tags: selectedTags,
+        birthday: birthday ?? undefined,
       })
       reset()
       onCreated(client)
@@ -171,6 +177,28 @@ function AddClientModal({
             />
 
             <Text style={[modalStyles.label, { marginTop: 14 }]}>
+              Cumpleaños <Text style={{ color: GRAY }}>(opcional)</Text>
+            </Text>
+            <TouchableOpacity
+              style={modalStyles.dateBtn}
+              onPress={() => setShowBirthdayPicker(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="calendar-outline" size={18} color={PRIMARY} />
+              <Text style={[modalStyles.dateBtnText, !birthday && { color: '#AAAAAA' }]}>
+                {birthday ? formatDateSpanish(birthday) : 'Seleccionar fecha'}
+              </Text>
+              {birthday ? (
+                <TouchableOpacity
+                  onPress={() => setBirthday(null)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="close-circle" size={18} color="#CCCCCC" />
+                </TouchableOpacity>
+              ) : null}
+            </TouchableOpacity>
+
+            <Text style={[modalStyles.label, { marginTop: 14 }]}>
               Notas <Text style={{ color: GRAY }}>(opcional)</Text>
             </Text>
             <TextInput
@@ -205,6 +233,16 @@ function AddClientModal({
           </ScrollView>
         </Animated.View>
       </KeyboardAvoidingView>
+
+      <DatePickerModal
+        visible={showBirthdayPicker}
+        value={birthday}
+        onConfirm={date => { setBirthday(date); setShowBirthdayPicker(false) }}
+        onCancel={() => setShowBirthdayPicker(false)}
+        title="Cumpleaños"
+        maxDate={today}
+        minDate="1940-01-01"
+      />
     </Modal>
   )
 }
@@ -435,4 +473,10 @@ const modalStyles = StyleSheet.create({
   tagText: { fontSize: 13, fontWeight: '500', color: DARK },
   btnPrimary: { height: 52, backgroundColor: PRIMARY, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
   btnPrimaryText: { color: '#fff', fontSize: 16, fontWeight: '500' },
+  dateBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    height: 46, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
+    paddingHorizontal: 14, backgroundColor: SURFACE,
+  },
+  dateBtnText: { flex: 1, fontSize: 15, color: DARK },
 })

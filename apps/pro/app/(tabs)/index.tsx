@@ -10,7 +10,7 @@ import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import {
   getSettings, getAppointments, getPromotions, getStats, getClients, getAppointmentsInRange,
-  getLoyaltyProgram, getLoyaltyAccounts, createClient, toVenezuelaDate,
+  getLoyaltyProgram, getLoyaltyAccounts, createClient, toVenezuelaDate, normalizeISODate,
   type AppointmentItem, type PromotionItem, type LoyaltyProgram, type ClientItem,
 } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, capitalize, formatTime, formatMoney } from '../../lib/utils'
@@ -36,6 +36,16 @@ function getGreeting(): string {
   if (h >= 5 && h < 12) return 'Buenos días'
   if (h >= 12 && h < 19) return 'Buenas tardes'
   return 'Buenas noches'
+}
+
+function isPromoActive(promo: PromotionItem): boolean {
+  const now = new Date()
+  if (!promo.validFrom && !promo.validUntil) return true
+  const from = promo.validFrom ? new Date(normalizeISODate(promo.validFrom)) : null
+  const until = promo.validUntil ? new Date(normalizeISODate(promo.validUntil)) : null
+  if (from && now < from) return false
+  if (until && now > until) return false
+  return true
 }
 
 // ─── skeletons ────────────────────────────────────────────────────────────────
@@ -221,7 +231,7 @@ export default function HomeScreen() {
       setUserName(sData?.name?.split(' ')[0] ?? '')
       setAvatarUrl(sData?.avatarUrl ?? null)
       setAppointments(appts.filter((a: any) => a.status !== 'cancelled'))
-      setPromos(promoList.filter((p: any) => !p.validUntil || new Date(p.validUntil) >= new Date()))
+      setPromos(promoList.filter(isPromoActive))
       setLoyaltyProgram(program)
       const withPts = accounts.filter((a: any) => a.totalPoints > 0)
       setLoyaltyStats({
@@ -248,6 +258,15 @@ export default function HomeScreen() {
   const now = new Date()
   const nextAppt = sortedAppts.find(a => new Date(a.startTime) >= now) ?? sortedAppts[0] ?? null
   const nextThree = sortedAppts.slice(0, 3)
+
+  // Cobrado hoy — derived from today's appointments
+  const cobradoUSD = appointments
+    .filter(a => a.payment?.isPaid && a.payment.currency !== 'Bs')
+    .reduce((s, a) => s + a.payment!.amount, 0)
+  const cobradoBs = appointments
+    .filter(a => a.payment?.isPaid && a.payment.currency === 'Bs')
+    .reduce((s, a) => s + a.payment!.amount, 0)
+  const completedSinCobro = appointments.filter(a => a.status === 'completed' && !a.payment).length
 
   const quickActions: QuickAction[] = [
     {
@@ -314,12 +333,15 @@ export default function HomeScreen() {
         {/* ─── Bento Stats Grid ─── */}
         {loading ? (
           <View style={{ paddingHorizontal: 20, gap: 10, marginBottom: 24 }}>
-            <PulseSkeleton height={100} mx={0} mb={0} />
+            <PulseSkeleton height={120} mx={0} mb={0} />
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <View style={{ flex: 1 }}><PulseSkeleton height={100} mx={0} mb={0} /></View>
-              <View style={{ flex: 1 }}><PulseSkeleton height={100} mx={0} mb={0} /></View>
+              <View style={{ flex: 1 }}><PulseSkeleton height={110} mx={0} mb={0} /></View>
+              <View style={{ flex: 1 }}><PulseSkeleton height={110} mx={0} mb={0} /></View>
             </View>
-            <PulseSkeleton height={68} mx={0} mb={0} />
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ flex: 1 }}><PulseSkeleton height={86} mx={0} mb={0} /></View>
+              <View style={{ flex: 1 }}><PulseSkeleton height={86} mx={0} mb={0} /></View>
+            </View>
           </View>
         ) : (
           <View style={styles.bentoContainer}>
@@ -338,18 +360,42 @@ export default function HomeScreen() {
               )}
             </View>
 
-            {/* Row 2: Ingresos semana + Clientas nuevas */}
+            {/* Row 2: Cobrado hoy + Clientas nuevas */}
             <View style={styles.subStatsRow}>
-              <View style={styles.halfCard}>
+              <TouchableOpacity
+                style={styles.halfCard}
+                onPress={() => router.push('/stats' as Parameters<typeof router.push>[0])}
+                activeOpacity={0.85}
+              >
                 <View style={styles.cardHeader}>
-                  <Text style={styles.bentoLabel}>INGRESOS SEMANA</Text>
-                  <Ionicons name="trending-up-outline" size={13} color={PRIMARY} />
+                  <Text style={styles.bentoLabel}>COBRADO HOY</Text>
+                  <Ionicons name="cash-outline" size={13} color={PRIMARY} />
                 </View>
-                <Text style={[styles.bentoVal, { fontFamily: MONO }]}>
-                  {weeklyRevenue !== null ? formatMoney(weeklyRevenue) : '—'}
-                </Text>
-                <Text style={styles.bentoSubText}>Últimos 7 días</Text>
-              </View>
+                {cobradoUSD > 0 || cobradoBs > 0 ? (
+                  <>
+                    {cobradoUSD > 0 && (
+                      <Text style={[styles.bentoVal, { fontFamily: MONO }]}>
+                        {formatMoney(cobradoUSD)}
+                      </Text>
+                    )}
+                    {cobradoBs > 0 && (
+                      <Text style={[styles.bentoValSm, { fontFamily: MONO }]}>
+                        {`Bs. ${cobradoBs.toFixed(0)}`}
+                      </Text>
+                    )}
+                  </>
+                ) : (
+                  <Text style={[styles.bentoVal, { fontFamily: MONO, color: GRAY }]}>$0</Text>
+                )}
+                {completedSinCobro > 0 && (
+                  <View style={styles.cobrarBadge}>
+                    <View style={styles.cobrarDot} />
+                    <Text style={styles.cobrarBadgeText}>
+                      {completedSinCobro} sin registrar
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
 
               <View style={styles.halfCard}>
                 <Text style={styles.bentoLabel}>CLIENTAS NUEVAS</Text>
@@ -360,11 +406,23 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            {/* Row 3: Ingresos del mes (full, compact) */}
-            <View style={styles.monthCard}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.bentoLabel}>INGRESOS DEL MES</Text>
-                <Text style={[styles.bentoVal, { fontFamily: MONO }]}>
+            {/* Row 3: Ingresos semana + Ingresos mes */}
+            <View style={styles.subStatsRow}>
+              <View style={[styles.halfCard, styles.halfCardCompact]}>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.bentoLabel}>ING. SEMANA</Text>
+                  <Ionicons name="trending-up-outline" size={13} color={PRIMARY} />
+                </View>
+                <Text style={[styles.bentoValSm, { fontFamily: MONO }]}>
+                  {weeklyRevenue !== null ? formatMoney(weeklyRevenue) : '—'}
+                </Text>
+              </View>
+
+              <View style={[styles.halfCard, styles.halfCardCompact, { backgroundColor: '#F5F0EB' }]}>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.bentoLabel}>ING. MES</Text>
+                </View>
+                <Text style={[styles.bentoValSm, { fontFamily: MONO }]}>
                   {monthlyRevenue !== null ? formatMoney(monthlyRevenue) : '—'}
                 </Text>
               </View>
@@ -416,6 +474,47 @@ export default function HomeScreen() {
             </View>
           )}
         </View>
+
+        {/* ─── Promociones activas ─── */}
+        {promos.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>PROMOCIONES ACTIVAS</Text>
+              <TouchableOpacity onPress={() => router.push('/promotions' as Parameters<typeof router.push>[0])}>
+                <Text style={styles.viewAllBtn}>VER TODO</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.promoList}>
+              {promos.map(promo => (
+                <TouchableOpacity
+                  key={promo.id}
+                  style={styles.promoCard}
+                  onPress={() => router.push(`/promotions/${promo.id}` as Parameters<typeof router.push>[0])}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.promoContent}>
+                    <Text style={styles.promoTitle} numberOfLines={1}>{promo.title}</Text>
+                    {promo.description ? (
+                      <Text style={styles.promoDesc} numberOfLines={1}>{promo.description}</Text>
+                    ) : null}
+                    {promo.validUntil ? (
+                      <Text style={styles.promoDate}>
+                        Válida hasta {shortDate(promo.validUntil)}
+                      </Text>
+                    ) : (
+                      <Text style={styles.promoDate}>Sin fecha límite</Text>
+                    )}
+                  </View>
+                  <View style={styles.promoDiscountBadge}>
+                    <Text style={[styles.promoDiscountText, { fontFamily: MONO }]}>
+                      -{promo.discount}%
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* ─── Pro Insights Spotlight ─── */}
         <View style={styles.section}>
@@ -499,6 +598,7 @@ const styles = StyleSheet.create({
   bentoValLarge: { fontSize: 34, color: DARK, fontWeight: 'normal', marginTop: 12 },
   bentoSubText: { fontSize: 11, color: GRAY, marginTop: 4 },
   bentoVal: { fontSize: 24, color: DARK, fontWeight: 'normal', marginTop: 8 },
+  bentoValSm: { fontSize: 18, color: DARK, fontWeight: 'normal', marginTop: 6 },
 
   apptsTodayCard: {
     backgroundColor: DARK, borderRadius: 16,
@@ -509,10 +609,12 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: BORDER,
     padding: 16, height: 110, justifyContent: 'space-between',
   },
-  monthCard: {
-    backgroundColor: '#F5F0EB', borderRadius: 16, borderWidth: 1, borderColor: BORDER,
-    padding: 16, height: 68, justifyContent: 'center',
+  halfCardCompact: { height: 86 },
+  cobrarBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4,
   },
+  cobrarDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#E67E22' },
+  cobrarBadgeText: { fontSize: 10, color: '#E67E22', fontWeight: '500' },
 
   section: { marginBottom: 24 },
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 12 },
@@ -540,6 +642,23 @@ const styles = StyleSheet.create({
   insightsDesc: { fontSize: 13, color: GRAY, lineHeight: 18 },
   insightsBtn: { height: 40, borderWidth: 1, borderColor: DARK, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   insightsBtnText: { fontSize: 12, fontWeight: '600', color: DARK, letterSpacing: 0.5 },
+
+  promoList: { marginHorizontal: 20, gap: 8 },
+  promoCard: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: BORDER,
+    padding: 14, gap: 12,
+  },
+  promoContent: { flex: 1, gap: 3 },
+  promoTitle: { fontSize: 14, fontWeight: '500', color: DARK },
+  promoDesc: { fontSize: 12, color: GRAY },
+  promoDate: { fontSize: 11, color: GRAY, marginTop: 2 },
+  promoDiscountBadge: {
+    minWidth: 52, height: 40, borderRadius: 10,
+    backgroundColor: '#FDF0EC', alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  promoDiscountText: { fontSize: 15, fontWeight: '600', color: PRIMARY },
 
   quickGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 20, gap: 10 },
   quickCard: {

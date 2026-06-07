@@ -4,13 +4,14 @@ import {
   StyleSheet, Linking, Modal, RefreshControl,
   KeyboardAvoidingView, Platform, Animated, Alert,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+import DatePickerModal, { formatDateSpanish } from '../../components/DatePickerModal'
 import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, router } from 'expo-router'
 import {
   getClientById, updateClient,
   getLoyaltyProgram, findLoyaltyAccountByClientId, redeemLoyaltyReward,
-  type ClientItem, type AppointmentStatus, type LoyaltyProgram, type LoyaltyAccount,
+  type ClientItem, type AppointmentStatus, type AppointmentPayment, type LoyaltyProgram, type LoyaltyAccount,
 } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials, formatShortDate, formatMoney } from '../../lib/utils'
 
@@ -33,6 +34,21 @@ function MiniPill({ status }: { status: AppointmentStatus }) {
       <Text style={[styles.pillText, { color: text }]}>{STATUS_LABEL[status]}</Text>
     </View>
   )
+}
+
+const METHOD_LABEL: Record<string, string> = {
+  efectivo_bs:  'Efectivo Bs.',
+  efectivo_usd: 'Efectivo USD',
+  pago_movil:   'Pago Móvil',
+  zelle:        'Zelle',
+  transferencia:'Transferencia',
+  otro:         'Otro',
+}
+
+function paymentAmountStr(p: AppointmentPayment): string {
+  return p.currency === 'Bs'
+    ? `Bs. ${p.amount.toFixed(2)}`
+    : `$${p.amount.toFixed(2)}`
 }
 
 // ─── loyalty section ──────────────────────────────────────────────────────────
@@ -151,18 +167,16 @@ function EditClientModal({
   onClose: () => void
   onSave: (data: ClientUpdate) => Promise<void>
 }) {
+  const insets = useSafeAreaInsets()
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
-  const [day, setDay] = useState('')
-  const [month, setMonth] = useState('')
-  const [year, setYear] = useState('')
+  const [birthday, setBirthday] = useState<string | null>(null)
+  const [showBirthdayPicker, setShowBirthdayPicker] = useState(false)
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
-
-  const refMonth = useRef<TextInput>(null)
-  const refYear = useRef<TextInput>(null)
+  const today = new Date().toISOString().split('T')[0]
 
   useEffect(() => {
     if (!visible) return
@@ -171,14 +185,7 @@ function EditClientModal({
     setEmail(client.email ?? '')
     setSelectedTags(client.tags ?? [])
     setNotes(client.notes ?? '')
-    if (client.birthday) {
-      const parts = client.birthday.split('-')
-      setYear(parts[0] ?? '')
-      setMonth(parts[1] ?? '')
-      setDay(parts[2] ?? '')
-    } else {
-      setDay(''); setMonth(''); setYear('')
-    }
+    setBirthday(client.birthday ?? null)
   }, [visible, client])
 
   function toggleTag(tag: string) {
@@ -190,11 +197,6 @@ function EditClientModal({
   async function handleSave() {
     if (!name.trim()) { Alert.alert('', 'El nombre es requerido'); return }
     if (!phone.trim()) { Alert.alert('', 'El teléfono es requerido'); return }
-
-    let birthday: string | null = null
-    if (day && month && year && year.length === 4) {
-      birthday = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
-    }
 
     setSaving(true)
     try {
@@ -213,26 +215,26 @@ function EditClientModal({
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={styles.mSafe} edges={['top', 'bottom']}>
         <View style={styles.mHeader}>
-          <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text style={styles.mCancel}>Cancelar</Text>
-          </TouchableOpacity>
           <Text style={styles.mTitle}>Editar clienta</Text>
-          <TouchableOpacity onPress={handleSave} disabled={saving} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text style={[styles.mSave, saving && { opacity: 0.5 }]}>
-              {saving ? 'Guardando…' : 'Guardar'}
-            </Text>
+          <TouchableOpacity
+            style={styles.mCloseBtn}
+            onPress={onClose}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="close-outline" size={24} color={DARK} />
           </TouchableOpacity>
         </View>
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          keyboardVerticalOffset={88}
         >
           <ScrollView
             contentContainerStyle={styles.mContent}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
           >
             <Text style={styles.mLabel}>Nombre completo *</Text>
             <TextInput
@@ -267,59 +269,21 @@ function EditClientModal({
             <Text style={[styles.mLabel, { marginTop: 14 }]}>
               Cumpleaños <Text style={{ color: '#BBBBBB' }}>(opcional)</Text>
             </Text>
-            <View style={styles.mBirthdayRow}>
-              <View style={styles.mBirthdayField}>
-                <Text style={styles.mBirthdayLabel}>DD</Text>
-                <TextInput
-                  style={styles.mBirthdayInput}
-                  value={day}
-                  onChangeText={v => {
-                    const d = v.replace(/\D/g, '').slice(0, 2)
-                    setDay(d)
-                    if (d.length === 2) refMonth.current?.focus()
-                  }}
-                  keyboardType="number-pad"
-                  maxLength={2}
-                  placeholder="DD"
-                  placeholderTextColor="#AAAAAA"
-                  textAlign="center"
-                />
-              </View>
-              <Text style={styles.mBirthdaySep}>/</Text>
-              <View style={styles.mBirthdayField}>
-                <Text style={styles.mBirthdayLabel}>MM</Text>
-                <TextInput
-                  ref={refMonth}
-                  style={styles.mBirthdayInput}
-                  value={month}
-                  onChangeText={v => {
-                    const m = v.replace(/\D/g, '').slice(0, 2)
-                    setMonth(m)
-                    if (m.length === 2) refYear.current?.focus()
-                  }}
-                  keyboardType="number-pad"
-                  maxLength={2}
-                  placeholder="MM"
-                  placeholderTextColor="#AAAAAA"
-                  textAlign="center"
-                />
-              </View>
-              <Text style={styles.mBirthdaySep}>/</Text>
-              <View style={[styles.mBirthdayField, { flex: 2 }]}>
-                <Text style={styles.mBirthdayLabel}>AAAA</Text>
-                <TextInput
-                  ref={refYear}
-                  style={styles.mBirthdayInput}
-                  value={year}
-                  onChangeText={v => setYear(v.replace(/\D/g, '').slice(0, 4))}
-                  keyboardType="number-pad"
-                  maxLength={4}
-                  placeholder="AAAA"
-                  placeholderTextColor="#AAAAAA"
-                  textAlign="center"
-                />
-              </View>
-            </View>
+            <TouchableOpacity
+              style={styles.dateBtn}
+              onPress={() => setShowBirthdayPicker(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="calendar-outline" size={16} color={PRIMARY} />
+              <Text style={[styles.dateBtnText, !birthday && { color: '#AAAAAA' }]} numberOfLines={1}>
+                {birthday ? formatDateSpanish(birthday) : 'Seleccionar fecha'}
+              </Text>
+              {birthday && (
+                <TouchableOpacity onPress={() => setBirthday(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="close-circle-outline" size={16} color={GRAY} />
+                </TouchableOpacity>
+              )}
+            </TouchableOpacity>
 
             <Text style={[styles.mLabel, { marginTop: 14 }]}>Etiquetas</Text>
             <View style={styles.mTagsRow}>
@@ -354,7 +318,32 @@ function EditClientModal({
             <View style={{ height: 20 }} />
           </ScrollView>
         </KeyboardAvoidingView>
+
+        {/* Botones de acción al fondo */}
+        <View style={[styles.mActions, { paddingBottom: insets.bottom + 16 }]}>
+          <TouchableOpacity style={styles.mCancelBtn} onPress={onClose} activeOpacity={0.8}>
+            <Text style={styles.mCancelBtnText}>Cancelar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.mSaveBtn, saving && { opacity: 0.6 }]}
+            onPress={handleSave}
+            disabled={saving}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.mSaveBtnText}>{saving ? 'Guardando…' : 'Aceptar'}</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
+
+      <DatePickerModal
+        visible={showBirthdayPicker}
+        value={birthday}
+        onConfirm={date => { setBirthday(date); setShowBirthdayPicker(false) }}
+        onCancel={() => setShowBirthdayPicker(false)}
+        title="Fecha de nacimiento"
+        minDate="1940-01-01"
+        maxDate={today}
+      />
     </Modal>
   )
 }
@@ -517,6 +506,48 @@ export default function ClientDetailScreen() {
                 />
               )}
 
+              {/* Total cobrado summary card */}
+              {c.appointments && c.appointments.length > 0 && (() => {
+                const paid = c.appointments.filter(a => a.payment?.isPaid)
+                const pending = c.appointments.filter(a => a.payment && !a.payment.isPaid)
+                const totalUSD = paid
+                  .filter(a => a.payment!.currency !== 'Bs')
+                  .reduce((s, a) => s + a.payment!.amount, 0)
+                const totalBs = paid
+                  .filter(a => a.payment!.currency === 'Bs')
+                  .reduce((s, a) => s + a.payment!.amount, 0)
+                const hasCobros = paid.length > 0 || pending.length > 0
+                if (!hasCobros) return null
+                return (
+                  <View style={styles.cobroCard}>
+                    <Text style={styles.cobroLabel}>TOTAL COBRADO</Text>
+                    <View style={styles.cobroAmounts}>
+                      {totalUSD > 0 && (
+                        <Text style={[styles.cobroAmount, { fontFamily: MONO }]}>
+                          ${totalUSD.toFixed(2)} USD
+                        </Text>
+                      )}
+                      {totalBs > 0 && (
+                        <Text style={[styles.cobroAmount, { fontFamily: MONO }]}>
+                          Bs. {totalBs.toFixed(2)}
+                        </Text>
+                      )}
+                      {paid.length === 0 && (
+                        <Text style={[styles.cobroAmount, { fontFamily: MONO }]}>$0.00</Text>
+                      )}
+                    </View>
+                    {pending.length > 0 && (
+                      <View style={styles.cobroPendingRow}>
+                        <View style={styles.cobroPendingDot} />
+                        <Text style={styles.cobroPendingText}>
+                          {pending.length} cobro{pending.length > 1 ? 's' : ''} pendiente{pending.length > 1 ? 's' : ''}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )
+              })()}
+
               {/* Appointment history */}
               <View style={styles.sectionBlock}>
                 <Text style={styles.sectionTitle}>Historial de citas</Text>
@@ -524,20 +555,36 @@ export default function ClientDetailScreen() {
                   <Text style={styles.grayText}>Sin citas anteriores registradas</Text>
                 ) : (
                   c.appointments.map(apt => (
-                    <View key={apt.id} style={styles.aptRow}>
+                    <TouchableOpacity
+                      key={apt.id}
+                      style={styles.aptRow}
+                      onPress={() => router.push(`/appointments/${apt.id}` as any)}
+                      activeOpacity={0.75}
+                    >
                       <View style={styles.aptLeft}>
                         <Text style={styles.aptDate}>{formatShortDate(apt.startTime)}</Text>
                         <Text style={styles.aptService}>{apt.service?.name ?? '—'}</Text>
+                        {apt.payment && (
+                          <View style={styles.aptPaymentRow}>
+                            <Text style={[styles.aptPaymentAmount, { fontFamily: MONO }]}>
+                              {paymentAmountStr(apt.payment)}
+                            </Text>
+                            <Text style={styles.aptPaymentMethod}>
+                              {METHOD_LABEL[apt.payment.method] ?? apt.payment.method}
+                            </Text>
+                            {!apt.payment.isPaid && (
+                              <View style={styles.aptPendingBadge}>
+                                <Text style={styles.aptPendingText}>pendiente</Text>
+                              </View>
+                            )}
+                          </View>
+                        )}
                       </View>
                       <View style={styles.aptRight}>
-                        {apt.service?.price != null && (
-                          <Text style={[styles.aptPrice, { fontFamily: MONO }]}>
-                            {formatMoney(apt.service.price)}
-                          </Text>
-                        )}
                         <MiniPill status={apt.status} />
+                        <Ionicons name="chevron-forward-outline" size={14} color={BORDER} />
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   ))
                 )}
               </View>
@@ -602,6 +649,28 @@ const styles = StyleSheet.create({
   aptService: { fontSize: 13, color: GRAY, marginTop: 2 },
   aptRight: { alignItems: 'flex-end', gap: 4 },
   aptPrice: { fontSize: 13, color: DARK },
+  aptPaymentRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3, flexWrap: 'wrap' },
+  aptPaymentAmount: { fontSize: 13, color: PRIMARY },
+  aptPaymentMethod: { fontSize: 11, color: GRAY },
+  aptPendingBadge: {
+    backgroundColor: '#FFF3E0', borderRadius: 6,
+    paddingHorizontal: 5, paddingVertical: 1,
+  },
+  aptPendingText: { fontSize: 10, color: '#E67E22', fontWeight: '500' },
+  cobroCard: {
+    backgroundColor: '#EAF4EA', borderRadius: 16,
+    borderWidth: 1, borderColor: '#C8E6C9',
+    padding: 16, marginBottom: 14,
+  },
+  cobroLabel: {
+    fontSize: 11, fontWeight: '600', color: '#27AE60',
+    letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8,
+  },
+  cobroAmounts: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 4 },
+  cobroAmount: { fontSize: 22, color: DARK },
+  cobroPendingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+  cobroPendingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#E67E22' },
+  cobroPendingText: { fontSize: 12, color: '#E67E22' },
   notesText: { fontSize: 15, color: DARK, lineHeight: 22 },
   grayText: { fontSize: 14, color: '#AAAAAA' },
   pill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
@@ -636,27 +705,45 @@ const styles = StyleSheet.create({
   // edit modal (full-screen)
   mSafe: { flex: 1, backgroundColor: SURFACE },
   mHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 14,
+    alignItems: 'center', justifyContent: 'center',
+    height: 56, paddingHorizontal: 16,
     backgroundColor: '#fff', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER,
   },
-  mCancel: { fontSize: 15, color: GRAY },
   mTitle: { fontSize: 17, fontWeight: '500', color: DARK },
-  mSave: { fontSize: 15, fontWeight: '600', color: PRIMARY },
+  mCloseBtn: {
+    position: 'absolute', right: 16,
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: '#F5F0EB', alignItems: 'center', justifyContent: 'center',
+  },
+  mActions: {
+    flexDirection: 'row', gap: 12,
+    paddingHorizontal: 20, paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: BORDER,
+    backgroundColor: '#fff',
+  },
+  mCancelBtn: {
+    flex: 1, height: 52, borderRadius: 26,
+    borderWidth: 1, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  mCancelBtnText: { fontSize: 15, fontWeight: '500', color: DARK },
+  mSaveBtn: {
+    flex: 1, height: 52, borderRadius: 26,
+    backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center',
+  },
+  mSaveBtnText: { fontSize: 15, fontWeight: '500', color: '#fff' },
   mContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
   mLabel: { fontSize: 12, color: GRAY, marginBottom: 6 },
   mInput: {
     height: 46, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
     paddingHorizontal: 14, fontSize: 15, color: DARK, backgroundColor: SURFACE,
   },
-  mBirthdayRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
-  mBirthdayField: { flex: 1 },
-  mBirthdayLabel: { fontSize: 10, color: GRAY, marginBottom: 4, textAlign: 'center' },
-  mBirthdayInput: {
+  dateBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
     height: 46, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
-    fontSize: 15, color: DARK, backgroundColor: SURFACE,
+    paddingHorizontal: 14, backgroundColor: SURFACE,
   },
-  mBirthdaySep: { fontSize: 20, color: GRAY, paddingBottom: 12 },
+  dateBtnText: { flex: 1, fontSize: 15, color: DARK },
   mTagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   mChip: {
     paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20,

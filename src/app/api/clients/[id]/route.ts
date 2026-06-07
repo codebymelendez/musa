@@ -44,7 +44,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
     const { data: client, error } = await admin
       .from("Client")
-      .select("*, appointments:Appointment(*, service:Service(*))")
+      .select("*, appointments:Appointment(*, service:Service(*), payment:Payment(*))")
       .eq("id", id)
       .eq("businessId", businessId)
       .single();

@@ -80,8 +80,11 @@ function EditFieldModal({
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <TouchableOpacity style={ms.overlay} activeOpacity={1} onPress={onClose} />
+      <KeyboardAvoidingView
+        style={{ flex: 1, justifyContent: 'flex-end' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={onClose} />
         <Animated.View style={[ms.sheet, { transform: [{ translateY: slide }] }]}>
           <View style={ms.handle} />
           <Text style={ms.sheetTitle}>{title}</Text>
@@ -399,7 +402,6 @@ export default function SettingsTabScreen() {
             <SRow
               icon="card-outline"
               label="Métodos de Pago"
-              subtitle="Próximamente"
               onPress={() => router.push('/settings/payment-methods' as Parameters<typeof router.push>[0])}
             />
           </View>
@@ -804,9 +806,7 @@ const styles = StyleSheet.create({
 })
 
 const ms = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
   sheet: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
     paddingHorizontal: 20, paddingTop: 12, paddingBottom: 48,
   },

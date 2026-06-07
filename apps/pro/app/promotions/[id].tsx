@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, router } from 'expo-router'
 import { getPromotions, updatePromotion, deletePromotion, type PromotionItem } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, SERIF } from '../../lib/utils'
+import DatePickerModal, { formatDateSpanish } from '../../components/DatePickerModal'
 
 function formatDisplayDate(iso: string | null): string {
   if (!iso) return ''
@@ -58,12 +59,16 @@ export default function PromotionEditScreen() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [discount, setDiscount] = useState('')
-  const [validFrom, setValidFrom] = useState('')
-  const [validUntil, setValidUntil] = useState('')
+  const [validFrom, setValidFrom] = useState<string | null>(null)
+  const [validUntil, setValidUntil] = useState<string | null>(null)
+  const [showFromPicker, setShowFromPicker] = useState(false)
+  const [showUntilPicker, setShowUntilPicker] = useState(false)
 
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [savedMsg, setSavedMsg] = useState(false)
+
+  const today = new Date().toISOString().split('T')[0]
 
   const insets = useSafeAreaInsets()
 
@@ -77,8 +82,8 @@ export default function PromotionEditScreen() {
       setTitle(found.title)
       setDescription(found.description ?? '')
       setDiscount(String(found.discount))
-      setValidFrom(formatDisplayDate(found.validFrom))
-      setValidUntil(formatDisplayDate(found.validUntil))
+      setValidFrom(found.validFrom ? found.validFrom.split('T')[0] : null)
+      setValidUntil(found.validUntil ? found.validUntil.split('T')[0] : null)
       setLoadState('ready')
     } catch { setLoadState('error') }
   }, [id])
@@ -93,8 +98,8 @@ export default function PromotionEditScreen() {
         title: title.trim(),
         description: description.trim() || undefined,
         discount: parseFloat(discount) || 0,
-        validFrom: parseDisplayDate(validFrom) ?? undefined,
-        validUntil: parseDisplayDate(validUntil) ?? undefined,
+        validFrom: validFrom ? `${validFrom}T00:00:00` : undefined,
+        validUntil: validUntil ? `${validUntil}T23:59:59` : undefined,
       })
       setSavedMsg(true)
       setTimeout(() => setSavedMsg(false), 2000)
@@ -175,15 +180,29 @@ export default function PromotionEditScreen() {
               <View style={styles.datesRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.label}>Fecha inicio</Text>
-                  <TextInput style={styles.input} value={validFrom}
-                    onChangeText={v => setValidFrom(formatDateInput(v))}
-                    placeholder="DD/MM/YYYY" placeholderTextColor="#AAAAAA" keyboardType="number-pad" />
+                  <TouchableOpacity
+                    style={styles.dateBtn}
+                    onPress={() => setShowFromPicker(true)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="calendar-outline" size={16} color={PRIMARY} />
+                    <Text style={[styles.dateBtnText, !validFrom && { color: '#AAAAAA' }]} numberOfLines={1}>
+                      {validFrom ? formatDateSpanish(validFrom) : 'Sin fecha'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.label}>Fecha fin</Text>
-                  <TextInput style={styles.input} value={validUntil}
-                    onChangeText={v => setValidUntil(formatDateInput(v))}
-                    placeholder="DD/MM/YYYY" placeholderTextColor="#AAAAAA" keyboardType="number-pad" />
+                  <TouchableOpacity
+                    style={styles.dateBtn}
+                    onPress={() => setShowUntilPicker(true)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="calendar-outline" size={16} color={PRIMARY} />
+                    <Text style={[styles.dateBtnText, !validUntil && { color: '#AAAAAA' }]} numberOfLines={1}>
+                      {validUntil ? formatDateSpanish(validUntil) : 'Sin fecha'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </View>
 
@@ -214,6 +233,23 @@ export default function PromotionEditScreen() {
           </View>
         </KeyboardAvoidingView>
       )}
+
+      <DatePickerModal
+        visible={showFromPicker}
+        value={validFrom}
+        onConfirm={date => { setValidFrom(date); setShowFromPicker(false) }}
+        onCancel={() => setShowFromPicker(false)}
+        title="Fecha de inicio"
+        minDate={today}
+      />
+      <DatePickerModal
+        visible={showUntilPicker}
+        value={validUntil}
+        onConfirm={date => { setValidUntil(date); setShowUntilPicker(false) }}
+        onCancel={() => setShowUntilPicker(false)}
+        title="Fecha de fin"
+        minDate={validFrom ?? today}
+      />
     </SafeAreaView>
   )
 }
@@ -227,7 +263,7 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '500', color: DARK },
-  content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
+  content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 120 },
   card: {
     backgroundColor: '#fff', borderRadius: 16, borderWidth: 1,
     borderColor: BORDER, padding: 18, marginBottom: 14,
@@ -239,6 +275,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, fontSize: 15, color: DARK, backgroundColor: SURFACE,
   },
   datesRow: { flexDirection: 'row', gap: 12, marginTop: 14 },
+  dateBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    height: 46, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
+    paddingHorizontal: 10, backgroundColor: SURFACE,
+  },
+  dateBtnText: { flex: 1, fontSize: 13, color: DARK },
   toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 18 },
   toggleLabel: { fontSize: 15, color: DARK, fontWeight: '500' },
   deleteBtn: {
