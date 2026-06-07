@@ -54,7 +54,7 @@ const SERVICE_TYPE_LABEL: Record<string, string> = {
 async function getPublicPromotions(): Promise<PublicPromotion[]> {
   try {
     const admin = createAdminClient();
-    const now = new Date().toISOString();
+    const today = new Date().toISOString().split("T")[0];
     const { data } = await admin
       .from("Promotion")
       .select(`
@@ -63,8 +63,8 @@ async function getPublicPromotions(): Promise<PublicPromotion[]> {
         owner:User!inner(name, slug)
       `)
       .eq("isActive", true)
-      .or(`validFrom.is.null,validFrom.lte.${now}`)
-      .or(`validUntil.is.null,validUntil.gte.${now}`)
+      .or(`validFrom.is.null,validFrom.lte.${today}`)
+      .or(`validUntil.is.null,validUntil.gte.${today}`)
       .order("createdAt", { ascending: false })
       .limit(8);
 
