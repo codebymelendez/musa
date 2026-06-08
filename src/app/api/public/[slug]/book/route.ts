@@ -41,7 +41,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     // Buscar profesional por slug
     const { data: user, error: userError } = await admin
       .from('User')
-      .select('*, settings:ProfessionalSettings(*)')
+      .select('*, settings:ProfessionalSettings(*), business:Business(timezone)')
       .eq('slug', slug)
       .single();
 
@@ -189,7 +189,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Error al crear cita" }, { status: 500 });
     }
 
-    const TZ = "America/Caracas";
+    const businessObj = Array.isArray(user.business) ? user.business[0] : user.business;
+    const TZ = (businessObj as any)?.timezone || "America/Caracas";
     const startStr = start.toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit", timeZone: TZ });
     const dateStr  = start.toLocaleDateString ("es-VE", { weekday: "long", day: "numeric", month: "long", timeZone: TZ });
 

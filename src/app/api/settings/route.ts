@@ -64,6 +64,7 @@ export async function GET(req: NextRequest) {
             ...s,
             workDays: JSON.parse(s.workDays || "[1,2,3,4,5]"),
             paymentMethods: s.paymentMethods ? JSON.parse(s.paymentMethods) : [],
+            timezone: user.business?.timezone || "America/Caracas",
           }
         : null,
     };
@@ -281,6 +282,7 @@ export async function PATCH(req: NextRequest) {
             ...s,
             workDays: JSON.parse(s.workDays || "[1,2,3,4,5]"),
             paymentMethods: s.paymentMethods ? JSON.parse(s.paymentMethods) : [],
+            timezone: updated?.business?.timezone || "America/Caracas",
           }
         : null,
     };

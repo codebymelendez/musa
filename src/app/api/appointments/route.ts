@@ -8,7 +8,7 @@ import { getBlocksInRange, isSlotBlocked } from "@/lib/availability";
 import { dayRangeUTC, DEFAULT_TZ } from "@/lib/utils";
 
 const createSchema = z.object({
-  clientId: z.string(),
+  clientId: z.string().nullable().optional(),
   serviceId: z.string(),
   startTime: z.string().datetime(),
   notes: z.string().optional(),
@@ -92,13 +92,18 @@ export async function POST(req: NextRequest) {
     }
 
     const { clientId, serviceId, startTime, notes } = parsed.data;
-    const supabase = await createClient();
+    // Usar el cliente ADMIN para evitar fallos de RLS debido a la falta de cookies en peticiones móviles
+    const supabase = createAdminClient();
 
     const { data: user } = await supabase
       .from('User')
       .select('businessId')
       .eq('id', session.userId)
       .single();
+
+    if (!user?.businessId) {
+      return NextResponse.json({ error: "El usuario no pertenece a un negocio" }, { status: 400 });
+    }
 
     // Obtener duración del servicio
     const { data: service } = await supabase
@@ -142,13 +147,46 @@ export async function POST(req: NextRequest) {
     }
 
     // Verificar límite inmediatamente antes del INSERT para minimizar ventana de race condition
-    if (user?.businessId) {
-      const canCreate = await checkAppointmentLimit(user.businessId);
-      if (!canCreate) {
-        return NextResponse.json(
-          { error: "Has alcanzado el límite de citas de tu plan gratuito. Actualiza a PRO para citas ilimitadas." },
-          { status: 403 }
-        );
+    const canCreate = await checkAppointmentLimit(user.businessId);
+    if (!canCreate) {
+      return NextResponse.json(
+        { error: "Has alcanzado el límite de citas de tu plan gratuito. Actualiza a PRO para citas ilimitadas." },
+        { status: 403 }
+      );
+    }
+
+    // Si clientId es nulo o indefinido (walk-in client de la app móvil),
+    // buscar o crear el cliente comodín "Cliente sin registrar" para el negocio.
+    let finalClientId = clientId;
+    if (!finalClientId) {
+      const { data: walkInClient } = await supabase
+        .from('Client')
+        .select('id')
+        .eq('businessId', user.businessId)
+        .eq('phone', '0000000000')
+        .maybeSingle();
+
+      if (walkInClient) {
+        finalClientId = walkInClient.id;
+      } else {
+        const { data: newWalkIn, error: walkInError } = await supabase
+          .from('Client')
+          .insert({
+            id: crypto.randomUUID(),
+            businessId: user.businessId,
+            userId: session.userId,
+            name: 'Cliente sin registrar',
+            phone: '0000000000',
+            isActive: true,
+          })
+          .select('id')
+          .single();
+
+        if (walkInError || !newWalkIn) {
+          console.error("[walkin client create error]", walkInError);
+          return NextResponse.json({ error: "Error al crear cliente comodín para walk-in" }, { status: 500 });
+        }
+        finalClientId = newWalkIn.id;
       }
     }
 
@@ -157,7 +195,7 @@ export async function POST(req: NextRequest) {
       .insert({
         id: crypto.randomUUID(),
         userId: session.userId,
-        clientId,
+        clientId: finalClientId,
         serviceId,
         startTime: start.toISOString(),
         endTime: end.toISOString(),

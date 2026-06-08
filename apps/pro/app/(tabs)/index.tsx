@@ -175,13 +175,29 @@ function AddClientModal({
   )
 }
 
-// ─── screen ───────────────────────────────────────────────────────────────────
-
 type QuickAction = {
   icon: React.ComponentProps<typeof Ionicons>['name']
   label: string
   onPress: () => void
 }
+
+interface DashboardData {
+  businessTz: string
+  userName: string
+  avatarUrl: string | null
+  appointments: AppointmentItem[]
+  promos: PromotionItem[]
+  loyaltyProgram: LoyaltyProgram | null
+  loyaltyStats: { clientsWithPoints: number; totalPoints: number }
+  monthlyRevenue: number | null
+  weeklyRevenue: number | null
+  newClientsCount: number | null
+}
+
+let _dashboardCache: {
+  timestamp: number
+  data: DashboardData
+} | null = null
 
 export default function HomeScreen() {
   const [loading, setLoading] = useState(true)
@@ -198,10 +214,27 @@ export default function HomeScreen() {
   const [monthlyRevenue, setMonthlyRevenue] = useState<number | null>(null)
   const [newClientsCount, setNewClientsCount] = useState<number | null>(null)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
+    if (!force && _dashboardCache && (Date.now() - _dashboardCache.timestamp < 30000)) {
+      const c = _dashboardCache.data
+      setBusinessTz(c.businessTz)
+      setUserName(c.userName)
+      setAvatarUrl(c.avatarUrl)
+      setAppointments(c.appointments)
+      setPromos(c.promos)
+      setLoyaltyProgram(c.loyaltyProgram)
+      setLoyaltyStats(c.loyaltyStats)
+      setMonthlyRevenue(c.monthlyRevenue)
+      setWeeklyRevenue(c.weeklyRevenue)
+      setNewClientsCount(c.newClientsCount)
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     try {
-      const venezNow = new Date(new Date().toLocaleString('en-US', { timeZone: businessTz }))
+      const currentTz = _dashboardCache?.data?.businessTz ?? businessTz
+      const venezNow = new Date(new Date().toLocaleString('en-US', { timeZone: currentTz }))
       const year = venezNow.getFullYear()
       const month = venezNow.getMonth() + 1
       const firstDayStr = `${year}-${String(month).padStart(2, '0')}-01`
@@ -229,30 +262,57 @@ export default function HomeScreen() {
       const clients = results[6].status === 'fulfilled' ? results[6].value as any[] : []
       const weekAppts = results[7].status === 'fulfilled' ? results[7].value as any[] : []
 
-      setBusinessTz(getBusinessTZ(sData))
-      setUserName(sData?.name?.split(' ')[0] ?? '')
-      setAvatarUrl(sData?.avatarUrl ?? null)
-      setAppointments(appts.filter((a: any) => a.status !== 'cancelled'))
-      setPromos(promoList.filter(isPromoActive))
-      setLoyaltyProgram(program)
+      const resolvedTz = getBusinessTZ(sData)
+      const resolvedUserName = sData?.name?.split(' ')[0] ?? ''
+      const resolvedAvatarUrl = sData?.avatarUrl ?? null
+      const resolvedAppts = appts.filter((a: any) => a.status !== 'cancelled')
+      const resolvedPromos = promoList.filter(isPromoActive)
+      const resolvedLoyaltyProgram = program
       const withPts = accounts.filter((a: any) => a.totalPoints > 0)
-      setLoyaltyStats({
+      const resolvedLoyaltyStats = {
         clientsWithPoints: withPts.length,
         totalPoints: withPts.reduce((s: number, a: any) => s + a.totalPoints, 0),
-      })
-      if (statsData) setMonthlyRevenue(statsData.monthlyRevenue)
+      }
+      const resolvedMonthlyRevenue = statsData ? statsData.monthlyRevenue : null
       const wRev = weekAppts
         .filter((a: any) => a.status === 'completed')
         .reduce((sum: number, a: any) => sum + (a.payment?.isPaid ? a.payment.amount : a.service.price), 0)
-      setWeeklyRevenue(wRev)
-      setNewClientsCount(clients.filter((c: any) => (c.createdAt ?? '').slice(0, 10) >= firstDayStr).length)
+      const resolvedWeeklyRevenue = wRev
+      const resolvedNewClientsCount = clients.filter((c: any) => (c.createdAt ?? '').slice(0, 10) >= firstDayStr).length
+
+      setBusinessTz(resolvedTz)
+      setUserName(resolvedUserName)
+      setAvatarUrl(resolvedAvatarUrl)
+      setAppointments(resolvedAppts)
+      setPromos(resolvedPromos)
+      setLoyaltyProgram(resolvedLoyaltyProgram)
+      setLoyaltyStats(resolvedLoyaltyStats)
+      setMonthlyRevenue(resolvedMonthlyRevenue)
+      setWeeklyRevenue(resolvedWeeklyRevenue)
+      setNewClientsCount(resolvedNewClientsCount)
+
+      _dashboardCache = {
+        timestamp: Date.now(),
+        data: {
+          businessTz: resolvedTz,
+          userName: resolvedUserName,
+          avatarUrl: resolvedAvatarUrl,
+          appointments: resolvedAppts,
+          promos: resolvedPromos,
+          loyaltyProgram: resolvedLoyaltyProgram,
+          loyaltyStats: resolvedLoyaltyStats,
+          monthlyRevenue: resolvedMonthlyRevenue,
+          weeklyRevenue: resolvedWeeklyRevenue,
+          newClientsCount: resolvedNewClientsCount,
+        }
+      }
     } catch { /* show what loaded */ }
     finally { setLoading(false) }
-  }, [])
+  }, [businessTz])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load(false) }, [load])
 
-  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false) }
+  const onRefresh = async () => { setRefreshing(true); await load(true); setRefreshing(false) }
 
   const sortedAppts = [...appointments].sort(
     (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()

@@ -108,7 +108,20 @@ export default function BusinessInfoScreen() {
   const [iosTempTime, setIosTempTime] = useState<string | null>(null)
 
   const insets = useSafeAreaInsets()
-  console.log('Places key:', GOOGLE_PLACES_API_KEY)
+  const placesRef = useRef<any>(null)
+  const mapRef = useRef<MapView | null>(null)
+
+  // Animate map when coordinates change
+  useEffect(() => {
+    if (latitude && longitude && mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude,
+        longitude,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      }, 500)
+    }
+  }, [latitude, longitude])
 
   const loadData = useCallback(async () => {
     try {
@@ -141,6 +154,9 @@ export default function BusinessInfoScreen() {
       setLogoUrl(business.logoUrl ?? null)
       setCoverUrl(business.coverUrl ?? null)
       setAddress(business.address ?? '')
+      setTimeout(() => {
+        placesRef.current?.setAddressText(business.address ?? '')
+      }, 100)
       setLatitude(business.latitude ?? null)
       setLongitude(business.longitude ?? null)
       setCountry(business.country ?? '')
@@ -587,6 +603,7 @@ export default function BusinessInfoScreen() {
               <Text style={styles.label}>Dirección física del negocio</Text>
               <View style={styles.autocompleteWrapper}>
                 <GooglePlacesAutocomplete
+                  ref={placesRef}
                   placeholder="Busca la dirección..."
                   fetchDetails={true}
                   onPress={async (data, details = null) => {
@@ -633,7 +650,6 @@ export default function BusinessInfoScreen() {
                   }}
                   textInputProps={{
                     placeholderTextColor: '#AAAAAA',
-                    value: address,
                     onChangeText: setAddress,
                   }}
                 />
@@ -643,6 +659,7 @@ export default function BusinessInfoScreen() {
               <View style={styles.mapContainer}>
                 {latitude && longitude ? (
                   <MapView
+                    ref={mapRef}
                     style={styles.map}
                     initialRegion={{
                       latitude,
@@ -950,7 +967,7 @@ const styles = StyleSheet.create({
     backgroundColor: SURFACE,
   },
   galleryAddText: { fontFamily: 'System', fontSize: 10, color: PRIMARY, fontWeight: '500' },
-  autocompleteWrapper: { marginBottom: 14 },
+  autocompleteWrapper: { marginBottom: 14, zIndex: 10, position: 'relative' },
   autocompleteInput: {
     fontFamily: 'System', height: 48, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
     paddingHorizontal: 14, fontSize: 15, color: DARK, backgroundColor: SURFACE,
