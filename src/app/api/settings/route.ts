@@ -199,16 +199,69 @@ export async function PATCH(req: NextRequest) {
           ...(settings.currency && { currency: settings.currency }),
           ...(settings.bookingEnabled !== undefined && { bookingEnabled: settings.bookingEnabled }),
           ...(settings.paymentMethods !== undefined && { paymentMethods: JSON.stringify(settings.paymentMethods) }),
-          ...(settings.timezone && { timezone: settings.timezone }),
         }, { onConflict: 'userId', ignoreDuplicates: false });
 
-      if (settings.timezone) {
-        const { data: cu } = await admin
-          .from('User').select('businessId').eq('id', session.userId).single();
-        if (cu?.businessId) {
+      const { data: cu } = await admin
+        .from('User').select('businessId').eq('id', session.userId).single();
+
+      if (cu?.businessId) {
+        if (settings.timezone) {
           await admin.from('Business')
             .update({ timezone: settings.timezone })
             .eq('id', cu.businessId);
+        }
+
+        // Sync with BusinessHours table if availability-related settings are patched
+        if (settings.workDays || settings.startHour !== undefined || settings.endHour !== undefined) {
+          const { data: existingHours } = await admin
+            .from('BusinessHours')
+            .select('*')
+            .eq('businessId', cu.businessId)
+            .is('userId', null);
+
+          const existingHoursMap = (existingHours ?? []).reduce((acc: any, curr: any) => {
+            acc[curr.dayOfWeek] = curr;
+            return acc;
+          }, {});
+
+          const { data: currentSettings } = await admin
+            .from('ProfessionalSettings')
+            .select('workDays, startHour, endHour')
+            .eq('userId', session.userId)
+            .single();
+
+          const activeWorkDays: number[] = settings.workDays ?? 
+            (currentSettings?.workDays ? JSON.parse(currentSettings.workDays) : [1, 2, 3, 4, 5]);
+
+          const startVal = settings.startHour !== undefined ? settings.startHour : (currentSettings?.startHour ?? 900);
+          const endVal = settings.endHour !== undefined ? settings.endHour : (currentSettings?.endHour ?? 1800);
+
+          const formatHour = (val: number) => {
+            const h = String(Math.floor(val / 100)).padStart(2, '0');
+            const m = String(val % 100).padStart(2, '0');
+            return `${h}:${m}`;
+          };
+
+          const openTime = formatHour(startVal);
+          const closeTime = formatHour(endVal);
+
+          const daysOfWeek = [1, 2, 3, 4, 5, 6, 0];
+          const payload = daysOfWeek.map(day => {
+            const existing = existingHoursMap[day];
+            return {
+              id: existing?.id ?? crypto.randomUUID(),
+              businessId: cu.businessId,
+              dayOfWeek: day,
+              openTime,
+              closeTime,
+              isOpen: activeWorkDays.includes(day),
+              userId: null,
+            };
+          });
+
+          await admin
+            .from('BusinessHours')
+            .upsert(payload);
         }
       }
     }

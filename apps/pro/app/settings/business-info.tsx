@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Animated, Alert, KeyboardAvoidingView, Platform,
-  ActivityIndicator, Switch,
+  ActivityIndicator, Switch, Modal,
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -33,6 +33,18 @@ interface BusinessPhotoItem {
   url: string
   sortOrder: number
 }
+
+const SLOT_OPTIONS = [15, 30, 45, 60, 90]
+
+const TIMEZONE_OPTIONS = [
+  { label: 'Venezuela',  value: 'America/Caracas' },
+  { label: 'Colombia',   value: 'America/Bogota' },
+  { label: 'Perú',       value: 'America/Lima' },
+  { label: 'México',     value: 'America/Mexico_City' },
+  { label: 'Argentina',  value: 'America/Argentina/Buenos_Aires' },
+  { label: 'España',     value: 'Europe/Madrid' },
+  { label: 'UTC',        value: 'UTC' },
+]
 
 function Skeleton() {
   const op = useRef(new Animated.Value(0.45)).current
@@ -89,9 +101,11 @@ export default function BusinessInfoScreen() {
 
   // Section 4: Business Hours
   const [businessHours, setBusinessHours] = useState<BusinessHoursState[]>([])
+  const [slotDuration, setSlotDuration] = useState(30)
   
   // DateTimePicker Temp State
   const [pickerShow, setPickerShow] = useState<{ day: number; type: 'open' | 'close' } | null>(null)
+  const [iosTempTime, setIosTempTime] = useState<string | null>(null)
 
   const insets = useSafeAreaInsets()
   console.log('Places key:', GOOGLE_PLACES_API_KEY)
@@ -133,6 +147,9 @@ export default function BusinessInfoScreen() {
       setTimezone(business.timezone ?? 'America/Caracas')
       setServiceMode((business.serviceMode as 'inStore' | 'homeVisit' | 'both') ?? 'inStore')
 
+      const slotDur = settings?.settings?.slotDuration ?? 30
+      setSlotDuration(slotDur)
+
       // Query gallery photos
       const { data: photos } = await supabase
         .from('BusinessPhoto')
@@ -165,8 +182,8 @@ export default function BusinessInfoScreen() {
         return {
           id: existing?.id,
           dayOfWeek: d.value,
-          openTime: existing?.openTime ?? '09:00',
-          closeTime: existing?.closeTime ?? '18:00',
+          openTime: existing?.openTime ? existing.openTime.slice(0, 5) : '09:00',
+          closeTime: existing?.closeTime ? existing.closeTime.slice(0, 5) : '18:00',
           isOpen: existing?.isOpen ?? true,
         }
       })
@@ -327,6 +344,39 @@ export default function BusinessInfoScreen() {
         .upsert(hoursPayload)
 
       if (hError) throw hError
+
+      // Sync to ProfessionalSettings for backward compatibility with web client
+      try {
+        const openDays = businessHours.filter(bh => bh.isOpen).map(bh => bh.dayOfWeek)
+        
+        let minStart = 900
+        let maxEnd = 1800
+        if (openDays.length > 0) {
+          const parseToHhmmInt = (timeStr: string) => {
+            const [h, m] = timeStr.split(':').map(Number)
+            return h * 100 + m
+          }
+          const openTimeInts = businessHours.filter(bh => bh.isOpen).map(bh => parseToHhmmInt(bh.openTime))
+          const closeTimeInts = businessHours.filter(bh => bh.isOpen).map(bh => parseToHhmmInt(bh.closeTime))
+          minStart = Math.min(...openTimeInts)
+          maxEnd = Math.max(...closeTimeInts)
+        }
+
+        const { data: userData } = await supabase.auth.getUser()
+        if (userData?.user?.id) {
+          await supabase
+            .from('ProfessionalSettings')
+            .update({
+              workDays: JSON.stringify(openDays),
+              startHour: minStart,
+              endHour: maxEnd,
+              slotDuration,
+            })
+            .eq('userId', userData.user.id)
+        }
+      } catch (syncErr) {
+        console.error('Error syncing to ProfessionalSettings:', syncErr)
+      }
 
       Alert.alert('Éxito', 'Configuración del negocio guardada correctamente')
       loadData()
@@ -690,18 +740,133 @@ export default function BusinessInfoScreen() {
               })}
             </View>
 
+            {/* SECTION 5: AJUSTES DE RESERVA */}
+            <View style={styles.card}>
+              <Text style={styles.sectionHeader}>Ajustes de Reserva</Text>
+              
+              <Text style={styles.label}>Duración de slots</Text>
+              <View style={[styles.pillsRow, { marginBottom: 16, marginTop: 4 }]}>
+                {SLOT_OPTIONS.map(min => {
+                  const active = slotDuration === min
+                  return (
+                    <TouchableOpacity
+                      key={min}
+                      style={[styles.slotPill, active && styles.dayPillActive]}
+                      onPress={() => setSlotDuration(min)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.dayPillText, active && styles.dayPillTextActive]}>
+                        {min} min
+                      </Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
+
+              <Text style={styles.label}>Zona horaria</Text>
+              <View style={[styles.pillsRow, { marginTop: 4 }]}>
+                {TIMEZONE_OPTIONS.map(({ label, value }) => {
+                  const active = timezone === value
+                  return (
+                    <TouchableOpacity
+                      key={value}
+                      style={[styles.tzPill, active && styles.dayPillActive]}
+                      onPress={() => setTimezone(value)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.dayPillText, active && styles.dayPillTextActive]}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
+            </View>
+
             <View style={{ height: 120 }} />
           </ScrollView>
 
           {/* DateTimePicker container (iOS and Android conditional) */}
-          {pickerShow !== null && (
-            <DateTimePicker
-              value={getDatePickerValue()}
-              mode="time"
-              is24Hour={true}
-              display="default"
-              onChange={handleTimeChange}
-            />
+          {Platform.OS === 'ios' ? (
+            <Modal
+              visible={pickerShow !== null}
+              transparent
+              animationType="fade"
+              onRequestClose={() => {
+                setPickerShow(null)
+                setIosTempTime(null)
+              }}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                  <View style={styles.modalHeader}>
+                    <TouchableOpacity onPress={() => {
+                      setPickerShow(null)
+                      setIosTempTime(null)
+                    }}>
+                      <Text style={styles.modalCancelText}>Cancelar</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.modalTitle}>Seleccionar hora</Text>
+                    <TouchableOpacity onPress={() => {
+                      if (pickerShow) {
+                        const currentPicker = pickerShow
+                        const timeStr = iosTempTime || (currentPicker.type === 'open'
+                          ? businessHours.find(bh => bh.dayOfWeek === currentPicker.day)?.openTime
+                          : businessHours.find(bh => bh.dayOfWeek === currentPicker.day)?.closeTime) || '09:00'
+                        setBusinessHours(prev => prev.map(bh => {
+                          if (bh.dayOfWeek === currentPicker.day) {
+                            return {
+                              ...bh,
+                              openTime: currentPicker.type === 'open' ? timeStr : bh.openTime,
+                              closeTime: currentPicker.type === 'close' ? timeStr : bh.closeTime,
+                            }
+                          }
+                          return bh
+                        }))
+                      }
+                      setPickerShow(null)
+                      setIosTempTime(null)
+                    }}>
+                      <Text style={styles.modalConfirmText}>Confirmar</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {pickerShow !== null && (
+                    <DateTimePicker
+                      value={(() => {
+                        const timeStr = iosTempTime || (pickerShow.type === 'open'
+                          ? businessHours.find(bh => bh.dayOfWeek === pickerShow.day)?.openTime
+                          : businessHours.find(bh => bh.dayOfWeek === pickerShow.day)?.closeTime) || '09:00'
+                        const [h, m] = timeStr.split(':').map(Number)
+                        const d = new Date()
+                        d.setHours(h, m, 0, 0)
+                        return d
+                      })()}
+                      mode="time"
+                      is24Hour={true}
+                      display="spinner"
+                      onChange={(event, selectedDate) => {
+                        if (selectedDate) {
+                          const hours = String(selectedDate.getHours()).padStart(2, '0')
+                          const mins = String(selectedDate.getMinutes()).padStart(2, '0')
+                          setIosTempTime(`${hours}:${mins}`)
+                        }
+                      }}
+                      style={{ backgroundColor: '#fff' }}
+                    />
+                  )}
+                </View>
+              </View>
+            </Modal>
+          ) : (
+            pickerShow !== null && (
+              <DateTimePicker
+                value={getDatePickerValue()}
+                mode="time"
+                is24Hour={true}
+                display="default"
+                onChange={handleTimeChange}
+              />
+            )
           )}
 
           {/* Bottom Save Bar */}
@@ -832,4 +997,49 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   btnPrimaryText: { color: '#fff', fontSize: 15, fontWeight: '500', fontFamily: 'System' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 40,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: BORDER,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: DARK,
+  },
+  modalCancelText: {
+    fontSize: 15,
+    color: GRAY,
+  },
+  modalConfirmText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: PRIMARY,
+  },
+  pillsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  dayPillActive: { backgroundColor: PRIMARY },
+  dayPillText: { fontSize: 13, fontWeight: '500', color: '#666666' },
+  dayPillTextActive: { color: '#fff' },
+  slotPill: {
+    paddingHorizontal: 16, height: 36, borderRadius: 18,
+    backgroundColor: '#EDE8E4', alignItems: 'center', justifyContent: 'center',
+  },
+  tzPill: {
+    paddingHorizontal: 14, height: 36, borderRadius: 18,
+    backgroundColor: '#EDE8E4', alignItems: 'center', justifyContent: 'center',
+  },
 })

@@ -358,14 +358,9 @@ export default function SettingsTabScreen() {
           <Text style={styles.sectionLabel}>Administración</Text>
           <View style={styles.card}>
             <SRow
-              icon="time-outline"
-              label="Horario"
-              onPress={() => router.push('/settings/availability' as Parameters<typeof router.push>[0])}
-            />
-            <View style={styles.rowDivider} />
-            <SRow
               icon="business-outline"
-              label="Información del negocio"
+              label="Mi Negocio y Disponibilidad"
+              subtitle="Horarios, dirección, fotos y slots"
               onPress={() => router.push('/settings/business-info' as Parameters<typeof router.push>[0])}
             />
             <View style={styles.rowDivider} />

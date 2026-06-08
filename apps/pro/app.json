@@ -53,6 +53,11 @@
         }
       },
       "owner": "codebymelendezs-team"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "5f40f09f-ead3-4bed-b7c1-2729c8476cab"
+      }
     }
   }
 }

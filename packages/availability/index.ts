@@ -44,8 +44,7 @@ export async function isBusinessOpen(
     }
 
     // Check regular hours
-    const startOfDay = fromZonedTime(`${date}T00:00:00`, timezone)
-    const dayOfWeek = toZonedTime(startOfDay, timezone).getDay()
+    const dayOfWeek = new Date(`${date}T12:00:00`).getDay()
 
     const { data: hours } = await supabase
       .from('BusinessHours')
@@ -92,8 +91,7 @@ export async function getAvailableSlots(params: {
   }
 
   // PASO 3 — Verificar BusinessHours para el día de la semana
-  const startOfDay = fromZonedTime(`${date}T00:00:00`, timezone)
-  const dayOfWeek = toZonedTime(startOfDay, timezone).getDay()
+  const dayOfWeek = new Date(`${date}T12:00:00`).getDay()
 
   if (!openTimeStr || !closeTimeStr) {
     const { data: hours } = await supabase
