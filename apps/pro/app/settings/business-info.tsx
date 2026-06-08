@@ -12,12 +12,13 @@ import * as ImagePicker from 'expo-image-picker'
 import MapView, { Marker } from 'react-native-maps'
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete'
 import DateTimePicker from '@react-native-community/datetimepicker'
+import { randomUUID } from 'expo-crypto'
 
 import { supabase } from '../../lib/supabase'
 import { getSettings } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials } from '../../lib/utils'
 
-const GOOGLE_PLACES_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY ?? ''
+const GOOGLE_PLACES_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_KEY ?? ''
 
 interface BusinessHoursState {
   id?: string
@@ -93,6 +94,7 @@ export default function BusinessInfoScreen() {
   const [pickerShow, setPickerShow] = useState<{ day: number; type: 'open' | 'close' } | null>(null)
 
   const insets = useSafeAreaInsets()
+  console.log('Places key:', GOOGLE_PLACES_API_KEY)
 
   const loadData = useCallback(async () => {
     try {
@@ -311,7 +313,7 @@ export default function BusinessInfoScreen() {
 
       // 2. Upsert BusinessHours (userId = null)
       const hoursPayload = businessHours.map(bh => ({
-        ...(bh.id ? { id: bh.id } : {}),
+        id: bh.id || randomUUID(),
         businessId,
         dayOfWeek: bh.dayOfWeek,
         openTime: bh.openTime,
@@ -571,7 +573,9 @@ export default function BusinessInfoScreen() {
                   query={{
                     key: GOOGLE_PLACES_API_KEY,
                     language: 'es',
+                    components: 'country:ve|country:es|country:mx|country:co',
                   }}
+                  onFail={(error) => console.error('Places error:', error)}
                   styles={{
                     textInput: styles.autocompleteInput,
                     container: { flex: 0 },
@@ -649,8 +653,9 @@ export default function BusinessInfoScreen() {
                 const dayLabel = DAYS_OF_WEEK.find(d => d.value === day.dayOfWeek)?.label ?? ''
                 return (
                   <View key={day.dayOfWeek} style={styles.dayRow}>
-                    <View style={styles.dayHeader}>
-                      <Text style={styles.dayText}>{dayLabel}</Text>
+                    <Text style={styles.dayText}>{dayLabel}</Text>
+                    
+                    <View style={styles.switchWrapper}>
                       <Switch
                         value={day.isOpen}
                         onValueChange={(checked) => handleHoursToggle(day.dayOfWeek, checked)}
@@ -658,23 +663,28 @@ export default function BusinessInfoScreen() {
                         thumbColor="#FFF"
                       />
                     </View>
-                    {day.isOpen && (
-                      <View style={styles.timePickersRow}>
-                        <TouchableOpacity
-                          style={styles.timePill}
-                          onPress={() => showTimePicker(day.dayOfWeek, 'open')}
-                        >
-                          <Text style={styles.timePillText}>{day.openTime}</Text>
-                        </TouchableOpacity>
-                        <Text style={styles.timeDash}>—</Text>
-                        <TouchableOpacity
-                          style={styles.timePill}
-                          onPress={() => showTimePicker(day.dayOfWeek, 'close')}
-                        >
-                          <Text style={styles.timePillText}>{day.closeTime}</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
+
+                    <View style={styles.timePickersContainer}>
+                      {day.isOpen ? (
+                        <View style={styles.timePickersRow}>
+                          <TouchableOpacity
+                            style={styles.timePill}
+                            onPress={() => showTimePicker(day.dayOfWeek, 'open')}
+                          >
+                            <Text style={styles.timePillText}>{day.openTime}</Text>
+                          </TouchableOpacity>
+                          <Text style={styles.timeDash}>—</Text>
+                          <TouchableOpacity
+                            style={styles.timePill}
+                            onPress={() => showTimePicker(day.dayOfWeek, 'close')}
+                          >
+                            <Text style={styles.timePillText}>{day.closeTime}</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <Text style={styles.closedLabel}>Cerrado</Text>
+                      )}
+                    </View>
                   </View>
                 )
               })}
@@ -798,11 +808,13 @@ const styles = StyleSheet.create({
   modeLabel: { fontFamily: 'System', fontSize: 11, color: DARK, fontWeight: '500' },
   modeLabelSelected: { color: PRIMARY },
   dayRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    flexDirection: 'row', alignItems: 'center',
     paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER,
   },
-  dayHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  dayText: { fontFamily: 'System', fontSize: 14, color: DARK, fontWeight: '500' },
+  dayText: { width: 90, fontFamily: 'System', fontSize: 14, color: DARK, fontWeight: '500' },
+  switchWrapper: { width: 60, alignItems: 'flex-start' },
+  timePickersContainer: { flex: 1, alignItems: 'flex-end' },
+  closedLabel: { fontFamily: 'System', fontSize: 13, color: GRAY },
   timePickersRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   timePill: {
     backgroundColor: SURFACE, paddingHorizontal: 10, paddingVertical: 6,
