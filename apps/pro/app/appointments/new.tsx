@@ -62,6 +62,7 @@ export default function NewAppointmentScreen() {
 
   // form state
   const [clientQuery, setClientQuery] = useState('')
+  const [serviceQuery, setServiceQuery] = useState('')
   const [clientId, setClientId] = useState<string | null | undefined>(undefined)
   const [clientName, setClientName] = useState<string>('')
   const [showClientList, setShowClientList] = useState(false)
@@ -76,7 +77,12 @@ export default function NewAppointmentScreen() {
   const [availableSlots, setAvailableSlots] = useState<Array<{ start: Date; end: Date }>>([])
 
   const insets = useSafeAreaInsets()
-  const selectedDate = dateMode === 'today' ? today : dateMode === 'tomorrow' ? tomorrow : new Date(pickedDate + 'T00:00:00')
+  const dateStr = dateMode === 'today'
+    ? todayISO
+    : dateMode === 'tomorrow'
+      ? `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`
+      : pickedDate
+  const businessId = settingsData?.businessId || settingsData?.business?.id
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -93,47 +99,36 @@ export default function NewAppointmentScreen() {
   useEffect(() => { load() }, [load])
 
   useEffect(() => {
-    const businessId = settingsData?.businessId || settingsData?.business?.id
-    if (!businessId || !selectedService) {
+    let cancelled = false
+
+    if (!selectedService?.id || !dateStr || !businessId) {
       setAvailableSlots([])
+      setSlotsLoading(false)
       return
     }
 
-    const currentBusinessId = businessId
-    const currentServiceId = selectedService.id
-    let active = true
+    setSlotsLoading(true)
 
-    async function fetchSlots() {
-      setSlotsLoading(true)
-      try {
-        const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
-        const slotsData = await getAvailableSlots({
-          businessId: currentBusinessId,
-          date: dateStr,
-          serviceId: currentServiceId,
-          supabase,
-        })
-        if (active) {
-          setAvailableSlots(slotsData)
-        }
-      } catch (err) {
-        console.error(err)
-        if (active) {
-          setAvailableSlots([])
-        }
-      } finally {
-        if (active) {
-          setSlotsLoading(false)
-        }
-      }
-    }
-
-    fetchSlots()
+    getAvailableSlots({
+      businessId,
+      date: dateStr,
+      serviceId: selectedService.id,
+      supabase,
+    })
+      .then(result => {
+        if (!cancelled) setAvailableSlots(result)
+      })
+      .catch(() => {
+        if (!cancelled) setAvailableSlots([])
+      })
+      .finally(() => {
+        if (!cancelled) setSlotsLoading(false)
+      })
 
     return () => {
-      active = false
+      cancelled = true
     }
-  }, [settingsData, selectedService, selectedDate])
+  }, [selectedService?.id, dateStr, businessId])
 
   const filteredClients = clientQuery.length > 0
     ? clients.filter(c =>
@@ -141,6 +136,10 @@ export default function NewAppointmentScreen() {
         c.phone.includes(clientQuery)
       ).slice(0, 6)
     : []
+
+  const filteredServices = serviceQuery.trim().length > 0
+    ? services.filter(s => s.name.toLowerCase().includes(serviceQuery.toLowerCase()))
+    : services.slice(0, 5)
 
   function selectClient(c: ClientItem) {
     setClientId(c.id)
@@ -262,25 +261,61 @@ export default function NewAppointmentScreen() {
               <Text style={styles.cardTitle}>Servicio</Text>
               {services.length === 0 ? (
                 <Text style={styles.grayText}>Sin servicios. Añade servicios primero.</Text>
+              ) : selectedService ? (
+                <View style={styles.selectedSvcBadge}>
+                  <Ionicons name="sparkles-outline" size={16} color={PRIMARY} />
+                  <Text style={styles.selectedSvcText}>
+                    {selectedService.name} ({selectedService.durationMin} min · ${selectedService.price})
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSelectedService(null)
+                      setSelectedSlot(null)
+                    }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="close-outline" size={18} color={GRAY} />
+                  </TouchableOpacity>
+                </View>
               ) : (
-                <View style={styles.pillsWrap}>
-                  {services.map(svc => {
-                    const active = selectedService?.id === svc.id
-                    return (
+                <>
+                  <TextInput
+                    style={styles.fieldInput}
+                    placeholder="Buscar servicio..."
+                    placeholderTextColor="#AAAAAA"
+                    value={serviceQuery}
+                    onChangeText={setServiceQuery}
+                  />
+
+                  <View style={styles.dropdown}>
+                    {filteredServices.map(svc => (
                       <TouchableOpacity
                         key={svc.id}
-                        style={[styles.svcPill, active && styles.svcPillActive]}
-                        onPress={() => setSelectedService(svc)}
-                        activeOpacity={0.78}
+                        style={styles.dropdownItem}
+                        onPress={() => {
+                          setSelectedService(svc)
+                          setServiceQuery('')
+                        }}
+                        activeOpacity={0.75}
                       >
-                        <Text style={[styles.svcPillName, active && { color: '#fff' }]}>{svc.name}</Text>
-                        <Text style={[styles.svcPillSub, active && { color: 'rgba(255,255,255,0.8)' }]}>
-                          {svc.durationMin} min
-                        </Text>
+                        <Ionicons name="sparkles-outline" size={16} color={GRAY} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.dropdownItemText}>{svc.name}</Text>
+                          <Text style={styles.dropdownItemSub}>
+                            {svc.durationMin} min · ${svc.price}
+                          </Text>
+                        </View>
                       </TouchableOpacity>
-                    )
-                  })}
-                </View>
+                    ))}
+                    {services.length > 5 && !serviceQuery && (
+                      <View style={{ padding: 10, alignItems: 'center' }}>
+                        <Text style={{ fontSize: 11, color: GRAY }}>
+                          Escribe para buscar más servicios...
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </>
               )}
             </View>
 
@@ -437,14 +472,12 @@ const styles = StyleSheet.create({
     borderRadius: 10, borderWidth: 1, borderColor: '#B8E6B8',
   },
   selectedClientText: { flex: 1, fontSize: 14, color: '#2E7D32' },
-  pillsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  svcPill: {
-    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12,
-    backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER,
+  selectedSvcBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    padding: 10, backgroundColor: 'rgba(181, 89, 62, 0.05)',
+    borderRadius: 10, borderWidth: 1, borderColor: 'rgba(181, 89, 62, 0.2)',
   },
-  svcPillActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
-  svcPillName: { fontSize: 14, fontWeight: '500', color: DARK },
-  svcPillSub: { fontSize: 11, color: GRAY, marginTop: 2 },
+  selectedSvcText: { flex: 1, fontSize: 14, color: PRIMARY },
   pillsRow: { flexDirection: 'row', gap: 8 },
   datePill: {
     flex: 1, height: 40, borderRadius: 20,
