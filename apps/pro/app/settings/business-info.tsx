@@ -1,17 +1,37 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Animated, Share, Linking, Alert, KeyboardAvoidingView, Platform,
+  StyleSheet, Animated, Alert, KeyboardAvoidingView, Platform,
+  ActivityIndicator, Switch,
 } from 'react-native'
-import * as Clipboard from 'expo-clipboard'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { Image } from 'expo-image'
 import { router } from 'expo-router'
-import { getSettings, updateSettings } from '../../lib/api'
+import * as ImagePicker from 'expo-image-picker'
+import MapView, { Marker } from 'react-native-maps'
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete'
+import DateTimePicker from '@react-native-community/datetimepicker'
+
+import { supabase } from '../../lib/supabase'
+import { getSettings } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials } from '../../lib/utils'
 
-const APP_URL = (process.env.EXPO_PUBLIC_APP_URL ?? 'https://getmusa.app').replace(/\/$/, '')
+const GOOGLE_PLACES_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY ?? ''
+
+interface BusinessHoursState {
+  id?: string
+  dayOfWeek: number
+  openTime: string
+  closeTime: string
+  isOpen: boolean
+}
+
+interface BusinessPhotoItem {
+  id: string
+  url: string
+  sortOrder: number
+}
 
 function Skeleton() {
   const op = useRef(new Animated.Value(0.45)).current
@@ -31,80 +51,335 @@ function Skeleton() {
   )
 }
 
-type LoadState = 'loading' | 'error' | 'ready'
+const DAYS_OF_WEEK = [
+  { label: 'Lunes', value: 1 },
+  { label: 'Martes', value: 2 },
+  { label: 'Miércoles', value: 3 },
+  { label: 'Jueves', value: 4 },
+  { label: 'Viernes', value: 5 },
+  { label: 'Sábado', value: 6 },
+  { label: 'Domingo', value: 0 },
+]
 
 export default function BusinessInfoScreen() {
-  const [loadState, setLoadState] = useState<LoadState>('loading')
-  const [slug, setSlug] = useState('')
-  const [planName, setPlanName] = useState('')
-  const [planLimits, setPlanLimits] = useState<{ maxMonthlyAppointments?: number; maxStaff?: number }>({})
-
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
-  const [businessName, setBusinessName] = useState('')
-  const [address, setAddress] = useState('')
-  const [bio, setBio] = useState('')
-  const [whatsapp, setWhatsapp] = useState('')
-  const [instagram, setInstagram] = useState('')
-
-  const [dirty, setDirty] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [savedMsg, setSavedMsg] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [businessId, setBusinessId] = useState<string | null>(null)
+
+  // Section 1: General Info
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
+  const [website, setWebsite] = useState('')
+  const [description, setDescription] = useState('')
+
+  // Section 2: Photos
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [coverUrl, setCoverUrl] = useState<string | null>(null)
+  const [galleryPhotos, setGalleryPhotos] = useState<BusinessPhotoItem[]>([])
+
+  // Section 3: Location & Modality
+  const [address, setAddress] = useState('')
+  const [latitude, setLatitude] = useState<number | null>(null)
+  const [longitude, setLongitude] = useState<number | null>(null)
+  const [country, setCountry] = useState('')
+  const [timezone, setTimezone] = useState('America/Caracas')
+  const [serviceMode, setServiceMode] = useState<'inStore' | 'homeVisit' | 'both'>('inStore')
+
+  // Section 4: Business Hours
+  const [businessHours, setBusinessHours] = useState<BusinessHoursState[]>([])
+  
+  // DateTimePicker Temp State
+  const [pickerShow, setPickerShow] = useState<{ day: number; type: 'open' | 'close' } | null>(null)
 
   const insets = useSafeAreaInsets()
 
-  const load = useCallback(async () => {
-    setLoadState('loading')
+  const loadData = useCallback(async () => {
     try {
-      const data = await getSettings()
-      if (!data) { setLoadState('error'); return }
-      setSlug(data.slug ?? '')
-      setBusinessName(data.business?.name ?? '')
-      setAddress(data.business?.address ?? '')
-      setBio(data.bio ?? '')
-      setAvatarUrl(data.avatarUrl ?? null)
-      setWhatsapp(data.whatsapp ?? '')
-      setInstagram(data.instagram ?? '')
-      setPlanName(data.business?.plan?.name ?? 'Free')
-      setPlanLimits(data.business?.plan?.limits ?? {})
-      setDirty(false)
-      setLoadState('ready')
-    } catch { setLoadState('error') }
+      setLoading(true)
+      const settings = await getSettings()
+      const bId = settings?.businessId
+      if (!bId) {
+        Alert.alert('Error', 'No se encontró el negocio vinculado al usuario')
+        router.back()
+        return
+      }
+      setBusinessId(bId)
+
+      // Query Business info directly for completeness
+      const { data: business, error: bError } = await supabase
+        .from('Business')
+        .select('*')
+        .eq('id', bId)
+        .single()
+
+      if (bError || !business) {
+        throw new Error(bError?.message ?? 'No se pudo cargar el negocio')
+      }
+
+      setName(business.name ?? '')
+      setPhone(business.phone ?? '')
+      setEmail(business.email ?? '')
+      setWebsite(business.website ?? '')
+      setDescription(business.description ?? '')
+      setLogoUrl(business.logoUrl ?? null)
+      setCoverUrl(business.coverUrl ?? null)
+      setAddress(business.address ?? '')
+      setLatitude(business.latitude ?? null)
+      setLongitude(business.longitude ?? null)
+      setCountry(business.country ?? '')
+      setTimezone(business.timezone ?? 'America/Caracas')
+      setServiceMode((business.serviceMode as 'inStore' | 'homeVisit' | 'both') ?? 'inStore')
+
+      // Query gallery photos
+      const { data: photos } = await supabase
+        .from('BusinessPhoto')
+        .select('*')
+        .eq('businessId', bId)
+        .eq('type', 'gallery')
+        .order('sortOrder', { ascending: true })
+
+      setGalleryPhotos((photos ?? []).map(p => ({
+        id: p.id,
+        url: p.url,
+        sortOrder: p.sortOrder,
+      })))
+
+      // Query BusinessHours (userId = null)
+      const { data: hours } = await supabase
+        .from('BusinessHours')
+        .select('*')
+        .eq('businessId', bId)
+        .is('userId', null)
+
+      // Map to full 7 days, setting defaults if missing
+      const hoursMap = (hours ?? []).reduce((acc, curr) => {
+        acc[curr.dayOfWeek] = curr
+        return acc
+      }, {} as Record<number, any>)
+
+      const finalHours = DAYS_OF_WEEK.map(d => {
+        const existing = hoursMap[d.value]
+        return {
+          id: existing?.id,
+          dayOfWeek: d.value,
+          openTime: existing?.openTime ?? '09:00',
+          closeTime: existing?.closeTime ?? '18:00',
+          isOpen: existing?.isOpen ?? true,
+        }
+      })
+      setBusinessHours(finalHours)
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Error al cargar la información')
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
-  function markDirty() { setDirty(true) }
+  const pickImage = async (target: 'logo' | 'cover' | 'gallery') => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!permission.granted) {
+      Alert.alert('Permiso requerido', 'Necesitamos acceso a tus fotos para cambiar las imágenes')
+      return
+    }
 
-  async function handleSave() {
-    setSaving(true)
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: target !== 'gallery',
+      aspect: target === 'logo' ? [1, 1] : target === 'cover' ? [16, 9] : undefined,
+      quality: 0.8,
+    })
+
+    if (result.canceled || !result.assets?.[0]?.uri) return
+
+    const localUri = result.assets[0].uri
+    uploadPhoto(localUri, target)
+  }
+
+  const uploadPhoto = async (uri: string, target: 'logo' | 'cover' | 'gallery') => {
+    if (!businessId) return
     try {
-      await updateSettings({
-        bio: bio.trim(),
-        businessName: businessName.trim(),
-        businessAddress: address.trim(),
-      })
-      setSavedMsg(true)
-      setDirty(false)
-      setTimeout(() => setSavedMsg(false), 2000)
-    } catch {
-      Alert.alert('Error', 'No se pudieron guardar los cambios')
-    } finally { setSaving(false) }
+      setSaving(true)
+      const response = await fetch(uri)
+      const blob = await response.blob()
+      const fileExt = uri.split('.').pop()?.toLowerCase() ?? 'jpg'
+      const fileName = `${businessId}/${target}_${Date.now()}.${fileExt}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('business-photos')
+        .upload(fileName, blob, {
+          contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
+          upsert: true,
+        })
+
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('business-photos')
+        .getPublicUrl(fileName)
+
+      if (target === 'logo') {
+        setLogoUrl(publicUrl)
+      } else if (target === 'cover') {
+        setCoverUrl(publicUrl)
+      } else {
+        // Gallery photo
+        if (galleryPhotos.length >= 6) {
+          Alert.alert('Límite alcanzado', 'Puedes subir un máximo de 6 fotos a la galería')
+          return
+        }
+
+        // Add to BusinessPhoto DB table
+        const { data: newPhoto, error: dbError } = await supabase
+          .from('BusinessPhoto')
+          .insert({
+            businessId,
+            url: publicUrl,
+            type: 'gallery',
+            sortOrder: galleryPhotos.length,
+          })
+          .select()
+          .single()
+
+        if (dbError) throw dbError
+        
+        setGalleryPhotos(prev => [...prev, {
+          id: newPhoto.id,
+          url: newPhoto.url,
+          sortOrder: newPhoto.sortOrder,
+        }])
+      }
+    } catch (err: any) {
+      Alert.alert('Error de subida', err.message || 'No se pudo subir la imagen')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  async function handleCopy() {
-    const link = `${APP_URL}/p/${slug}`
-    await Clipboard.setStringAsync(link)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  const removeGalleryPhoto = async (photoId: string) => {
+    try {
+      setSaving(true)
+      const { error } = await supabase
+        .from('BusinessPhoto')
+        .delete()
+        .eq('id', photoId)
+
+      if (error) throw error
+      setGalleryPhotos(prev => prev.filter(p => p.id !== photoId))
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'No se pudo eliminar la imagen')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  async function handleShare() {
-    const link = `${APP_URL}/p/${slug}`
-    await Share.share({ message: `Reserva tu cita en ${link}`, url: link })
+  const handleSaveAll = async () => {
+    if (!businessId) return
+    if (!name.trim()) {
+      Alert.alert('Falta información', 'El nombre del negocio es obligatorio')
+      return
+    }
+
+    try {
+      setSaving(true)
+
+      // 1. Update Business info
+      const { error: bError } = await supabase
+        .from('Business')
+        .update({
+          name: name.trim(),
+          phone: phone.trim() || null,
+          email: email.trim() || null,
+          website: website.trim() || null,
+          description: description.trim() || null,
+          logoUrl,
+          coverUrl,
+          address: address.trim() || null,
+          latitude,
+          longitude,
+          country: country || null,
+          timezone,
+          serviceMode,
+        })
+        .eq('id', businessId)
+
+      if (bError) throw bError
+
+      // 2. Upsert BusinessHours (userId = null)
+      const hoursPayload = businessHours.map(bh => ({
+        ...(bh.id ? { id: bh.id } : {}),
+        businessId,
+        dayOfWeek: bh.dayOfWeek,
+        openTime: bh.openTime,
+        closeTime: bh.closeTime,
+        isOpen: bh.isOpen,
+        userId: null,
+      }))
+
+      const { error: hError } = await supabase
+        .from('BusinessHours')
+        .upsert(hoursPayload)
+
+      if (hError) throw hError
+
+      Alert.alert('Éxito', 'Configuración del negocio guardada correctamente')
+      loadData()
+    } catch (err: any) {
+      Alert.alert('Error al guardar', err.message || 'Ocurrió un error inesperado')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const bookingLink = `${APP_URL}/p/${slug}`
+  const handleHoursToggle = (dayValue: number, checked: boolean) => {
+    setBusinessHours(prev => prev.map(bh => {
+      if (bh.dayOfWeek === dayValue) {
+        return { ...bh, isOpen: checked }
+      }
+      return bh
+    }))
+  }
+
+  const showTimePicker = (dayValue: number, type: 'open' | 'close') => {
+    setPickerShow({ day: dayValue, type })
+  }
+
+  const handleTimeChange = (event: any, selectedDate?: Date) => {
+    if (!pickerShow) return
+    const currentPicker = pickerShow
+    setPickerShow(null)
+
+    if (event.type === 'dismissed' || !selectedDate) return
+
+    const hours = String(selectedDate.getHours()).padStart(2, '0')
+    const mins = String(selectedDate.getMinutes()).padStart(2, '0')
+    const formatted = `${hours}:${mins}`
+
+    setBusinessHours(prev => prev.map(bh => {
+      if (bh.dayOfWeek === currentPicker.day) {
+        return {
+          ...bh,
+          openTime: currentPicker.type === 'open' ? formatted : bh.openTime,
+          closeTime: currentPicker.type === 'close' ? formatted : bh.closeTime,
+        }
+      }
+      return bh
+    }))
+  }
+
+  const getDatePickerValue = () => {
+    if (!pickerShow) return new Date()
+    const target = businessHours.find(bh => bh.dayOfWeek === pickerShow.day)
+    const timeStr = pickerShow.type === 'open' ? target?.openTime : target?.closeTime
+    const [h, m] = (timeStr || '09:00').split(':').map(Number)
+    const d = new Date()
+    d.setHours(h, m, 0, 0)
+    return d
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -113,22 +388,13 @@ export default function BusinessInfoScreen() {
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="chevron-back-outline" size={24} color={DARK} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Información del negocio</Text>
+        <Text style={styles.headerTitle}>Rediseño de Negocio</Text>
         <View style={styles.backBtn} />
       </View>
 
-      {loadState === 'loading' && <ScrollView><Skeleton /></ScrollView>}
-
-      {loadState === 'error' && (
-        <View style={styles.center}>
-          <Text style={styles.grayText}>No se pudo cargar la configuración</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={load} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Reintentar</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {loadState === 'ready' && (
+      {loading ? (
+        <ScrollView><Skeleton /></ScrollView>
+      ) : (
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}
@@ -140,138 +406,309 @@ export default function BusinessInfoScreen() {
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
           >
-
+            {/* SECTION 1: INFORMACIÓN GENERAL */}
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Mi negocio</Text>
-
-              <View style={styles.avatarSection}>
-                {avatarUrl ? (
-                  <Image source={{ uri: avatarUrl }} style={styles.avatarCircle} />
-                ) : (
-                  <View style={styles.avatarCircle}>
-                    <Text style={styles.avatarInitials}>
-                      {initials(businessName || 'M')}
-                    </Text>
-                  </View>
-                )}
-                <Text style={styles.avatarHint}>
-                  Tu foto de perfil representa tu negocio.{'\n'}Cámbiala desde Ajustes.
-                </Text>
-              </View>
-
-              <Text style={styles.label}>Nombre del negocio</Text>
+              <Text style={styles.sectionHeader}>Información General</Text>
+              
+              <Text style={styles.label}>Nombre del negocio *</Text>
               <TextInput
-                style={styles.input} value={businessName}
-                onChangeText={v => { setBusinessName(v); markDirty() }}
-                placeholderTextColor="#AAAAAA" placeholder="Nombre de tu negocio"
+                style={styles.input}
+                value={name}
+                onChangeText={setName}
+                placeholder="Ej. Studio de Belleza MUSA"
+                placeholderTextColor="#AAAAAA"
               />
 
-              <Text style={[styles.label, { marginTop: 14 }]}>Dirección</Text>
+              <Text style={styles.label}>Teléfono</Text>
               <TextInput
-                style={styles.input} value={address}
-                onChangeText={v => { setAddress(v); markDirty() }}
-                placeholderTextColor="#AAAAAA" placeholder="Ciudad, dirección"
+                style={styles.input}
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="Ej. +58 412 1234567"
+                placeholderTextColor="#AAAAAA"
+                keyboardType="phone-pad"
               />
 
-              <Text style={[styles.label, { marginTop: 14 }]}>Descripción</Text>
+              <Text style={styles.label}>Email del negocio</Text>
               <TextInput
-                style={[styles.input, { height: 80, textAlignVertical: 'top', paddingTop: 10 }]}
-                value={bio}
-                onChangeText={v => { setBio(v); markDirty() }}
-                multiline placeholderTextColor="#AAAAAA"
-                placeholder="Describe tu negocio…"
+                style={styles.input}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Ej. info@negocio.com"
+                placeholderTextColor="#AAAAAA"
+                keyboardType="email-address"
+                autoCapitalize="none"
               />
 
-              <Text style={[styles.label, { marginTop: 14 }]}>WhatsApp</Text>
-              <View style={styles.infoRow}>
-                <Text style={styles.prefix}>+58</Text>
-                <Text style={[styles.infoValue, !whatsapp && styles.infoPlaceholder]} numberOfLines={1}>
-                  {whatsapp || 'No configurado'}
-                </Text>
-                <Ionicons name="lock-closed-outline" size={14} color="#CCCCCC" />
-              </View>
-              <Text style={styles.infoHint}>Editar en Ajustes → Integraciones</Text>
+              <Text style={styles.label}>Sitio web</Text>
+              <TextInput
+                style={styles.input}
+                value={website}
+                onChangeText={setWebsite}
+                placeholder="Ej. https://misitio.com"
+                placeholderTextColor="#AAAAAA"
+                keyboardType="url"
+                autoCapitalize="none"
+              />
 
-              <Text style={[styles.label, { marginTop: 14 }]}>Instagram</Text>
-              <View style={styles.infoRow}>
-                <Text style={styles.prefix}>@</Text>
-                <Text style={[styles.infoValue, !instagram && styles.infoPlaceholder]} numberOfLines={1}>
-                  {instagram || 'No configurado'}
-                </Text>
-                <Ionicons name="lock-closed-outline" size={14} color="#CCCCCC" />
+              <View style={styles.descriptionHeader}>
+                <Text style={styles.label}>Descripción</Text>
+                <Text style={styles.counter}>{description.length} / 300</Text>
               </View>
-              <Text style={styles.infoHint}>Editar en Ajustes → Integraciones</Text>
+              <TextInput
+                style={[styles.input, styles.textarea]}
+                value={description}
+                onChangeText={v => {
+                  if (v.length <= 300) setDescription(v)
+                }}
+                placeholder="Cuéntale a tus clientes sobre la experiencia y especialidades de tu salón..."
+                placeholderTextColor="#AAAAAA"
+                multiline
+                numberOfLines={4}
+              />
             </View>
 
+            {/* SECTION 2: FOTOS */}
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Enlace de reserva</Text>
-              <View style={styles.linkBox}>
-                <Text style={[styles.linkText, { fontFamily: MONO }]} numberOfLines={1}>
-                  {bookingLink}
-                </Text>
-              </View>
-              <View style={styles.linkActions}>
-                <TouchableOpacity style={styles.linkBtn} onPress={handleCopy} activeOpacity={0.8}>
-                  <Ionicons name={copied ? 'checkmark-outline' : 'copy-outline'} size={16} color={copied ? '#2E7D32' : DARK} />
-                  <Text style={[styles.linkBtnText, copied && { color: '#2E7D32' }]}>
-                    {copied ? '¡Copiado!' : 'Copiar enlace'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.linkBtn} onPress={handleShare} activeOpacity={0.8}>
-                  <Ionicons name="share-outline" size={16} color={DARK} />
-                  <Text style={styles.linkBtnText}>Compartir</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+              <Text style={styles.sectionHeader}>Fotos</Text>
 
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Plan actual</Text>
-              <View style={styles.planRow}>
-                <View style={styles.planPill}>
-                  <Text style={styles.planPillText}>{planName}</Text>
+              {/* Logo selection */}
+              <View style={styles.photoUploadRow}>
+                <View style={styles.logoCircleWrapper}>
+                  {logoUrl ? (
+                    <Image source={{ uri: logoUrl }} style={styles.logoCircle} />
+                  ) : (
+                    <View style={styles.logoCircle}>
+                      <Text style={styles.avatarInitials}>{initials(name || 'M')}</Text>
+                    </View>
+                  )}
+                  <TouchableOpacity style={styles.logoEditBadge} onPress={() => pickImage('logo')}>
+                    <Ionicons name="camera-outline" size={14} color="#FFF" />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.photoDescContainer}>
+                  <Text style={styles.photoTitle}>Logo del Negocio</Text>
+                  <Text style={styles.photoSub}>Imagen circular recomendada (80x80px). Se muestra en búsquedas y reservas.</Text>
                 </View>
               </View>
-              <View style={styles.limitsGrid}>
-                {planLimits.maxMonthlyAppointments != null && (
-                  <View style={styles.limitItem}>
-                    <Text style={styles.limitValue}>{planLimits.maxMonthlyAppointments}</Text>
-                    <Text style={styles.limitLabel}>citas/mes</Text>
+
+              {/* Cover Photo */}
+              <Text style={styles.photoTitleLabel}>Foto de Portada</Text>
+              <TouchableOpacity style={styles.coverWrapper} onPress={() => pickImage('cover')} activeOpacity={0.9}>
+                {coverUrl ? (
+                  <Image source={{ uri: coverUrl }} style={styles.coverImage} />
+                ) : (
+                  <View style={styles.coverPlaceholder}>
+                    <Ionicons name="image-outline" size={32} color={GRAY} />
+                    <Text style={styles.coverPlaceholderText}>Seleccionar banner horizontal (16:9)</Text>
                   </View>
                 )}
-                {planLimits.maxStaff != null && (
-                  <View style={styles.limitItem}>
-                    <Text style={styles.limitValue}>{planLimits.maxStaff}</Text>
-                    <Text style={styles.limitLabel}>staff máx.</Text>
+              </TouchableOpacity>
+
+              {/* Place Gallery */}
+              <View style={styles.galleryHeader}>
+                <Text style={styles.photoTitleLabel}>Galería del Lugar</Text>
+                <Text style={styles.counter}>{galleryPhotos.length} / 6</Text>
+              </View>
+              <View style={styles.galleryGrid}>
+                {galleryPhotos.map((photo) => (
+                  <View key={photo.id} style={styles.galleryPhotoWrapper}>
+                    <Image source={{ uri: photo.url }} style={styles.galleryPhoto} />
+                    <TouchableOpacity style={styles.photoDeleteBtn} onPress={() => removeGalleryPhoto(photo.id)}>
+                      <Ionicons name="close-circle" size={18} color="#D32F2F" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                {galleryPhotos.length < 6 && (
+                  <TouchableOpacity style={styles.galleryAddBtn} onPress={() => pickImage('gallery')}>
+                    <Ionicons name="add-outline" size={24} color={PRIMARY} />
+                    <Text style={styles.galleryAddText}>Añadir</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
+            {/* SECTION 3: LOCALIZACIÓN Y MODALIDAD */}
+            <View style={styles.card}>
+              <Text style={styles.sectionHeader}>Localización y Modalidad</Text>
+
+              <Text style={styles.label}>Dirección física del negocio</Text>
+              <View style={styles.autocompleteWrapper}>
+                <GooglePlacesAutocomplete
+                  placeholder="Busca la dirección..."
+                  fetchDetails={true}
+                  onPress={async (data, details = null) => {
+                    if (details) {
+                      const detailsAny = details as any
+                      const lat = detailsAny.geometry.location.lat
+                      const lng = detailsAny.geometry.location.lng
+                      const formattedAddress = detailsAny.formatted_address
+
+                      const countryComp = detailsAny.address_components.find((c: any) => c.types.includes('country'))
+                      const detectedCountry = countryComp ? countryComp.short_name : 'VE'
+
+                      setAddress(formattedAddress)
+                      setLatitude(lat)
+                      setLongitude(lng)
+                      setCountry(detectedCountry)
+
+                      // Fetch Timezone dynamically using Places API coordinates
+                      if (GOOGLE_PLACES_API_KEY) {
+                        try {
+                          const tzRes = await fetch(
+                            `https://maps.googleapis.com/maps/api/timezone/json?location=${lat},${lng}&timestamp=${Math.floor(Date.now() / 1000)}&key=${GOOGLE_PLACES_API_KEY}`
+                          )
+                          const tzData = await tzRes.json()
+                          if (tzData.timeZoneId) {
+                            setTimezone(tzData.timeZoneId)
+                          }
+                        } catch (e) {
+                          console.log('Error fetching timezone', e)
+                        }
+                      }
+                    }
+                  }}
+                  query={{
+                    key: GOOGLE_PLACES_API_KEY,
+                    language: 'es',
+                  }}
+                  styles={{
+                    textInput: styles.autocompleteInput,
+                    container: { flex: 0 },
+                    listView: styles.autocompleteList,
+                  }}
+                  textInputProps={{
+                    placeholderTextColor: '#AAAAAA',
+                    value: address,
+                    onChangeText: setAddress,
+                  }}
+                />
+              </View>
+
+              {/* Map Preview */}
+              <View style={styles.mapContainer}>
+                {latitude && longitude ? (
+                  <MapView
+                    style={styles.map}
+                    initialRegion={{
+                      latitude,
+                      longitude,
+                      latitudeDelta: 0.005,
+                      longitudeDelta: 0.005,
+                    }}
+                  >
+                    <Marker coordinate={{ latitude, longitude }} />
+                  </MapView>
+                ) : (
+                  <View style={styles.mapEmpty}>
+                    <Ionicons name="map-outline" size={28} color={GRAY} />
+                    <Text style={styles.mapEmptyText}>Añade tu dirección para ver el mapa</Text>
                   </View>
                 )}
               </View>
-              <TouchableOpacity
-                style={styles.upgradeBtn}
-                onPress={() => Linking.openURL('https://getmusa.app')}
-                activeOpacity={0.85}>
-                <Text style={styles.upgradeBtnText}>Mejorar plan</Text>
-              </TouchableOpacity>
+
+              {/* Service Mode */}
+              <Text style={styles.photoTitleLabel}>Modalidad de Servicio</Text>
+              <View style={styles.modeRow}>
+                {[
+                  { value: 'inStore', label: 'Solo en local', icon: 'storefront-outline' },
+                  { value: 'homeVisit', label: 'A domicilio', icon: 'home-outline' },
+                  { value: 'both', label: 'Ambas', icon: 'git-compare-outline' },
+                ].map((mode) => (
+                  <TouchableOpacity
+                    key={mode.value}
+                    style={[
+                      styles.modeCard,
+                      serviceMode === mode.value && styles.modeCardSelected,
+                    ]}
+                    onPress={() => setServiceMode(mode.value as any)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons
+                      name={mode.icon as any}
+                      size={20}
+                      color={serviceMode === mode.value ? PRIMARY : DARK}
+                    />
+                    <Text
+                      style={[
+                        styles.modeLabel,
+                        serviceMode === mode.value && styles.modeLabelSelected,
+                      ]}
+                    >
+                      {mode.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
 
-            <View style={{ height: 20 }} />
+            {/* SECTION 4: HORARIOS DE APERTURA */}
+            <View style={styles.card}>
+              <Text style={styles.sectionHeader}>Horarios de Apertura</Text>
+              {businessHours.map((day) => {
+                const dayLabel = DAYS_OF_WEEK.find(d => d.value === day.dayOfWeek)?.label ?? ''
+                return (
+                  <View key={day.dayOfWeek} style={styles.dayRow}>
+                    <View style={styles.dayHeader}>
+                      <Text style={styles.dayText}>{dayLabel}</Text>
+                      <Switch
+                        value={day.isOpen}
+                        onValueChange={(checked) => handleHoursToggle(day.dayOfWeek, checked)}
+                        trackColor={{ true: PRIMARY, false: BORDER }}
+                        thumbColor="#FFF"
+                      />
+                    </View>
+                    {day.isOpen && (
+                      <View style={styles.timePickersRow}>
+                        <TouchableOpacity
+                          style={styles.timePill}
+                          onPress={() => showTimePicker(day.dayOfWeek, 'open')}
+                        >
+                          <Text style={styles.timePillText}>{day.openTime}</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.timeDash}>—</Text>
+                        <TouchableOpacity
+                          style={styles.timePill}
+                          onPress={() => showTimePicker(day.dayOfWeek, 'close')}
+                        >
+                          <Text style={styles.timePillText}>{day.closeTime}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                )
+              })}
+            </View>
+
+            <View style={{ height: 120 }} />
           </ScrollView>
 
-          {(dirty || savedMsg) && (
-            <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
-              {savedMsg ? (
-                <View style={styles.savedBadge}>
-                  <Ionicons name="checkmark-circle-outline" size={18} color="#2E7D32" />
-                  <Text style={styles.savedText}>Guardado ✓</Text>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={[styles.btnPrimary, saving && { opacity: 0.6 }]}
-                  onPress={handleSave} disabled={saving} activeOpacity={0.85}>
-                  <Text style={styles.btnPrimaryText}>{saving ? 'Guardando…' : 'Guardar cambios'}</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+          {/* DateTimePicker container (iOS and Android conditional) */}
+          {pickerShow !== null && (
+            <DateTimePicker
+              value={getDatePickerValue()}
+              mode="time"
+              is24Hour={true}
+              display="default"
+              onChange={handleTimeChange}
+            />
           )}
+
+          {/* Bottom Save Bar */}
+          <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
+            <TouchableOpacity
+              style={[styles.btnPrimary, saving && { opacity: 0.7 }]}
+              onPress={handleSaveAll}
+              disabled={saving}
+              activeOpacity={0.85}
+            >
+              {saving ? (
+                <ActivityIndicator color="#FFF" size="small" />
+              ) : (
+                <Text style={styles.btnPrimaryText}>Guardar cambios</Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </KeyboardAvoidingView>
       )}
     </SafeAreaView>
@@ -286,74 +723,101 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER,
   },
   backBtn: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontFamily: SERIF, fontSize: 20, color: DARK },
-  content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 200 },
+  headerTitle: { fontFamily: SERIF, fontSize: 18, fontWeight: 'normal', color: DARK },
+  content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
   card: {
     backgroundColor: '#fff', borderRadius: 16, borderWidth: 1,
     borderColor: BORDER, padding: 18, marginBottom: 14,
   },
-  cardTitle: { fontSize: 15, fontWeight: '500', color: DARK, marginBottom: 16 },
-  avatarSection: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 18 },
-  avatarCircle: {
-    width: 72, height: 72, borderRadius: 36,
+  sectionHeader: { fontFamily: SERIF, fontSize: 18, color: DARK, marginBottom: 16 },
+  label: { fontFamily: 'System', fontSize: 12, color: GRAY, marginBottom: 6, fontWeight: '500' },
+  counter: { fontFamily: MONO, fontSize: 11, color: GRAY },
+  input: {
+    fontFamily: 'System', height: 48, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
+    paddingHorizontal: 14, fontSize: 15, color: DARK, backgroundColor: SURFACE,
+    marginBottom: 14, fontWeight: 'normal',
+  },
+  descriptionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  textarea: { height: 100, textAlignVertical: 'top', paddingTop: 12 },
+  photoUploadRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 18 },
+  logoCircleWrapper: { position: 'relative' },
+  logoCircle: {
+    width: 80, height: 80, borderRadius: 40,
     backgroundColor: '#EDE8E4', borderWidth: 1, borderColor: BORDER,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
   avatarInitials: { fontSize: 24, fontWeight: '500', color: PRIMARY },
-  avatarHint: { flex: 1, fontSize: 12, color: GRAY, lineHeight: 18 },
-  label: { fontSize: 12, color: GRAY, marginBottom: 6 },
-  input: {
-    height: 46, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
+  logoEditBadge: {
+    position: 'absolute', bottom: 0, right: 0,
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: '#fff',
+  },
+  photoDescContainer: { flex: 1 },
+  photoTitle: { fontFamily: 'System', fontSize: 15, fontWeight: '500', color: DARK },
+  photoSub: { fontFamily: 'System', fontSize: 11, color: GRAY, marginTop: 4, lineHeight: 15 },
+  photoTitleLabel: { fontFamily: 'System', fontSize: 13, fontWeight: '500', color: DARK, marginTop: 14, marginBottom: 8 },
+  coverWrapper: {
+    height: 180, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
+    overflow: 'hidden', backgroundColor: SURFACE,
+  },
+  coverImage: { width: '100%', height: '100%' },
+  coverPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
+  coverPlaceholderText: { fontFamily: 'System', fontSize: 12, color: GRAY },
+  galleryHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, marginBottom: 8 },
+  galleryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  galleryPhotoWrapper: { position: 'relative', width: 72, height: 72 },
+  galleryPhoto: { width: '100%', height: '100%', borderRadius: 8, borderWidth: 1, borderColor: BORDER },
+  photoDeleteBtn: { position: 'absolute', top: -6, right: -6 },
+  galleryAddBtn: {
+    width: 72, height: 72, borderRadius: 8, borderWidth: 1, borderColor: PRIMARY,
+    borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 4,
+    backgroundColor: SURFACE,
+  },
+  galleryAddText: { fontFamily: 'System', fontSize: 10, color: PRIMARY, fontWeight: '500' },
+  autocompleteWrapper: { marginBottom: 14 },
+  autocompleteInput: {
+    fontFamily: 'System', height: 48, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
     paddingHorizontal: 14, fontSize: 15, color: DARK, backgroundColor: SURFACE,
+    fontWeight: 'normal',
   },
-  prefixInput: {
-    flexDirection: 'row', alignItems: 'center',
-    height: 46, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
-    backgroundColor: SURFACE, overflow: 'hidden',
+  autocompleteList: {
+    borderWidth: 1, borderColor: BORDER, borderRadius: 12, backgroundColor: '#fff',
+    marginTop: 4, position: 'absolute', top: 48, left: 0, right: 0, zIndex: 999,
   },
-  prefix: { paddingHorizontal: 14, fontSize: 15, color: GRAY },
-  prefixField: { flex: 1, fontSize: 15, color: DARK, paddingRight: 14, height: '100%' },
-  infoRow: {
-    flexDirection: 'row', alignItems: 'center',
-    height: 46, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
-    backgroundColor: '#FAFAFA', paddingRight: 14,
+  mapContainer: { height: 180, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: BORDER, marginBottom: 14 },
+  map: { width: '100%', height: '100%' },
+  mapEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: SURFACE },
+  mapEmptyText: { fontFamily: 'System', fontSize: 12, color: GRAY },
+  modeRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  modeCard: {
+    flex: 1, height: 72, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: SURFACE,
   },
-  infoValue: { flex: 1, fontSize: 15, color: DARK },
-  infoPlaceholder: { color: '#CCCCCC' },
-  infoHint: { fontSize: 11, color: '#AAAAAA', marginTop: 4, paddingLeft: 2 },
-  linkBox: {
-    padding: 12, borderRadius: 10, backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER,
-    marginBottom: 12,
+  modeCardSelected: { borderColor: PRIMARY, backgroundColor: '#FFF5F2' },
+  modeLabel: { fontFamily: 'System', fontSize: 11, color: DARK, fontWeight: '500' },
+  modeLabelSelected: { color: PRIMARY },
+  dayRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER,
   },
-  linkText: { fontSize: 13, color: DARK },
-  linkActions: { flexDirection: 'row', gap: 10 },
-  linkBtn: {
-    flex: 1, height: 40, borderRadius: 20, borderWidth: 1, borderColor: BORDER,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+  dayHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  dayText: { fontFamily: 'System', fontSize: 14, color: DARK, fontWeight: '500' },
+  timePickersRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  timePill: {
+    backgroundColor: SURFACE, paddingHorizontal: 10, paddingVertical: 6,
+    borderRadius: 8, borderWidth: 1, borderColor: BORDER,
   },
-  linkBtnText: { fontSize: 13, fontWeight: '500', color: DARK },
-  planRow: { marginBottom: 14 },
-  planPill: {
-    alignSelf: 'flex-start', backgroundColor: '#FDF0EC', borderRadius: 999,
-    paddingHorizontal: 14, paddingVertical: 5, borderWidth: 1, borderColor: '#F5D8CE',
+  timePillText: { fontFamily: MONO, fontSize: 13, color: DARK },
+  timeDash: { color: GRAY, fontSize: 12 },
+  bottomBar: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    paddingHorizontal: 20, paddingTop: 16, backgroundColor: '#fff',
+    borderTopWidth: 1, borderTopColor: BORDER,
   },
-  planPillText: { fontSize: 14, fontWeight: '500', color: PRIMARY },
-  limitsGrid: { flexDirection: 'row', gap: 16, marginBottom: 16 },
-  limitItem: { alignItems: 'center' },
-  limitValue: { fontSize: 22, fontWeight: '500', color: DARK },
-  limitLabel: { fontSize: 11, color: GRAY, marginTop: 2 },
-  upgradeBtn: {
-    height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: PRIMARY,
+  btnPrimary: {
+    height: 48, backgroundColor: PRIMARY, borderRadius: 24,
     alignItems: 'center', justifyContent: 'center',
   },
-  upgradeBtnText: { fontSize: 15, fontWeight: '500', color: PRIMARY },
-  bottomBar: { paddingHorizontal: 20, paddingTop: 16, backgroundColor: SURFACE },
-  btnPrimary: { height: 52, backgroundColor: PRIMARY, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-  btnPrimaryText: { color: '#fff', fontSize: 16, fontWeight: '500' },
-  savedBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 52, gap: 8 },
-  savedText: { fontSize: 16, fontWeight: '500', color: '#2E7D32' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
-  grayText: { fontSize: 14, color: '#AAAAAA' },
-  retryBtn: { height: 48, paddingHorizontal: 32, backgroundColor: PRIMARY, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  retryText: { color: '#fff', fontSize: 15, fontWeight: '500' },
+  btnPrimaryText: { color: '#fff', fontSize: 15, fontWeight: '500', fontFamily: 'System' },
 })

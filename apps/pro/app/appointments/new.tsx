@@ -8,11 +8,14 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import {
   getClients, getServices, getSettings, createAppointment,
-  generateTimeSlots, getBusinessTZ,
+  getBusinessTZ,
   type ClientItem, type ServiceItem, type SettingsData,
 } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO } from '../../lib/utils'
 import DatePickerModal from '../../components/DatePickerModal'
+import { getAvailableSlots } from '@musa/availability'
+import { supabase } from '../../lib/supabase'
+import { toZonedTime, format } from 'date-fns-tz'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -20,33 +23,6 @@ function addDays(date: Date, n: number): Date {
   const d = new Date(date)
   d.setDate(d.getDate() + n)
   return d
-}
-
-function getOffsetH(tz: string): number {
-  const now    = new Date()
-  const utcStr = now.toLocaleString('sv-SE', { timeZone: 'UTC' })
-  const tzStr  = now.toLocaleString('sv-SE', { timeZone: tz })
-  const utcMs  = new Date(utcStr.replace(' ', 'T') + 'Z').getTime()
-  const tzMs   = new Date(tzStr.replace(' ', 'T')  + 'Z').getTime()
-  return (utcMs - tzMs) / 3_600_000
-}
-
-function makeSlotISO(date: Date, slot: string, offsetH: number): string {
-  const [h, m] = slot.split(':').map(Number)
-  const y  = date.getFullYear()
-  const mo = String(date.getMonth() + 1).padStart(2, '0')
-  const d  = String(date.getDate()).padStart(2, '0')
-  const hs = String(h).padStart(2, '0')
-  const ms = String(m).padStart(2, '0')
-  const absH = Math.abs(offsetH)
-  const sign = offsetH >= 0 ? '-' : '+'
-  const oh = String(Math.floor(absH)).padStart(2, '0')
-  const om = String(Math.round((absH % 1) * 60)).padStart(2, '0')
-  return `${y}-${mo}-${d}T${hs}:${ms}:00${sign}${oh}:${om}`
-}
-
-function addMinutesToISO(iso: string, mins: number): string {
-  return new Date(new Date(iso).getTime() + mins * 60_000).toISOString()
 }
 
 // ─── skeleton ─────────────────────────────────────────────────────────────────
@@ -82,7 +58,6 @@ export default function NewAppointmentScreen() {
   const [clients, setClients] = useState<ClientItem[]>([])
   const [services, setServices] = useState<ServiceItem[]>([])
   const [settingsData, setSettingsData] = useState<SettingsData | null>(null)
-  const [slots, setSlots] = useState<string[]>([])
   const [businessTz, setBusinessTz] = useState('America/Caracas')
 
   // form state
@@ -94,9 +69,11 @@ export default function NewAppointmentScreen() {
   const [dateMode, setDateMode] = useState<DateMode>('today')
   const [pickedDate, setPickedDate] = useState<string>(todayISO)
   const [showDatePicker, setShowDatePicker] = useState(false)
-  const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
+  const [selectedSlot, setSelectedSlot] = useState<{ start: Date; end: Date } | null>(null)
   const [notes, setNotes] = useState('')
   const [creating, setCreating] = useState(false)
+  const [slotsLoading, setSlotsLoading] = useState(false)
+  const [availableSlots, setAvailableSlots] = useState<Array<{ start: Date; end: Date }>>([])
 
   const insets = useSafeAreaInsets()
   const selectedDate = dateMode === 'today' ? today : dateMode === 'tomorrow' ? tomorrow : new Date(pickedDate + 'T00:00:00')
@@ -109,15 +86,54 @@ export default function NewAppointmentScreen() {
       setServices(svcs)
       setSettingsData(sdata)
       setBusinessTz(getBusinessTZ(sdata))
-      if (sdata?.settings) {
-        const { startHour, endHour, slotDuration } = sdata.settings
-        setSlots(generateTimeSlots(startHour, endHour, slotDuration))
-      }
     } catch { /* silently fail */ }
     finally { setLoading(false) }
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    const businessId = settingsData?.businessId || settingsData?.business?.id
+    if (!businessId || !selectedService) {
+      setAvailableSlots([])
+      return
+    }
+
+    const currentBusinessId = businessId
+    const currentServiceId = selectedService.id
+    let active = true
+
+    async function fetchSlots() {
+      setSlotsLoading(true)
+      try {
+        const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
+        const slotsData = await getAvailableSlots({
+          businessId: currentBusinessId,
+          date: dateStr,
+          serviceId: currentServiceId,
+          supabase,
+        })
+        if (active) {
+          setAvailableSlots(slotsData)
+        }
+      } catch (err) {
+        console.error(err)
+        if (active) {
+          setAvailableSlots([])
+        }
+      } finally {
+        if (active) {
+          setSlotsLoading(false)
+        }
+      }
+    }
+
+    fetchSlots()
+
+    return () => {
+      active = false
+    }
+  }, [settingsData, selectedService, selectedDate])
 
   const filteredClients = clientQuery.length > 0
     ? clients.filter(c =>
@@ -145,17 +161,17 @@ export default function NewAppointmentScreen() {
     if (!selectedSlot) { Alert.alert('', 'Selecciona una hora'); return }
 
     setCreating(true)
+    const businessId = settingsData?.businessId || settingsData?.business?.id || undefined
     try {
-      const offsetH = getOffsetH(businessTz)
-      const startISO = makeSlotISO(selectedDate, selectedSlot, offsetH)
-      const endISO = addMinutesToISO(startISO, selectedService.durationMin)
       const result = await createAppointment({
         clientId: clientId,
         serviceId: selectedService.id,
-        startTime: startISO,
-        endTime: endISO,
+        startTime: selectedSlot.start.toISOString(),
+        endTime: selectedSlot.end.toISOString(),
         notes: notes.trim() || undefined,
         status: 'confirmed',
+        businessId: businessId,
+        businessTimezone: businessTz,
       })
       router.back()
     } catch (e) {
@@ -304,21 +320,32 @@ export default function NewAppointmentScreen() {
             {/* Time slots */}
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Hora</Text>
-              {slots.length === 0 ? (
-                <Text style={styles.grayText}>Configura tu disponibilidad en Ajustes.</Text>
+              {!selectedService ? (
+                <Text style={styles.grayText}>Selecciona un servicio primero.</Text>
+              ) : slotsLoading ? (
+                <View style={styles.slotsGrid}>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <View key={i} style={[styles.slotPill, { backgroundColor: '#F0EDE9', borderColor: '#EDE8E4' }]}>
+                      <Text style={[styles.slotText, { color: 'transparent' }]}>00:00</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : availableSlots.length === 0 ? (
+                <Text style={styles.grayText}>No hay horario disponible para este día</Text>
               ) : (
                 <View style={styles.slotsGrid}>
-                  {slots.map(slot => {
-                    const active = selectedSlot === slot
+                  {availableSlots.map(slot => {
+                    const slotStr = format(toZonedTime(slot.start, businessTz), 'HH:mm', { timeZone: businessTz })
+                    const active = selectedSlot?.start.getTime() === slot.start.getTime()
                     return (
                       <TouchableOpacity
-                        key={slot}
+                        key={slot.start.toISOString()}
                         style={[styles.slotPill, active && styles.slotPillActive]}
                         onPress={() => setSelectedSlot(slot)}
                         activeOpacity={0.78}
                       >
                         <Text style={[styles.slotText, { fontFamily: MONO }, active && { color: '#fff' }]}>
-                          {slot}
+                          {slotStr}
                         </Text>
                       </TouchableOpacity>
                     )

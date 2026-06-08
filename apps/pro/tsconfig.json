@@ -9,6 +9,9 @@
       "@musa/validators": [
         "../../../packages/validators"
       ],
+      "@musa/availability": [
+        "../../../packages/availability"
+      ],
       "@shared/*": [
         "../../shared/*"
       ]

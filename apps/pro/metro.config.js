@@ -17,6 +17,7 @@ config.resolver.nodeModulesPaths = [
 config.resolver.extraNodeModules = {
   '@musa/types': path.resolve(workspaceRoot, 'packages/types'),
   '@musa/validators': path.resolve(workspaceRoot, 'packages/validators'),
+  '@musa/availability': path.resolve(workspaceRoot, 'packages/availability'),
 }
 
 // VirtualViewNativeComponent uses Flow event types that expo@54's

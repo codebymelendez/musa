@@ -10,6 +10,8 @@ import {
   getAppointments, toVenezuelaDate, getSettings, getBusinessTZ,
   type AppointmentItem, type AppointmentStatus,
 } from '../../lib/api'
+import { useBusinessDay } from '../../hooks/useBusinessDay'
+import { toZonedTime } from 'date-fns-tz'
 
 // ─── module-level cache (survives view switches) ──────────────────────────────
 
@@ -309,10 +311,16 @@ export default function CalendarScreen() {
   const [refreshing,   setRefreshing]   = useState(false)
   const [cacheVersion, setCacheVersion] = useState(0)
   const [businessTz,   setBusinessTz]   = useState('America/Caracas')
+  const [businessId,   setBusinessId]   = useState<string | null>(null)
 
   useEffect(() => {
     getSettings()
-      .then(s => { setBusinessTz(getBusinessTZ(s)) })
+      .then(s => {
+        if (s) {
+          setBusinessTz(getBusinessTZ(s))
+          setBusinessId(s.businessId || s.business?.id || null)
+        }
+      })
       .catch(() => {})
   }, [])
 
@@ -333,6 +341,9 @@ export default function CalendarScreen() {
   }, [])
 
   useEffect(() => { load(date) }, [date, load])
+
+  const dateStr = date.toISOString().split('T')[0]
+  const businessDay = useBusinessDay(businessId, dateStr, businessTz)
 
   // Background fetch for week view
   useEffect(() => {
@@ -382,6 +393,9 @@ export default function CalendarScreen() {
         </TouchableOpacity>
 
         <View style={s.headerCenter}>
+          {businessTz && businessTz !== 'UTC' && (
+            <Text style={s.timezoneText}>Agenda · {businessTz}</Text>
+          )}
           {view === 'day' && (
             <>
               <Text style={[s.weekday, isToday(date) && s.weekdayActive]}>{formatWeekday(date)}</Text>
@@ -427,14 +441,45 @@ export default function CalendarScreen() {
         >
           {state.kind === 'loading' && <SkeletonCards />}
           {state.kind === 'error'   && <ErrorState onRetry={() => load(date)} />}
-          {state.kind === 'ok' && state.data.length === 0 && <EmptyDay />}
-          {state.kind === 'ok' && state.data.length > 0 && (
-            <FlatList
-              data={state.data}
-              keyExtractor={item => item.id}
-              scrollEnabled={false}
-              renderItem={({ item }) => <AppointmentCard item={item} tz={businessTz} />}
-            />
+          {state.kind === 'ok' && (
+            <View style={{ flex: 1 }}>
+              {!businessDay.isOpen && (
+                <View style={s.closedBanner}>
+                  <Text style={s.closedBannerText}>Negocio cerrado</Text>
+                </View>
+              )}
+              {(() => {
+                const openHour = businessDay.openTime ? parseInt(businessDay.openTime.split(':')[0], 10) : 9
+                const closeHour = businessDay.closeTime ? parseInt(businessDay.closeTime.split(':')[0], 10) : 18
+                const startH = Math.min(8, openHour)
+                const endH = Math.max(22, closeHour)
+                const dayHours = Array.from({ length: endH - startH + 1 }, (_, i) => startH + i)
+
+                return dayHours.map(h => {
+                  const hourStr = `${String(h).padStart(2, '0')}:00`
+                  const isHourClosed = !businessDay.isOpen || hourStr < businessDay.openTime || hourStr >= businessDay.closeTime
+
+                  // Find appointments that start in this hour in business timezone
+                  const apptsInHour = state.data.filter(apt => {
+                    const zonedStart = toZonedTime(new Date(apt.startTime), businessTz)
+                    return zonedStart.getHours() === h
+                  })
+
+                  return (
+                    <View key={h} style={s.hourRow}>
+                      <View style={s.hourCol}>
+                        <Text style={s.hourText}>{hourStr}</Text>
+                      </View>
+                      <View style={[s.contentCol, isHourClosed ? s.closedHourBg : s.openHourBg]}>
+                        {apptsInHour.map(item => (
+                          <AppointmentCard key={item.id} item={item} tz={businessTz} />
+                        ))}
+                      </View>
+                    </View>
+                  )
+                })
+              })()}
+            </View>
           )}
         </ScrollView>
       )}
@@ -557,4 +602,13 @@ const s = StyleSheet.create({
   mnNum:           { fontSize: 14, color: DARK },
   mnNumToday:      { color: '#fff' },
   mnNumFaded:      { color: '#CCCCCC' },
+  timezoneText:    { fontSize: 11, color: '#888888', letterSpacing: 0.1, marginBottom: 2 },
+  closedBanner:    { backgroundColor: 'rgba(181, 89, 62, 0.08)', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12, marginBottom: 16, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(181, 89, 62, 0.2)' },
+  closedBannerText:{ color: PRIMARY, fontSize: 13, fontWeight: '500' },
+  hourRow:         { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#EDE8E4', minHeight: 64 },
+  hourCol:         { width: 64, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 12, borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: '#EDE8E4' },
+  hourText:        { fontFamily: MONO, fontSize: 12, color: '#888888' },
+  contentCol:      { flex: 1, padding: 6, gap: 6, justifyContent: 'center' },
+  closedHourBg:    { backgroundColor: '#EDE8E4' },
+  openHourBg:      { backgroundColor: '#FFFFFF' },
 })

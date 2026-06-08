@@ -413,6 +413,8 @@ export async function createAppointment(data: {
   endTime: string
   notes?: string
   status?: string
+  businessId?: string
+  businessTimezone?: string
 }): Promise<{ id: string }> {
   const headers = await authHeaders()
   if (!headers) { await handle401(); throw new Error('No auth') }
