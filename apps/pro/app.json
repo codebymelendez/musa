@@ -21,10 +21,6 @@
       "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      },
-      "googleServicesFile": "./GoogleService-Info.plist",
-      "config": {
-        "googleMapsApiKey": "AIzaSyCYqW7q46eelGXHq7FrxJe9alpgEzLjkf4"
       }
     },
     "android": {
@@ -34,7 +30,6 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#34271E"
       },
-      "googleServicesFile": "./google-services.json",
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyCYqW7q46eelGXHq7FrxJe9alpgEzLjkf4"
