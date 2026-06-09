@@ -6,15 +6,17 @@ import { sendNotification, sendClientNotification } from "@/lib/notifications";
 import { getBlocksInRange, isSlotBlocked } from "@/lib/availability";
 import { checkAppointmentLimit } from "@/lib/limits";
 import { sendWhatsAppMessage, buildBookingConfirmationMsg, normalizePhone } from "@/lib/whatsapp";
+import { rateLimit } from "@/lib/rateLimit";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
+// Strict schema: enforce max lengths to prevent oversized payloads and injection attempts.
 const bookSchema = z.object({
-  serviceId: z.string(),
+  serviceId: z.string().uuid(),
   startTime: z.string().datetime(),
-  clientName: z.string().min(2),
-  clientPhone: z.string().min(7),
-  clientEmail: z.string().email().optional().or(z.literal("")),
+  clientName: z.string().min(2).max(100),
+  clientPhone: z.string().min(7).max(25),
+  clientEmail: z.string().email().max(254).optional().or(z.literal("")),
   wantsNotifications: z.boolean().optional(),
 });
 
@@ -22,6 +24,25 @@ type Params = { params: Promise<{ slug: string }> };
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { slug } = await params;
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "0.0.0.0";
+
+  // Rate limit 1: global per-IP — 10 booking attempts per 10 min across all professionals.
+  // Allows a real user to book at multiple places without friction, blocks burst bots.
+  if (!rateLimit(ip, { limit: 10, windowMs: 10 * 60 * 1000 })) {
+    return NextResponse.json(
+      { error: "Demasiados intentos. Por favor espera unos minutos." },
+      { status: 429 }
+    );
+  }
+
+  // Rate limit 2: per IP+slug — 3 bookings per hour per professional.
+  // Prevents a single IP from filling one professional's calendar.
+  if (!rateLimit(`${ip}:${slug}`, { limit: 3, windowMs: 60 * 60 * 1000 })) {
+    return NextResponse.json(
+      { error: "Demasiados intentos para esta agenda. Intenta más tarde." },
+      { status: 429 }
+    );
+  }
 
   try {
     const body = await req.json();
