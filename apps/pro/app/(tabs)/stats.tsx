@@ -86,6 +86,8 @@ const setCachedPeriodData = (p: Period, data: { stats: StatsData; upcoming: Appo
 
 export default function StatsScreen() {
   const [period, setPeriod] = useState<Period>('month')
+
+
   const [state, setState] = useState<State>(() => {
     const cached = getCachedPeriodData('month')
     if (cached) {

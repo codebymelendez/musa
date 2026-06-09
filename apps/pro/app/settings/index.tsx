@@ -37,6 +37,9 @@ export default function BusinessSettingsScreen() {
   const [slug, setSlug] = useState('')
   const [planName, setPlanName] = useState('')
   const [planLimits, setPlanLimits] = useState<{ maxMonthlyAppointments?: number; maxStaff?: number }>({})
+  const [planStatus, setPlanStatus] = useState('free')
+  const [planExpiresAt, setPlanExpiresAt] = useState<string | null>(null)
+  const [latestPayment, setLatestPayment] = useState<any | null>(null)
 
   const [businessName, setBusinessName] = useState('')
   const [address, setAddress] = useState('')
@@ -64,6 +67,9 @@ export default function BusinessSettingsScreen() {
       setInstagram(data.instagram ?? '')
       setPlanName(data.business?.plan?.name ?? 'Free')
       setPlanLimits(data.business?.plan?.limits ?? {})
+      setPlanStatus(data.business?.planStatus ?? 'free')
+      setPlanExpiresAt(data.business?.planExpiresAt ?? null)
+      setLatestPayment(data.latestPayment ?? null)
       setDirty(false)
       setLoadState('ready')
     } catch { setLoadState('error') }
@@ -219,30 +225,92 @@ export default function BusinessSettingsScreen() {
             {/* Plan actual */}
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Plan actual</Text>
+              
               <View style={styles.planRow}>
-                <View style={styles.planPill}>
-                  <Text style={styles.planPillText}>{planName}</Text>
+                <View style={[
+                  styles.planPill,
+                  planStatus === 'active' && { backgroundColor: '#E8F5E9', borderColor: '#C8E6C9' },
+                  (planStatus === 'expired' || planStatus === 'payment_rejected') && { backgroundColor: '#FDF0EC', borderColor: '#F5D8CE' },
+                  planStatus === 'under_review' && { backgroundColor: '#FFF9EB', borderColor: '#FFE7B3' }
+                ]}>
+                  <Text style={[
+                    styles.planPillText,
+                    planStatus === 'active' && { color: '#2E7D32' },
+                    (planStatus === 'expired' || planStatus === 'payment_rejected') && { color: '#C62828' },
+                    planStatus === 'under_review' && { color: '#8F6B00' }
+                  ]}>
+                    {planStatus === 'active' ? `${planName} · Activo` : planStatus === 'under_review' ? `${planName} · En Revisión` : planStatus === 'expired' ? 'Expirado' : planStatus === 'payment_rejected' ? 'Rechazado' : planName}
+                  </Text>
                 </View>
               </View>
+
+              {/* Status Alert Banners for Mobile */}
+              {planStatus === 'under_review' && (
+                <View style={styles.mobileAlertYellow}>
+                  <Text style={styles.mobileAlertYellowText}>
+                    ⏳ Pago en verificación. Referencia {latestPayment?.referenceNumber || 'S/N'}. 
+                    Verificando en las próximas horas.
+                  </Text>
+                </View>
+              )}
+
+              {planStatus === 'payment_rejected' && (
+                <View style={styles.mobileAlertRed}>
+                  <Text style={styles.mobileAlertRedText}>
+                    ⚠️ Pago rechazado. 
+                    {latestPayment?.notes ? ` Motivo: ${latestPayment.notes}.` : ''} Por favor, reintenta el pago.
+                  </Text>
+                </View>
+              )}
+
+              {planStatus === 'expired' && (
+                <View style={styles.mobileAlertRed}>
+                  <Text style={styles.mobileAlertRedText}>
+                    ❌ Suscripción expirada. Tu cuenta tiene los límites del plan gratis.
+                  </Text>
+                </View>
+              )}
+
+              {planStatus === 'active' && planExpiresAt && (
+                <View style={styles.mobileAlertGreen}>
+                  <Text style={styles.mobileAlertGreenText}>
+                    📅 Vence el {new Date(planExpiresAt).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}. ¡Gracias por apoyar a GetMusa!
+                  </Text>
+                </View>
+              )}
+
               <View style={styles.limitsGrid}>
                 {planLimits.maxMonthlyAppointments != null && (
                   <View style={styles.limitItem}>
-                    <Text style={styles.limitValue}>{planLimits.maxMonthlyAppointments}</Text>
+                    <Text style={styles.limitValue}>
+                      {planStatus === 'active' ? '∞' : planLimits.maxMonthlyAppointments}
+                    </Text>
                     <Text style={styles.limitLabel}>citas/mes</Text>
                   </View>
                 )}
                 {planLimits.maxStaff != null && (
                   <View style={styles.limitItem}>
-                    <Text style={styles.limitValue}>{planLimits.maxStaff}</Text>
+                    <Text style={styles.limitValue}>
+                      {planStatus === 'active' ? '∞' : planLimits.maxStaff}
+                    </Text>
                     <Text style={styles.limitLabel}>staff máx.</Text>
                   </View>
                 )}
               </View>
+
               <TouchableOpacity
-                style={styles.upgradeBtn}
-                onPress={() => Linking.openURL('https://getmusa.app')}
+                style={[
+                  styles.upgradeBtn,
+                  planStatus === 'active' && { borderColor: '#2E7D32' }
+                ]}
+                onPress={() => Linking.openURL(`${APP_URL}/settings/plans`)}
                 activeOpacity={0.85}>
-                <Text style={styles.upgradeBtnText}>Mejorar plan</Text>
+                <Text style={[
+                  styles.upgradeBtnText,
+                  planStatus === 'active' && { color: '#2E7D32' }
+                ]}>
+                  {planStatus === 'active' ? 'Administrar plan' : planStatus === 'under_review' ? 'Ver estado del pago' : 'Mejorar plan'}
+                </Text>
               </TouchableOpacity>
             </View>
 
@@ -342,4 +410,43 @@ const styles = StyleSheet.create({
   grayText: { fontSize: 14, color: '#AAAAAA' },
   retryBtn: { height: 48, paddingHorizontal: 32, backgroundColor: PRIMARY, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
   retryText: { color: '#fff', fontSize: 15, fontWeight: '500' },
+  mobileAlertYellow: {
+    backgroundColor: '#FFF9EB',
+    borderColor: '#FFE7B3',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  mobileAlertYellowText: {
+    fontSize: 12,
+    color: '#8F6B00',
+    lineHeight: 16,
+  },
+  mobileAlertRed: {
+    backgroundColor: '#FDF0EC',
+    borderColor: '#F5D8CE',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  mobileAlertRedText: {
+    fontSize: 12,
+    color: '#C62828',
+    lineHeight: 16,
+  },
+  mobileAlertGreen: {
+    backgroundColor: '#E8F5E9',
+    borderColor: '#C8E6C9',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  mobileAlertGreenText: {
+    fontSize: 12,
+    color: '#2E7D32',
+    lineHeight: 16,
+  },
 })

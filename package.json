@@ -1,6 +1,6 @@
 {
   "name": "musa",
-  "version": "2.2.0",
+  "version": "2.5.0",
   "private": true,
   "workspaces": [
     "apps/*",
@@ -29,6 +29,7 @@
     "nanoid": "^5.1.7",
     "next": "16.2.0",
     "nodemailer": "^8.0.4",
+    "pg": "^8.21.0",
     "qrcode": "^1.5.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",

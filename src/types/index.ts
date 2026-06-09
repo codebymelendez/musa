@@ -32,7 +32,15 @@ export type PaymentMethod =
   | "zelle"
   | "otro";
 
-export type PlanName = "FREE" | "PRO";
+export type PlanName = "FREE" | "PRO" | "TEAM";
+
+export type PlanStatus =
+  | "free"
+  | "pending_payment"
+  | "under_review"
+  | "active"
+  | "payment_rejected"
+  | "expired";
 
 // ─── Entidades ────────────────────────────────────────────────────────────────
 
@@ -47,6 +55,8 @@ export interface Business {
   planId: string;
   timezone?: string | null;
   plan?: PlanDef;
+  planStatus?: PlanStatus;
+  planExpiresAt?: string | null;
 }
 
 export interface PlanDef {
@@ -55,6 +65,26 @@ export interface PlanDef {
   price: number;
   currency: string;
   limits: any;
+}
+
+export interface SubscriptionPayment {
+  id: string;
+  businessId: string;
+  userId: string;
+  planId: string;
+  status: "under_review" | "approved" | "rejected";
+  paymentMethod: "pagomovil" | "zelle";
+  referenceNumber: string | null;
+  amountUSD: number;
+  amountBS: number | null;
+  bcvRate: number | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  approvedAt: string | null;
+  rejectedAt: string | null;
+  approvedBy?: string | null;
+  rejectedBy?: string | null;
 }
 
 export interface User {
@@ -74,6 +104,8 @@ export interface User {
   createdAt: string;
   settings?: ProfessionalSettings | null;
   business?: Business | null;
+  latestPayment?: SubscriptionPayment | null;
+  isAdmin?: boolean;
 }
 
 export interface Client {

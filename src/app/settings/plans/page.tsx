@@ -6,6 +6,9 @@ import Link from "next/link";
 import { CheckCircleIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
 
 
+import { useAuth } from "@/hooks/useAuth";
+import { useEffect } from "react";
+
 const PLANS = [
   {
     name: "FREE",
@@ -55,7 +58,27 @@ const PLANS = [
 
 export default function PlansPage() {
   const { user } = useAppStore();
+  const { loadUser } = useAuth();
+
+  useEffect(() => {
+    loadUser();
+  }, [loadUser]);
+
   const currentPlan = user?.business?.plan?.name || "FREE";
+  const planStatus = user?.business?.planStatus || "free";
+  const expiresAt = user?.business?.planExpiresAt;
+  const latestPayment = user?.latestPayment;
+
+  const isAdmin = !!user?.isAdmin;
+
+  const formatExpiracion = (isoString?: string | null) => {
+    if (!isoString) return "";
+    return new Date(isoString).toLocaleDateString("es-ES", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
 
   return (
     <div className="min-h-screen bg-background p-6 pb-32 pt-20">
@@ -65,9 +88,81 @@ export default function PlansPage() {
           <p className="font-ui text-[15px] text-on-surface-variant font-medium">Escala tu negocio con funciones potentes.</p>
         </header>
 
+        {/* Banners de Estado */}
+        {planStatus === "under_review" && (
+          <div className="bg-[#FFF9EB] border border-[#FFE7B3] p-4 rounded-2xl flex items-start gap-3">
+            <span className="text-[20px] shrink-0">⏳</span>
+            <div className="space-y-1">
+              <p className="font-ui text-[14px] font-semibold text-[#8F6B00]">Pago en verificación manual</p>
+              <p className="font-ui text-[12px] text-[#A67C00] leading-relaxed">
+                Hemos registrado tu pago manual ({latestPayment?.paymentMethod === 'pagomovil' ? 'Pago Móvil' : 'Zelle'}) de{" "}
+                <span className="font-semibold text-on-surface">
+                  {latestPayment?.amountBS ? `Bs. ${latestPayment.amountBS}` : `$${latestPayment?.amountUSD} USD`}
+                </span>{" "}
+                con referencia <span className="font-mono font-bold">{latestPayment?.referenceNumber || "S/N"}</span>. 
+                Nuestro equipo lo verificará en breve. Mientras tanto, sigues usando los límites de tu plan gratuito.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {planStatus === "payment_rejected" && (
+          <div className="bg-[#FDF0EC] border border-[#F5D8CE] p-4 rounded-2xl flex items-start gap-3">
+            <span className="text-[20px] shrink-0">⚠️</span>
+            <div className="space-y-1">
+              <p className="font-ui text-[14px] font-semibold text-[#C62828]">Pago Rechazado</p>
+              <p className="font-ui text-[12px] text-[#D32F2F] leading-relaxed">
+                Tu pago registrado anteriormente fue rechazado. 
+                {latestPayment?.notes && (
+                  <> Motivo: <span className="font-semibold text-on-surface">{latestPayment.notes}</span>.</>
+                )}
+                {" "}Por favor, selecciona un plan e intenta registrar el pago nuevamente con los datos correctos.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {planStatus === "expired" && (
+          <div className="bg-[#FDF0EC] border border-[#F5D8CE] p-4 rounded-2xl flex items-start gap-3">
+            <span className="text-[20px] shrink-0">❌</span>
+            <div className="space-y-1">
+              <p className="font-ui text-[14px] font-semibold text-[#C62828]">Suscripción Expirada</p>
+              <p className="font-ui text-[12px] text-[#D32F2F] leading-relaxed">
+                Tu plan de pago ha finalizado. Tu negocio ha vuelto a los límites del plan gratuito. 
+                Registra un nuevo pago para reactivar tus beneficios ilimitados.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {planStatus === "active" && expiresAt && (
+          <div className="bg-[#E8F5E9] border border-[#C8E6C9] p-4 rounded-2xl flex items-start gap-3">
+            <span className="text-[20px] shrink-0">✅</span>
+            <div className="space-y-1">
+              <p className="font-ui text-[14px] font-semibold text-[#2E7D32]">Suscripción Activa</p>
+              <p className="font-ui text-[12px] text-[#388E3C] leading-relaxed">
+                Tu plan <span className="font-semibold text-on-surface">{currentPlan}</span> está activo y vigente hasta el{" "}
+                <span className="font-semibold text-on-surface">{formatExpiracion(expiresAt)}</span>.
+                ¡Gracias por usar GetMusa!
+              </p>
+            </div>
+          </div>
+        )}
+
+        {isAdmin && (
+          <div className="text-center pt-2">
+            <Link
+              href="/settings/plans/admin"
+              className="inline-flex items-center gap-2 px-5 py-2.5 border border-primary text-primary hover:bg-primary/5 rounded-full text-xs font-semibold uppercase tracking-wider transition-colors"
+            >
+              🛠️ Panel Admin de Pagos
+            </Link>
+          </div>
+        )}
+
         <div className="space-y-6">
           {PLANS.map((plan) => {
-            const isSelected = plan.name === currentPlan;
+            const isSelected = plan.name === currentPlan && (planStatus === "active" || planStatus === "free");
             return (
               <div 
                 key={plan.name}
@@ -113,17 +208,26 @@ export default function PlansPage() {
                   </ul>
 
                   {!isSelected && (
-                    <Link 
-                      href={`/settings/plans/payment?plan=${plan.name}`}
-                      className={`w-full h-14 rounded-full font-medium transition-transform active:scale-95 flex items-center justify-center gap-2 shadow-primary-sm ${
-                        plan.highlight 
-                          ? 'bg-on-primary text-primary hover:bg-white/90' 
-                          : 'bg-primary text-on-primary hover:bg-primary-hover'
-                      }`}
-                    >
-                      {plan.name === "FREE" ? "Seleccionar" : "Actualizar ahora"}
-                      <ArrowRightIcon className="w-5 h-5" />
-                    </Link>
+                    planStatus === "under_review" ? (
+                      <button
+                        disabled
+                        className="w-full h-14 rounded-full font-medium flex items-center justify-center gap-2 bg-outline-variant/20 text-on-surface-variant/40 cursor-not-allowed"
+                      >
+                        Pago en revisión...
+                      </button>
+                    ) : (
+                      <Link 
+                        href={`/settings/plans/payment?plan=${plan.name}`}
+                        className={`w-full h-14 rounded-full font-medium transition-transform active:scale-95 flex items-center justify-center gap-2 shadow-primary-sm ${
+                          plan.highlight 
+                            ? 'bg-on-primary text-primary hover:bg-white/90' 
+                            : 'bg-primary text-on-primary hover:bg-primary-hover'
+                        }`}
+                      >
+                        {plan.name === "FREE" ? "Seleccionar" : "Actualizar ahora"}
+                        <ArrowRightIcon className="w-5 h-5" />
+                      </Link>
+                    )
                   )}
                 </div>
               </div>

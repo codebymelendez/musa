@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import {
   getAppointments, toVenezuelaDate, getSettings, getBusinessTZ,
-  type AppointmentItem, type AppointmentStatus,
+  type AppointmentItem, type AppointmentStatus, type SettingsData,
 } from '../../lib/api'
 import { useBusinessDay } from '../../hooks/useBusinessDay'
 import { toZonedTime } from 'date-fns-tz'
@@ -546,15 +546,22 @@ export default function CalendarScreen() {
                 </View>
               )}
               {(() => {
-                const openHour = businessDay.openTime ? parseInt(businessDay.openTime.split(':')[0], 10) : 9
-                const closeHour = businessDay.closeTime ? parseInt(businessDay.closeTime.split(':')[0], 10) : 18
-                const startH = Math.min(8, openHour)
-                const endH = Math.max(22, closeHour)
+                // Use ProfessionalSettings as source of truth for hours — same source
+                // as the web booking API — to avoid showing BusinessHours mismatches.
+                const sCache = cacheManager.get('settings') as SettingsData | null
+                const sStartH = sCache?.settings?.startHour ?? 900
+                const sEndH   = sCache?.settings?.endHour   ?? 1800
+                const openH   = Math.floor(sStartH / 100)
+                const closeH  = Math.floor(sEndH   / 100)
+                const openTimeStr  = `${String(openH).padStart(2, '0')}:${String(sStartH % 100).padStart(2, '0')}`
+                const closeTimeStr = `${String(closeH).padStart(2, '0')}:${String(sEndH   % 100).padStart(2, '0')}`
+                const startH = Math.min(8, openH)
+                const endH   = Math.max(22, closeH)
                 const dayHours = Array.from({ length: endH - startH + 1 }, (_, i) => startH + i)
 
                 return dayHours.map(h => {
                   const hourStr = `${String(h).padStart(2, '0')}:00`
-                  const isHourClosed = !businessDay.isOpen || hourStr < businessDay.openTime || hourStr >= businessDay.closeTime
+                  const isHourClosed = !businessDay.isOpen || hourStr < openTimeStr || hourStr >= closeTimeStr
 
                   // Find appointments that start in this hour in business timezone
                   const apptsInHour = state.data.filter(apt => {

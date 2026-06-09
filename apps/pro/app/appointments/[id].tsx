@@ -9,7 +9,7 @@ import { useLocalSearchParams, router } from 'expo-router'
 import {
   getAppointmentById, triggerAppointmentAction, completeAppointment, registerPayment,
   getSettings, getBusinessTZ,
-  type AppointmentItem, type AppointmentStatus, type AppointmentPayment,
+  type AppointmentItem, type AppointmentStatus, type AppointmentPayment, type SettingsData,
 } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, formatTime, formatDate, formatMoney } from '../../lib/utils'
 import { cacheManager } from '../../lib/cache'
@@ -153,19 +153,18 @@ export default function AppointmentDetailScreen() {
   const [acting, setActing] = useState(false)
   const insets = useSafeAreaInsets()
 
-  // Timezone state
-  const [businessTz, setBusinessTz] = useState('America/Caracas')
+  // Timezone state — read cache synchronously so first render is already in business TZ
+  const [businessTz, setBusinessTz] = useState(() => {
+    const cached = cacheManager.get('settings')
+    return cached ? getBusinessTZ(cached) : 'America/Caracas'
+  })
 
   useEffect(() => {
     const cached = cacheManager.get('settings')
     if (cached) {
       setBusinessTz(getBusinessTZ(cached))
     } else {
-      getSettings().then((s) => {
-        if (s) {
-          setBusinessTz(getBusinessTZ(s))
-        }
-      }).catch(() => {})
+      getSettings().then((s) => { if (s) setBusinessTz(getBusinessTZ(s)) }).catch(() => {})
     }
   }, [])
 
@@ -332,6 +331,12 @@ export default function AppointmentDetailScreen() {
         const showPaymentForm = apt.status === 'confirmed' && (!apt.payment || editingPayment)
         const showPaymentSummary = !!apt.payment && !showPaymentForm
 
+        const _rawPayMethods = (cacheManager.get('settings') as SettingsData | null)?.settings?.paymentMethods
+        const enabledPayMethods = _rawPayMethods !== undefined
+          ? PAYMENT_METHODS.filter(m => _rawPayMethods.includes(m.id))
+          : [...PAYMENT_METHODS]
+        const noMethodsConfigured = _rawPayMethods !== undefined && enabledPayMethods.length === 0
+
         return (
           <KeyboardAvoidingView
             style={{ flex: 1 }}
@@ -443,30 +448,40 @@ export default function AppointmentDetailScreen() {
                           ))}
                         </View>
 
-                        {/* Payment method grid */}
+                        {/* Payment method grid — filtered by business settings */}
                         <Text style={[pf.label, { marginTop: 16 }]}>MÉTODO DE PAGO</Text>
-                        <View style={pf.methodGrid}>
-                          {PAYMENT_METHODS.map(m => {
-                            const active = method === m.id
-                            return (
-                              <TouchableOpacity
-                                key={m.id}
-                                style={[pf.methodPill, active && pf.methodPillActive]}
-                                onPress={() => setMethod(m.id)}
-                                activeOpacity={0.78}
-                              >
-                                <Ionicons
-                                  name={m.icon as React.ComponentProps<typeof Ionicons>['name']}
-                                  size={14}
-                                  color={active ? '#fff' : DARK}
-                                />
-                                <Text style={[pf.methodPillText, active && pf.methodPillTextActive]}>
-                                  {m.label}
-                                </Text>
-                              </TouchableOpacity>
-                            )
-                          })}
-                        </View>
+                        {noMethodsConfigured ? (
+                          <View style={pf.noMethodsBox}>
+                            <Ionicons name="settings-outline" size={16} color={GRAY} />
+                            <Text style={pf.noMethodsText}>
+                              Ningún método de pago habilitado.{'\n'}
+                              Ve a Ajustes → Mi negocio para configurarlos.
+                            </Text>
+                          </View>
+                        ) : (
+                          <View style={pf.methodGrid}>
+                            {enabledPayMethods.map(m => {
+                              const active = method === m.id
+                              return (
+                                <TouchableOpacity
+                                  key={m.id}
+                                  style={[pf.methodPill, active && pf.methodPillActive]}
+                                  onPress={() => setMethod(m.id)}
+                                  activeOpacity={0.78}
+                                >
+                                  <Ionicons
+                                    name={m.icon as React.ComponentProps<typeof Ionicons>['name']}
+                                    size={14}
+                                    color={active ? '#fff' : DARK}
+                                  />
+                                  <Text style={[pf.methodPillText, active && pf.methodPillTextActive]}>
+                                    {m.label}
+                                  </Text>
+                                </TouchableOpacity>
+                              )
+                            })}
+                          </View>
+                        )}
 
                         {/* isPaid switch */}
                         <View style={pf.switchRow}>
@@ -501,9 +516,9 @@ export default function AppointmentDetailScreen() {
 
                         {/* Primary CTA */}
                         <TouchableOpacity
-                          style={[pf.primaryBtn, registering && pf.btnDisabled]}
+                          style={[pf.primaryBtn, (registering || noMethodsConfigured) && pf.btnDisabled]}
                           onPress={() => handleRegisterPayment(apt)}
-                          disabled={registering || acting}
+                          disabled={registering || acting || noMethodsConfigured}
                           activeOpacity={0.85}
                         >
                           {registering
@@ -711,6 +726,13 @@ const pf = StyleSheet.create({
   },
   secondaryBtnText: { fontSize: 13, fontWeight: '500', color: DARK },
   btnDisabled: { opacity: 0.55 },
+  noMethodsBox: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+    backgroundColor: '#FFF8F5', borderRadius: 10,
+    borderWidth: 1, borderColor: '#F5D5C8',
+    padding: 12, marginTop: 4,
+  },
+  noMethodsText: { flex: 1, fontSize: 13, color: GRAY, lineHeight: 19 },
 })
 
 // ─── payment summary styles ───────────────────────────────────────────────────

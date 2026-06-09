@@ -114,25 +114,28 @@ function PaymentContent() {
   };
 
   // El botón se habilita solo si: hay método seleccionado
-  // + si es pagomovil → referenceNumber obligatorio
+  // + referenceNumber obligatorio y no vacío
   const canActivate =
     !!selectedMethod &&
-    (selectedMethod !== "pagomovil" || referenceNumber.trim().length > 0) &&
+    referenceNumber.trim().length > 0 &&
     !loading;
 
   if (success) {
     return (
-      <div className="flex flex-col items-center justify-center text-center py-20 space-y-4">
+      <div className="flex flex-col items-center justify-center text-center py-10 space-y-5">
         <div className="w-20 h-20 bg-success-surface rounded-full flex items-center justify-center mx-auto">
           <CheckCircleSolid className="w-10 h-10 text-success" />
         </div>
-        <h2 className="font-display font-normal text-[32px] text-on-surface">¡Plan Activado!</h2>
+        <h2 className="font-display font-normal text-[32px] text-on-surface">¡Pago Registrado!</h2>
         <p className="font-ui text-[14px] text-on-surface-muted max-w-xs leading-relaxed">
-          Tu configuración ha sido actualizada al plan{" "}
-          <span className="font-semibold text-primary">{planName}</span>.
+          Tu pago para el plan{" "}
+          <span className="font-semibold text-primary">{planName}</span> ha sido enviado a revisión manual.
+        </p>
+        <p className="font-ui text-[12px] text-[#8F6B00] bg-[#FFF9EB] border border-[#FFE7B3] p-4 rounded-2xl max-w-xs leading-normal">
+          El plan gratis se mantendrá activo mientras verificamos tu pago en las próximas horas.
         </p>
         <p className="font-ui text-[12px] text-on-surface-subtle animate-pulse mt-4">
-          Redirigiendo…
+          Redirigiendo a planes…
         </p>
       </div>
     );
@@ -160,7 +163,7 @@ function PaymentContent() {
         </Link>
         <h1 className="font-display font-normal text-[30px] text-on-surface">Datos de Pago</h1>
         <p className="font-ui text-[14px] text-on-surface-muted">
-          Completa la información para activar tu plan.
+          Completa la información para registrar tu plan.
         </p>
       </header>
 
@@ -199,7 +202,6 @@ function PaymentContent() {
                   className="w-9 h-9 rounded-full bg-surface flex items-center justify-center text-on-surface hover:bg-surface-sunken transition-colors disabled:opacity-30"
                   aria-label="Reducir"
                 >
-                  {/* Bug 8: MinusIcon de Heroicons en lugar de "remove" de Material Symbols */}
                   <MinusIcon className="w-4 h-4" />
                 </button>
                 <span className="font-mono-num text-[16px] font-semibold text-on-surface w-6 text-center select-none">
@@ -212,7 +214,6 @@ function PaymentContent() {
                   className="w-9 h-9 rounded-full bg-surface flex items-center justify-center text-on-surface hover:bg-surface-sunken transition-colors disabled:opacity-30"
                   aria-label="Aumentar"
                 >
-                  {/* Bug 8: PlusIcon de Heroicons en lugar de "add" de Material Symbols */}
                   <PlusIcon className="w-4 h-4" />
                 </button>
               </div>
@@ -226,7 +227,6 @@ function PaymentContent() {
 
       {/* Métodos de pago */}
       <section className="space-y-4">
-        {/* Bug 9: CreditCardIcon de Heroicons en lugar de "payments" de Material Symbols */}
         <div className="flex items-center gap-2.5">
           <CreditCardIcon className="w-5 h-5 text-primary" />
           <h3 className="font-ui font-semibold text-[15px] text-on-surface">
@@ -238,7 +238,7 @@ function PaymentContent() {
           {/* Pago Móvil */}
           <button
             type="button"
-            onClick={() => setSelectedMethod("pagomovil")}
+            onClick={() => { setSelectedMethod("pagomovil"); setReferenceNumber(""); }}
             className={`w-full text-left p-4 rounded-2xl border-2 transition-all duration-150 ${
               selectedMethod === "pagomovil"
                 ? "border-primary bg-primary-surface shadow-primary-sm"
@@ -254,14 +254,12 @@ function PaymentContent() {
               )}
             </div>
 
-            {/* Bug 10A — Datos BNC correctos */}
             <div className="font-ui text-[13px] text-on-surface space-y-0.5">
               <p>Banco: <span className="font-semibold">BNC · Banco Nacional de Crédito</span></p>
               <p>C.I.: <span className="font-semibold">14.544.945</span></p>
               <p>Teléfono: <span className="font-semibold">0422-012.5754</span></p>
             </div>
 
-            {/* Bug 11 — Monto en Bs con tasa BCV real */}
             {selectedMethod === "pagomovil" && (
               <div className="mt-4 pt-4 border-t border-primary/20">
                 {bcvLoading && (
@@ -304,7 +302,7 @@ function PaymentContent() {
           {/* Zelle */}
           <button
             type="button"
-            onClick={() => setSelectedMethod("zelle")}
+            onClick={() => { setSelectedMethod("zelle"); setReferenceNumber(""); }}
             className={`w-full text-left p-4 rounded-2xl border-2 transition-all duration-150 ${
               selectedMethod === "zelle"
                 ? "border-primary bg-primary-surface shadow-primary-sm"
@@ -335,26 +333,44 @@ function PaymentContent() {
         </div>
       </section>
 
-      {/* Bug 10B — Campo de referencia (solo para Pago Móvil) */}
-      {selectedMethod === "pagomovil" && (
+      {/* Campo de detalles del pago */}
+      {selectedMethod && (
         <section className="space-y-2">
           <label className="font-ui text-[13px] font-medium text-on-surface block">
-            Número de referencia del pago <span className="text-primary">*</span>
+            {selectedMethod === "pagomovil" ? (
+              <>Número de referencia del pago <span className="text-primary">*</span></>
+            ) : (
+              <>Correo o nombre del remitente (Zelle) <span className="text-primary">*</span></>
+            )}
           </label>
-          <input
-            type="number"
-            inputMode="numeric"
-            maxLength={20}
-            placeholder="Ej: 00123456789"
-            value={referenceNumber}
-            onChange={(e) => {
-              const v = e.target.value.replace(/\D/g, "").slice(0, 20);
-              setReferenceNumber(v);
-            }}
-            className="musa-input font-mono-num"
-          />
+          {selectedMethod === "pagomovil" ? (
+            <input
+              type="number"
+              inputMode="numeric"
+              maxLength={20}
+              placeholder="Ej: 00123456789"
+              value={referenceNumber}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, "").slice(0, 20);
+                setReferenceNumber(v);
+              }}
+              className="musa-input font-mono-num animate-fade-in"
+            />
+          ) : (
+            <input
+              type="text"
+              placeholder="Ej: pedro.gonzalez@zelle.com o Pedro González"
+              value={referenceNumber}
+              onChange={(e) => {
+                setReferenceNumber(e.target.value.slice(0, 100));
+              }}
+              className="musa-input animate-fade-in"
+            />
+          )}
           <p className="font-ui text-[11px] text-on-surface-muted">
-            Ingresa el número de referencia de la operación Pago Móvil.
+            {selectedMethod === "pagomovil"
+              ? "Ingresa el número de referencia de la operación Pago Móvil."
+              : "Ingresa el correo electrónico o el nombre del remitente desde el cual realizaste el pago Zelle."}
           </p>
         </section>
       )}
@@ -369,7 +385,7 @@ function PaymentContent() {
 
         {selectedMethod && (
           <p className="font-ui text-[12px] text-on-surface-muted text-center">
-            Realiza el pago y luego pulsa el botón de abajo para activar tu plan.
+            Realiza el pago y luego pulsa el botón de abajo para enviar los datos para revisión.
           </p>
         )}
 
@@ -388,12 +404,12 @@ function PaymentContent() {
           {loading ? (
             <>
               <div className="w-4 h-4 border-2 border-on-primary/50 border-t-on-primary rounded-full animate-spin" />
-              Validando…
+              Enviando...
             </>
           ) : (
             <>
               <CheckBadgeIcon className="w-5 h-5" />
-              Validar y Activar Plan
+              Enviar Pago para Revisión
             </>
           )}
         </button>

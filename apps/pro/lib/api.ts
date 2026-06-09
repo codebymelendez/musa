@@ -320,9 +320,12 @@ export interface SettingsData {
     phone?: string | null;
     category?: string | null;
     plan?: { name: string; limits?: { maxMonthlyAppointments?: number; maxStaff?: number } } | null;
+    planStatus?: string;
+    planExpiresAt?: string | null;
     users?: TeamMember[];
     invitations?: TeamInvitation[];
   } | null
+  latestPayment?: any | null
   settings: {
     workDays: number[]    // [0-6] where 0=Sunday
     startHour: number     // HHMM e.g. 800 = 08:00

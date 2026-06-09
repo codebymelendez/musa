@@ -47,15 +47,38 @@ export async function GET(req: NextRequest) {
     const s = Array.isArray(user.settings) ? user.settings[0] : user.settings;
 
     let bizHours = null;
+    let latestPayment = null;
+
     if (user.businessId) {
-      const { data } = await admin
-        .from('BusinessHours')
-        .select('*')
-        .eq('businessId', user.businessId)
-        .is('userId', null);
-      bizHours = data;
+      const [{ data: hours }, { data: payData }] = await Promise.all([
+        admin
+          .from('BusinessHours')
+          .select('*')
+          .eq('businessId', user.businessId)
+          .is('userId', null),
+        admin
+          .from('SubscriptionPayment')
+          .select('*, plan:Plan(name)')
+          .eq('businessId', user.businessId)
+          .order('createdAt', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      ]);
+      bizHours = hours;
+      if (payData) {
+        latestPayment = {
+          ...payData,
+          plan: Array.isArray(payData.plan) ? payData.plan[0] : payData.plan
+        };
+      }
     }
     const computedHours = parseBusinessHoursToSettings(bizHours);
+
+    const rawBiz = user.business;
+    const businessToReturn = rawBiz ? {
+      ...rawBiz,
+      plan: Array.isArray(rawBiz.plan) ? rawBiz.plan[0] : rawBiz.plan
+    } : null;
 
     const userToReturn = {
       id: user.id,
@@ -71,7 +94,9 @@ export async function GET(req: NextRequest) {
       instagram: user.instagram,
       onboardingDone: user.onboardingDone,
       businessId: user.businessId,
-      business: user.business,
+      business: businessToReturn,
+      latestPayment,
+      isAdmin: user.isAdmin,
       settings: s
         ? {
             ...s,

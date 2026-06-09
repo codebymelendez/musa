@@ -18,19 +18,34 @@ async function getPlanConfig(businessId: string) {
   const admin = createAdminClient();
   const { data } = await admin
     .from("Business")
-    .select("plan:Plan(name, limits)")
+    .select("planStatus, planExpiresAt, plan:Plan(name, limits)")
     .eq("id", businessId)
     .single();
 
+  const rawStatus = data?.planStatus ?? "free";
+  const planExpiresAt = data?.planExpiresAt;
+
+  // Check if active plan has expired
+  let isVibrantActive = rawStatus === "active";
+  if (isVibrantActive && planExpiresAt) {
+    const expires = new Date(planExpiresAt);
+    if (expires < new Date()) {
+      isVibrantActive = false;
+    }
+  }
+
   const plan = Array.isArray(data?.plan) ? data?.plan[0] : data?.plan;
-  const limits = (plan?.limits ?? {}) as Record<string, number>;
+
+  // If active, use plan limits. Otherwise, fall back to FREE limits
+  const limits = (isVibrantActive ? (plan?.limits ?? {}) : {}) as Record<string, number>;
+  const planName = isVibrantActive ? (plan?.name ?? "FREE") : "FREE";
 
   return {
-    planName: (plan?.name ?? "FREE") as string,
+    planName: planName as string,
     maxMonthlyAppointments:
-      limits.maxMonthlyAppointments ?? FREE_PLAN_LIMITS.maxMonthlyAppointments,
+      limits.appointments ?? limits.maxMonthlyAppointments ?? FREE_PLAN_LIMITS.maxMonthlyAppointments,
     maxActiveClients:
-      limits.maxActiveClients ?? FREE_PLAN_LIMITS.maxActiveClients,
+      limits.activeClients ?? limits.maxActiveClients ?? FREE_PLAN_LIMITS.maxActiveClients,
   };
 }
 

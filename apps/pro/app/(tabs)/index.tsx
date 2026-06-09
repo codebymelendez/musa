@@ -1,17 +1,17 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Animated, RefreshControl, Modal, TextInput,
-  KeyboardAvoidingView, Platform, Alert,
+  Animated, RefreshControl,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import {
-  getDashboardData, createClient, normalizeISODate,
+  getDashboardData, normalizeISODate,
   type AppointmentItem, type PromotionItem, type LoyaltyProgram, type ClientItem, type DashboardData
 } from '../../lib/api'
+import AddClientModal from '../../components/AddClientModal'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, capitalize, formatTime, formatMoney } from '../../lib/utils'
 import { cacheManager } from '../../lib/cache'
 import { ob } from '../../lib/observability'
@@ -69,112 +69,6 @@ function PulseSkeleton({ height, mx = 20, mb = 14 }: { height: number; mx?: numb
   )
 }
 
-// ─── add client modal ─────────────────────────────────────────────────────────
-
-const CLIENT_TAGS = ['VIP', 'Nueva', 'Regular', 'Frecuente'] as const
-
-function AddClientModal({
-  visible, onClose, onCreated,
-}: {
-  visible: boolean; onClose: () => void; onCreated: (c: ClientItem) => void
-}) {
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [email, setEmail] = useState('')
-  const [notes, setNotes] = useState('')
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [saving, setSaving] = useState(false)
-
-  function reset() {
-    setName(''); setPhone(''); setEmail(''); setNotes(''); setSelectedTags([])
-  }
-
-  async function handleCreate() {
-    if (!name.trim()) { Alert.alert('', 'El nombre es requerido'); return }
-    if (!phone.trim()) { Alert.alert('', 'El teléfono es requerido'); return }
-    setSaving(true)
-    try {
-      const client = await createClient({
-        name: name.trim(), phone: phone.trim(),
-        email: email.trim() || undefined,
-        notes: notes.trim() || undefined,
-        tags: selectedTags,
-      })
-      reset(); onCreated(client)
-    } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'No se pudo crear la clienta')
-    } finally { setSaving(false) }
-  }
-
-  const slide = useRef(new Animated.Value(500)).current
-  useEffect(() => {
-    Animated.timing(slide, { toValue: visible ? 0 : 500, duration: 280, useNativeDriver: true }).start()
-    if (!visible) reset()
-  }, [visible])
-
-  return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <TouchableOpacity style={ms.overlay} activeOpacity={1} onPress={onClose} />
-        <Animated.View style={[ms.sheet, { transform: [{ translateY: slide }] }]}>
-          <View style={ms.handle} />
-          <Text style={ms.title}>Nueva clienta</Text>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={ms.label}>Nombre completo *</Text>
-            <TextInput style={ms.input} value={name} onChangeText={setName}
-              placeholder="María García" placeholderTextColor="#AAAAAA" />
-
-            <Text style={[ms.label, { marginTop: 14 }]}>Teléfono *</Text>
-            <TextInput style={ms.input} value={phone} onChangeText={setPhone}
-              placeholder="04141234567" placeholderTextColor="#AAAAAA" keyboardType="phone-pad" />
-
-            <Text style={[ms.label, { marginTop: 14 }]}>
-              Email <Text style={{ color: GRAY }}>(opcional)</Text>
-            </Text>
-            <TextInput style={ms.input} value={email} onChangeText={setEmail}
-              placeholder="maria@email.com" placeholderTextColor="#AAAAAA"
-              keyboardType="email-address" autoCapitalize="none" />
-
-            <Text style={[ms.label, { marginTop: 14 }]}>
-              Notas <Text style={{ color: GRAY }}>(opcional)</Text>
-            </Text>
-            <TextInput
-              style={[ms.input, { height: 70, textAlignVertical: 'top', paddingTop: 10 }]}
-              value={notes} onChangeText={setNotes} multiline
-              placeholder="Preferencias, alergias…" placeholderTextColor="#AAAAAA" />
-
-            <Text style={[ms.label, { marginTop: 14 }]}>Etiquetas</Text>
-            <View style={ms.tagsRow}>
-              {CLIENT_TAGS.map(tag => {
-                const active = selectedTags.includes(tag)
-                return (
-                  <TouchableOpacity
-                    key={tag}
-                    style={[ms.tagChip, active && ms.tagChipActive]}
-                    onPress={() =>
-                      setSelectedTags(prev =>
-                        prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
-                      )
-                    }
-                    activeOpacity={0.78}
-                  >
-                    <Text style={[ms.tagText, active && { color: '#fff' }]}>{tag}</Text>
-                  </TouchableOpacity>
-                )
-              })}
-            </View>
-
-            <TouchableOpacity
-              style={[ms.btnPrimary, { marginTop: 24, marginBottom: 8 }, saving && { opacity: 0.6 }]}
-              onPress={handleCreate} disabled={saving} activeOpacity={0.85}>
-              <Text style={ms.btnPrimaryText}>{saving ? 'Creando…' : 'Crear clienta'}</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </Animated.View>
-      </KeyboardAvoidingView>
-    </Modal>
-  )
-}
 
 type QuickAction = {
   icon: React.ComponentProps<typeof Ionicons>['name']
@@ -722,33 +616,3 @@ const styles = StyleSheet.create({
   },
 })
 
-// ─── modal styles ─────────────────────────────────────────────────────────────
-
-const ms = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 48, maxHeight: '92%',
-  },
-  handle: {
-    width: 40, height: 4, borderRadius: 2, backgroundColor: '#DDDDDD',
-    alignSelf: 'center', marginBottom: 16,
-  },
-  title: { fontFamily: SERIF, fontSize: 22, color: DARK, marginBottom: 20 },
-  label: { fontSize: 12, color: GRAY, marginBottom: 6 },
-  input: {
-    height: 46, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
-    paddingHorizontal: 14, fontSize: 15, color: DARK, backgroundColor: SURFACE,
-  },
-  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tagChip: {
-    paddingHorizontal: 16, height: 36, borderRadius: 18,
-    backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  tagChipActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
-  tagText: { fontSize: 13, fontWeight: '500', color: DARK },
-  btnPrimary: { height: 52, backgroundColor: PRIMARY, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-  btnPrimaryText: { color: '#fff', fontSize: 16, fontWeight: '500' },
-})
