@@ -46,6 +46,7 @@ interface PublicData {
     slotDuration: number;
     currency: string;
     bookingEnabled: boolean;
+    timezone?: string;
   };
   slots: TimeSlot[] | null;
 }
@@ -478,7 +479,17 @@ export default function PublicBookingPage() {
               {next14Days.map((day, i) => {
                 const isSelected = day.toDateString() === selectedDate.toDateString();
                 const isToday    = i === 0;
-                const isWorkday  = data.settings.workDays.includes(day.getDay());
+                
+                // Evaluar día de la semana en la zona horaria del negocio
+                let dayOfWeek = day.getDay();
+                try {
+                  const localStr = new Intl.DateTimeFormat('sv-SE', { timeZone: data.settings.timezone || 'America/Caracas' }).format(day);
+                  const [y, m, d] = localStr.split('-').map(Number);
+                  dayOfWeek = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+                } catch {
+                  dayOfWeek = day.getDay();
+                }
+                const isWorkday  = data.settings.workDays.includes(dayOfWeek);
                 return (
                   <button
                     key={i}

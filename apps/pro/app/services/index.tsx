@@ -13,6 +13,7 @@ import {
   type ServiceItem,
 } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, formatMoney } from '../../lib/utils'
+import { cacheManager } from '../../lib/cache'
 
 // ─── duration pills ───────────────────────────────────────────────────────────
 
@@ -262,6 +263,7 @@ export default function ServicesScreen() {
           onPress: async () => {
             try {
               await deleteService(svc.id)
+              cacheManager.invalidate('business')
               setServices(prev => prev.filter(s => s.id !== svc.id))
             } catch {
               Alert.alert('Error', 'No se pudo eliminar el servicio')
@@ -326,6 +328,7 @@ export default function ServicesScreen() {
         visible={showModal}
         onClose={() => setShowModal(false)}
         onCreated={svc => {
+          cacheManager.invalidate('business')
           setServices(prev => [...prev, svc])
           setShowModal(false)
         }}

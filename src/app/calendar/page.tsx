@@ -10,7 +10,7 @@ import {
 import { useAppointments } from "@/hooks/useAppointments";
 import { useAvailabilityBlocks } from "@/hooks/useAvailabilityBlocks";
 import { Appointment, AvailabilityBlock } from "@/types";
-import { weekRangeUTC, parseSupa, formatTimeES, DEFAULT_TZ } from "@/lib/utils";
+import { weekRangeUTC, parseSupa, formatTimeES, DEFAULT_TZ, toLocalDate, dayRangeUTC } from "@/lib/utils";
 import BlockTimeModal from "@/components/calendar/BlockTimeModal";
 import NewAppointmentModal from "@/components/appointments/NewAppointmentModal";
 
@@ -25,11 +25,35 @@ function getWeekDays(weekStart: string): Date[] {
   );
 }
 
-function positionStyle(apt: Appointment): React.CSSProperties {
+function getZonedHoursAndMinutes(date: Date, tz: string): { hours: number; minutes: number } {
+  let safeTz = tz;
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: tz });
+  } catch {
+    safeTz = 'America/Caracas';
+  }
+  const timeStr = new Intl.DateTimeFormat('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: safeTz,
+  }).format(date);
+  const [h, m] = timeStr.split(':').map(Number);
+  return { hours: h, minutes: m };
+}
+
+function getZonedDayOfWeek(dateStr: string): number {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
+function positionStyle(apt: Appointment, tz: string): React.CSSProperties {
   const start = parseSupa(apt.startTime);
   const end   = parseSupa(apt.endTime);
-  const startHour = start.getHours() + start.getMinutes() / 60;
-  const endHour   = end.getHours()   + end.getMinutes()   / 60;
+  const startHM = getZonedHoursAndMinutes(start, tz);
+  const endHM   = getZonedHoursAndMinutes(end, tz);
+  const startHour = startHM.hours + startHM.minutes / 60;
+  const endHour   = endHM.hours   + endHM.minutes   / 60;
   return {
     top:      `${Math.max(0, (startHour - HOURS[0]) * HOUR_HEIGHT)}px`,
     height:   `${Math.max(20, (endHour - startHour) * HOUR_HEIGHT)}px`,
@@ -39,11 +63,13 @@ function positionStyle(apt: Appointment): React.CSSProperties {
   };
 }
 
-function blockPositionStyle(block: AvailabilityBlock): React.CSSProperties {
+function blockPositionStyle(block: AvailabilityBlock, tz: string): React.CSSProperties {
   const start     = parseSupa(block.startTime);
   const end       = parseSupa(block.endTime);
-  const startHour = Math.max(start.getHours() + start.getMinutes() / 60, HOURS[0]);
-  const endHour   = Math.min(end.getHours()   + end.getMinutes()   / 60, HOURS[HOURS.length - 1] + 1);
+  const startHM   = getZonedHoursAndMinutes(start, tz);
+  const endHM     = getZonedHoursAndMinutes(end, tz);
+  const startHour = Math.max(startHM.hours + startHM.minutes / 60, HOURS[0]);
+  const endHour   = Math.min(endHM.hours   + endHM.minutes   / 60, HOURS[HOURS.length - 1] + 1);
   return {
     top:      `${(startHour - HOURS[0]) * HOUR_HEIGHT}px`,
     height:   `${Math.max((endHour - startHour) * HOUR_HEIGHT, 16)}px`,
@@ -90,10 +116,12 @@ export default function Calendar() {
 
   const aptsByDay: Record<number, Appointment[]> = {};
   for (const apt of appointments) {
-    const d      = parseSupa(apt.startTime);
-    const colIdx = d.getDay() === 0 ? 6 : d.getDay() - 1;
-    if (!aptsByDay[colIdx]) aptsByDay[colIdx] = [];
-    aptsByDay[colIdx].push(apt);
+    const aptLocalDateStr = toLocalDate(parseSupa(apt.startTime), businessTz);
+    const colIdx = weekDays.findIndex(day => toLocalDate(day, businessTz) === aptLocalDateStr);
+    if (colIdx !== -1) {
+      if (!aptsByDay[colIdx]) aptsByDay[colIdx] = [];
+      aptsByDay[colIdx].push(apt);
+    }
   }
 
   const blocksByDay: Record<number, AvailabilityBlock[]> = {};
@@ -101,8 +129,10 @@ export default function Calendar() {
     const bStart = parseSupa(block.startTime);
     const bEnd   = parseSupa(block.endTime);
     weekDays.forEach((day, colIdx) => {
-      const dayStart = new Date(day); dayStart.setHours(0, 0, 0, 0);
-      const dayEnd   = new Date(day); dayEnd.setHours(23, 59, 59, 999);
+      const dayStartStr = toLocalDate(day, businessTz);
+      const { start: dayStartUtcStr, end: dayEndUtcStr } = dayRangeUTC(dayStartStr, businessTz);
+      const dayStart = new Date(dayStartUtcStr);
+      const dayEnd   = new Date(dayEndUtcStr);
       if (bStart <= dayEnd && bEnd >= dayStart) {
         if (!blocksByDay[colIdx]) blocksByDay[colIdx] = [];
         blocksByDay[colIdx].push(block);
@@ -210,11 +240,15 @@ export default function Calendar() {
               Hora
             </div>
             {weekDays.map((day, i) => {
-              const isToday = day.toDateString() === todayStr;
+              const dayStr = toLocalDate(day, businessTz);
+              const todayLocalDateStr = toLocalDate(new Date(), businessTz);
+              const isToday = dayStr === todayLocalDateStr;
+              const dayOfWeek = getZonedDayOfWeek(dayStr);
+              const dateNumber = Number(dayStr.split('-')[2]);
               return (
                 <div key={i} className="flex flex-col items-center gap-1">
                   <span className={`font-ui text-[11px] font-medium ${isToday ? "text-primary" : "text-on-surface-muted"}`}>
-                    {DAY_ABBR[day.getDay()]}
+                    {DAY_ABBR[dayOfWeek]}
                   </span>
                   <span
                     className={`font-ui text-[17px] font-medium ${
@@ -223,7 +257,7 @@ export default function Calendar() {
                         : "text-on-surface"
                     }`}
                   >
-                    {day.getDate()}
+                    {dateNumber}
                   </span>
                 </div>
               );
@@ -269,7 +303,7 @@ export default function Calendar() {
                   {(blocksByDay[colIdx] ?? []).map((block) => (
                     <div
                       key={block.id}
-                      style={blockPositionStyle(block)}
+                      style={blockPositionStyle(block, businessTz)}
                       className="z-[5] overflow-hidden"
                     >
                       <div className="w-full h-full bg-stone-100 border-l-[3px] border-stone-400 rounded-r flex flex-col justify-start gap-0.5 pt-1 px-1">
@@ -323,7 +357,7 @@ export default function Calendar() {
                     return (
                       <div
                         key={apt.id}
-                        style={positionStyle(apt)}
+                        style={positionStyle(apt, businessTz)}
                         className={`rounded-lg p-1.5 overflow-hidden z-10 transition-all ${bgClass}`}
                       >
                         <p className={`font-ui text-[10px] leading-tight mb-0.5 ${timeClass}`}>

@@ -11,6 +11,7 @@ import {
   type AppointmentItem, type AppointmentStatus, type AppointmentPayment,
 } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, formatTime, formatDate, formatMoney } from '../../lib/utils'
+import { cacheManager } from '../../lib/cache'
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -185,6 +186,9 @@ export default function AppointmentDetailScreen() {
     setActing(true)
     try {
       await triggerAppointmentAction(id, action)
+      cacheManager.invalidate('dashboard')
+      cacheManager.invalidate('calendar')
+      cacheManager.invalidate('stats')
       await load()
     } catch {
       // non-blocking
@@ -215,6 +219,9 @@ export default function AppointmentDetailScreen() {
         completeAppointment: apt.status === 'confirmed' && !editingPayment,
       })
       if (updated) {
+        cacheManager.invalidate('dashboard')
+        cacheManager.invalidate('calendar')
+        cacheManager.invalidate('stats')
         setState({ kind: 'ok', data: updated })
         setEditingPayment(false)
       }
@@ -238,6 +245,9 @@ export default function AppointmentDetailScreen() {
             setActing(true)
             try {
               await completeAppointment(id)
+              cacheManager.invalidate('dashboard')
+              cacheManager.invalidate('calendar')
+              cacheManager.invalidate('stats')
               await load()
             } catch {
               Alert.alert('Error', 'No se pudo completar la cita')

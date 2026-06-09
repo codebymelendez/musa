@@ -11,6 +11,7 @@ import {
   type LoyaltyProgram,
 } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF } from '../../lib/utils'
+import { cacheManager } from '../../lib/cache'
 
 // ─── skeleton ─────────────────────────────────────────────────────────────────
 
@@ -118,6 +119,8 @@ export default function LoyaltyScreen() {
         rewardThreshold: threshold,
         rewardDescription: rewardDescription.trim(),
       })
+      cacheManager.invalidate('business')
+      cacheManager.invalidate('dashboard')
       setSavedMsg(true)
       setTimeout(() => setSavedMsg(false), 2000)
     } catch (e) {

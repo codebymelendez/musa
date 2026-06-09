@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
       .from("Business")
       .select(`
         *,
+        hours:BusinessHours(dayOfWeek, isOpen, userId),
         users:User(
           name,
           slug,
@@ -39,7 +40,7 @@ export async function GET(request: NextRequest) {
           appRole,
           onboardingDone,
           services:Service(isActive, name, category, price),
-          settings:ProfessionalSettings(workDays, bookingEnabled)
+          settings:ProfessionalSettings(bookingEnabled)
         )
       `)
       .order("createdAt", { ascending: false })
@@ -70,10 +71,11 @@ export async function GET(request: NextRequest) {
         .from("Business")
         .select(`
           *,
+          hours:BusinessHours(dayOfWeek, isOpen, userId),
           users:User(
             name, slug, avatarUrl, bio, serviceType, appRole, onboardingDone,
             services:Service(isActive, name, category, price),
-            settings:ProfessionalSettings(workDays, bookingEnabled)
+            settings:ProfessionalSettings(bookingEnabled)
           )
         `)
         .order("createdAt", { ascending: false })
@@ -104,24 +106,19 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // ── Filtro por fecha (día de semana vs workDays) ──────────────────────
+    // ── Filtro por fecha (día de semana vs BusinessHours) ──────────────────────
     if (date) {
-      // date = "YYYY-MM-DD" → usamos T12:00 para evitar saltos de día por zona horaria
-      const dayOfWeek = new Date(date + "T12:00:00").getDay(); // 0=Dom … 6=Sáb
+      // date = "YYYY-MM-DD" → obtenemos el día de la semana de forma segura e independiente de zona horaria
+      const [y, m, dayNum] = date.split('-').map(Number);
+      const dayOfWeek = new Date(Date.UTC(y, m - 1, dayNum)).getUTCDay();
+
       filteredBusinesses = filteredBusinesses.filter((b: any) => {
-        const owner    = Array.isArray(b.users) ? b.users[0] : b.users;
-        const settArr  = Array.isArray(owner?.settings) ? owner.settings : [owner?.settings];
-        const settings = settArr[0];
-        if (!settings?.workDays) return true; // sin configuración = incluir siempre
-        try {
-          const workDays: number[] =
-            typeof settings.workDays === "string"
-              ? JSON.parse(settings.workDays)
-              : settings.workDays;
-          return Array.isArray(workDays) && workDays.includes(dayOfWeek);
-        } catch {
-          return true;
-        }
+        const hours = b.hours || [];
+        if (hours.length === 0) return true; // sin configuración = incluir siempre
+        
+        // Buscar el horario del negocio para ese día (userId === null)
+        const dayConfig = hours.find((h: any) => h.dayOfWeek === dayOfWeek && h.userId === null);
+        return dayConfig ? dayConfig.isOpen : false;
       });
     }
 

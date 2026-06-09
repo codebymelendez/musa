@@ -9,11 +9,12 @@ import { Ionicons } from '@expo/vector-icons'
 import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import {
-  getSettings, getAppointments, getPromotions, getStats, getClients, getAppointmentsInRange,
-  getLoyaltyProgram, getLoyaltyAccounts, createClient, toVenezuelaDate, normalizeISODate, getBusinessTZ,
-  type AppointmentItem, type PromotionItem, type LoyaltyProgram, type ClientItem,
+  getDashboardData, createClient, normalizeISODate,
+  type AppointmentItem, type PromotionItem, type LoyaltyProgram, type ClientItem, type DashboardData
 } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, capitalize, formatTime, formatMoney } from '../../lib/utils'
+import { cacheManager } from '../../lib/cache'
+import { ob } from '../../lib/observability'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -181,136 +182,115 @@ type QuickAction = {
   onPress: () => void
 }
 
-interface DashboardData {
-  businessTz: string
-  userName: string
-  avatarUrl: string | null
-  appointments: AppointmentItem[]
-  promos: PromotionItem[]
-  loyaltyProgram: LoyaltyProgram | null
-  loyaltyStats: { clientsWithPoints: number; totalPoints: number }
-  monthlyRevenue: number | null
-  weeklyRevenue: number | null
-  newClientsCount: number | null
-}
-
-let _dashboardCache: {
-  timestamp: number
-  data: DashboardData
-} | null = null
-
 export default function HomeScreen() {
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => !cacheManager.has('dashboard'))
   const [refreshing, setRefreshing] = useState(false)
-  const [businessTz, setBusinessTz] = useState('America/Caracas')
-  const [userName, setUserName] = useState('')
-  const [appointments, setAppointments] = useState<AppointmentItem[]>([])
-  const [promos, setPromos] = useState<PromotionItem[]>([])
-  const [loyaltyProgram, setLoyaltyProgram] = useState<LoyaltyProgram | null>(null)
-  const [loyaltyStats, setLoyaltyStats] = useState({ clientsWithPoints: 0, totalPoints: 0 })
+
+  const [businessTz, setBusinessTz] = useState(() => {
+    const c = cacheManager.get('dashboard') as DashboardData | null
+    return c?.businessTz ?? 'America/Caracas'
+  })
+  const [userName, setUserName] = useState(() => {
+    const c = cacheManager.get('dashboard') as DashboardData | null
+    return c?.userName ?? ''
+  })
+  const [appointments, setAppointments] = useState<AppointmentItem[]>(() => {
+    const c = cacheManager.get('dashboard') as DashboardData | null
+    return c?.appointments ?? []
+  })
+  const [promos, setPromos] = useState<PromotionItem[]>(() => {
+    const c = cacheManager.get('dashboard') as DashboardData | null
+    return c?.promos ?? []
+  })
+  const [loyaltyProgram, setLoyaltyProgram] = useState<LoyaltyProgram | null>(() => {
+    const c = cacheManager.get('dashboard') as DashboardData | null
+    return c?.loyaltyProgram ?? null
+  })
+  const [loyaltyStats, setLoyaltyStats] = useState(() => {
+    const c = cacheManager.get('dashboard') as DashboardData | null
+    return c?.loyaltyStats ?? { clientsWithPoints: 0, totalPoints: 0 }
+  })
   const [showAddClient, setShowAddClient] = useState(false)
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
-  const [weeklyRevenue, setWeeklyRevenue] = useState<number | null>(null)
-  const [monthlyRevenue, setMonthlyRevenue] = useState<number | null>(null)
-  const [newClientsCount, setNewClientsCount] = useState<number | null>(null)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(() => {
+    const c = cacheManager.get('dashboard') as DashboardData | null
+    return c?.avatarUrl ?? null
+  })
+  const [weeklyRevenue, setWeeklyRevenue] = useState<number | null>(() => {
+    const c = cacheManager.get('dashboard') as DashboardData | null
+    return c?.weeklyRevenue ?? null
+  })
+  const [monthlyRevenue, setMonthlyRevenue] = useState<number | null>(() => {
+    const c = cacheManager.get('dashboard') as DashboardData | null
+    return c?.monthlyRevenue ?? null
+  })
+  const [newClientsCount, setNewClientsCount] = useState<number | null>(() => {
+    const c = cacheManager.get('dashboard') as DashboardData | null
+    return c?.newClientsCount ?? null
+  })
 
   const load = useCallback(async (force = false) => {
-    if (!force && _dashboardCache && (Date.now() - _dashboardCache.timestamp < 30000)) {
-      const c = _dashboardCache.data
-      setBusinessTz(c.businessTz)
-      setUserName(c.userName)
-      setAvatarUrl(c.avatarUrl)
-      setAppointments(c.appointments)
-      setPromos(c.promos)
-      setLoyaltyProgram(c.loyaltyProgram)
-      setLoyaltyStats(c.loyaltyStats)
-      setMonthlyRevenue(c.monthlyRevenue)
-      setWeeklyRevenue(c.weeklyRevenue)
-      setNewClientsCount(c.newClientsCount)
-      setLoading(false)
-      return
+    const cache = cacheManager.get('dashboard') as DashboardData | null
+    const timestamp = cacheManager.getTimestamp('dashboard')
+
+    if (cache) {
+      setBusinessTz(cache.businessTz)
+      setUserName(cache.userName)
+      setAvatarUrl(cache.avatarUrl)
+      setAppointments(cache.appointments)
+      setPromos(cache.promos)
+      setLoyaltyProgram(cache.loyaltyProgram)
+      setLoyaltyStats(cache.loyaltyStats)
+      setMonthlyRevenue(cache.monthlyRevenue)
+      setWeeklyRevenue(cache.weeklyRevenue)
+      setNewClientsCount(cache.newClientsCount)
+      
+      // If cache is fresh and we aren't forcing, skip background fetch
+      if (!force && (Date.now() - timestamp < 30000)) {
+        setLoading(false)
+        return
+      }
+    } else {
+      setLoading(true)
     }
 
-    setLoading(true)
     try {
-      const currentTz = _dashboardCache?.data?.businessTz ?? businessTz
-      const venezNow = new Date(new Date().toLocaleString('en-US', { timeZone: currentTz }))
-      const year = venezNow.getFullYear()
-      const month = venezNow.getMonth() + 1
-      const firstDayStr = `${year}-${String(month).padStart(2, '0')}-01`
-      const weekFrom = new Date(Date.now() - 7 * 86_400_000).toISOString()
-      const weekTo = new Date().toISOString()
-      const todayStr = toVenezuelaDate(new Date())
+      const data = await getDashboardData()
 
-      const results = await Promise.allSettled([
-        getSettings(),
-        getAppointments(todayStr),
-        getPromotions(),
-        getLoyaltyProgram(),
-        getLoyaltyAccounts(),
-        getStats(year, month).catch(() => null),
-        getClients().catch(() => [] as ClientItem[]),
-        getAppointmentsInRange(weekFrom, weekTo).catch(() => [] as AppointmentItem[]),
-      ])
+      setBusinessTz(data.businessTz)
+      setUserName(data.userName)
+      setAvatarUrl(data.avatarUrl)
+      setAppointments(data.appointments)
+      setPromos(data.promos)
+      setLoyaltyProgram(data.loyaltyProgram)
+      setLoyaltyStats(data.loyaltyStats)
+      setMonthlyRevenue(data.monthlyRevenue)
+      setWeeklyRevenue(data.weeklyRevenue)
+      setNewClientsCount(data.newClientsCount)
 
-      const sData = results[0].status === 'fulfilled' ? results[0].value as any : null
-      const appts = results[1].status === 'fulfilled' ? results[1].value as any[] : []
-      const promoList = results[2].status === 'fulfilled' ? results[2].value as any[] : []
-      const program = results[3].status === 'fulfilled' ? results[3].value as any : null
-      const accounts = results[4].status === 'fulfilled' ? results[4].value as any[] : []
-      const statsData = results[5].status === 'fulfilled' ? results[5].value as any : null
-      const clients = results[6].status === 'fulfilled' ? results[6].value as any[] : []
-      const weekAppts = results[7].status === 'fulfilled' ? results[7].value as any[] : []
+      cacheManager.set('dashboard', data)
+    } catch (e) {
+      ob.logError('HomeScreen load', e)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
-      const resolvedTz = getBusinessTZ(sData)
-      const resolvedUserName = sData?.name?.split(' ')[0] ?? ''
-      const resolvedAvatarUrl = sData?.avatarUrl ?? null
-      const resolvedAppts = appts.filter((a: any) => a.status !== 'cancelled')
-      const resolvedPromos = promoList.filter(isPromoActive)
-      const resolvedLoyaltyProgram = program
-      const withPts = accounts.filter((a: any) => a.totalPoints > 0)
-      const resolvedLoyaltyStats = {
-        clientsWithPoints: withPts.length,
-        totalPoints: withPts.reduce((s: number, a: any) => s + a.totalPoints, 0),
+  // Telemetry of render time
+  useEffect(() => {
+    const endTrack = ob.trackTime()
+    load(false).then(() => {
+      ob.logPerformance('HomeScreen', endTrack())
+    })
+  }, [load])
+
+  // Reactive subscription
+  useEffect(() => {
+    return cacheManager.subscribe('dashboard', () => {
+      if (!cacheManager.has('dashboard')) {
+        load(true)
       }
-      const resolvedMonthlyRevenue = statsData ? statsData.monthlyRevenue : null
-      const wRev = weekAppts
-        .filter((a: any) => a.status === 'completed')
-        .reduce((sum: number, a: any) => sum + (a.payment?.isPaid ? a.payment.amount : a.service.price), 0)
-      const resolvedWeeklyRevenue = wRev
-      const resolvedNewClientsCount = clients.filter((c: any) => (c.createdAt ?? '').slice(0, 10) >= firstDayStr).length
-
-      setBusinessTz(resolvedTz)
-      setUserName(resolvedUserName)
-      setAvatarUrl(resolvedAvatarUrl)
-      setAppointments(resolvedAppts)
-      setPromos(resolvedPromos)
-      setLoyaltyProgram(resolvedLoyaltyProgram)
-      setLoyaltyStats(resolvedLoyaltyStats)
-      setMonthlyRevenue(resolvedMonthlyRevenue)
-      setWeeklyRevenue(resolvedWeeklyRevenue)
-      setNewClientsCount(resolvedNewClientsCount)
-
-      _dashboardCache = {
-        timestamp: Date.now(),
-        data: {
-          businessTz: resolvedTz,
-          userName: resolvedUserName,
-          avatarUrl: resolvedAvatarUrl,
-          appointments: resolvedAppts,
-          promos: resolvedPromos,
-          loyaltyProgram: resolvedLoyaltyProgram,
-          loyaltyStats: resolvedLoyaltyStats,
-          monthlyRevenue: resolvedMonthlyRevenue,
-          weeklyRevenue: resolvedWeeklyRevenue,
-          newClientsCount: resolvedNewClientsCount,
-        }
-      }
-    } catch { /* show what loaded */ }
-    finally { setLoading(false) }
-  }, [businessTz])
-
-  useEffect(() => { load(false) }, [load])
+    })
+  }, [load])
 
   const onRefresh = async () => { setRefreshing(true); await load(true); setRefreshing(false) }
 
@@ -627,7 +607,11 @@ export default function HomeScreen() {
       <AddClientModal
         visible={showAddClient}
         onClose={() => setShowAddClient(false)}
-        onCreated={() => setShowAddClient(false)}
+        onCreated={() => {
+          setShowAddClient(false)
+          cacheManager.invalidate('dashboard')
+          cacheManager.invalidate('clients')
+        }}
       />
     </SafeAreaView>
   )

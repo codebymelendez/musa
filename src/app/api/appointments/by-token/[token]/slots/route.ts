@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { getBlocksInRange, isSlotBlocked } from "@/lib/availability";
+import { toLocalDate, dayRangeUTC, parseBusinessHoursToSettings } from "@/lib/utils";
 
 type Params = { params: Promise<{ token: string }> };
 
@@ -14,7 +15,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   console.log(`[slots] Request received for token/id: "${token}"`);
   const supabase = createAdminClient();
   
-  // Consulta ultra-simplificada para descartar errores de joins
+  // Consulta de la cita
   const { data: appointment, error: appoError } = await supabase
     .from('Appointment')
     .select('id, userId, status, serviceId, rescheduleToken, startTime, endTime')
@@ -27,84 +28,115 @@ export async function GET(req: NextRequest, { params }: Params) {
   }
 
   if (!appointment) {
-    console.log(`[slots] Cita NO encontrada en DB para "${token}". Consultando tabla completa para depurar...`);
-    // Opcional: ver si la tabla tiene algo
-    const { count } = await supabase.from('Appointment').select('*', { count: 'exact', head: true });
-    console.log(`[slots] Total citas en tabla Appointment: ${count}`);
     return NextResponse.json({ error: "Cita no encontrada" }, { status: 404 });
   }
 
-  console.log(`[slots] Cita encontrada OK: ID=${appointment.id}, User=${appointment.userId}.`);
-  
-  // Ahora buscamos el servicio y settings por separado
+  // Buscar servicio, usuario (para obtener business y timezone) y settings
   const { data: service } = await supabase.from('Service').select('*').eq('id', appointment.serviceId).single();
+  const { data: user } = await supabase.from('User').select('businessId, business:Business(timezone)').eq('id', appointment.userId).single();
   const { data: settings } = await supabase.from('ProfessionalSettings').select('*').eq('userId', appointment.userId).single();
 
-  if (!service || !settings) {
-    console.log(`[slots] Error: Falta servicio (${!!service}) o settings (${!!settings})`);
+  if (!service || !settings || !user) {
+    console.log(`[slots] Error: Falta servicio (${!!service}), settings (${!!settings}) o usuario (${!!user})`);
     return NextResponse.json({ error: "Configuración incompleta", slots: [] });
   }
 
   const serviceDurationMin = service.durationMin;
+  const timezone = (user.business as any)?.timezone || "America/Caracas";
 
-  const workDays: number[] = JSON.parse(settings.workDays);
-  const { startHour, endHour, slotDuration } = settings;
+  // Query BusinessHours
+  let bizHours = null;
+  if (user.businessId) {
+    const { data } = await supabase
+      .from('BusinessHours')
+      .select('*')
+      .eq('businessId', user.businessId)
+      .is('userId', null);
+    bizHours = data;
+  }
+  const computedHours = parseBusinessHoursToSettings(bizHours);
 
-  const now = new Date();
-  const from = new Date(now);
-  from.setDate(from.getDate() + 1);
-  from.setHours(0, 0, 0, 0);
+  const today = new Date();
+  
+  // Definir rango de búsqueda en UTC
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowLocalStr = toLocalDate(tomorrow, timezone);
 
-  const until = new Date(from);
-  until.setDate(until.getDate() + days);
-  until.setHours(23, 59, 59, 999);
+  const endDay = new Date(today);
+  endDay.setDate(endDay.getDate() + days);
+  const endLocalStr = toLocalDate(endDay, timezone);
 
+  const { start: startUtcRange } = dayRangeUTC(tomorrowLocalStr, timezone);
+  const { end: endUtcRange } = dayRangeUTC(endLocalStr, timezone);
+
+  // Cargar citas existentes del profesional en el rango
   const { data: existingAppointments, error: exError } = await supabase
     .from('Appointment')
     .select('startTime, endTime')
     .eq('userId', appointment.userId)
-    // EXCLUIMOS la cita actual para que el usuario pueda ver huecos libres si se moviera
     .neq('id', appointment.id)
     .not('status', 'in', '(cancelled,no_show)')
-    .gte('startTime', from.toISOString())
-    .lte('startTime', until.toISOString());
+    .gte('startTime', startUtcRange)
+    .lte('startTime', endUtcRange);
 
   if (exError) {
     console.error("[slots] Error fetch existing appointments:", exError);
   }
 
   // Cargar bloqueos de agenda del profesional en el mismo rango
-  const activeBlocks = await getBlocksInRange(appointment.userId, from, until);
+  const activeBlocks = await getBlocksInRange(appointment.userId, new Date(startUtcRange), new Date(endUtcRange));
 
   const allSlots: { time: string, isAvailable: boolean, isCurrent: boolean }[] = [];
 
-  for (let d = 0; d < days; d++) {
-    const day = new Date(from);
-    day.setDate(day.getDate() + d);
+  for (let d = 1; d <= days; d++) {
+    const loopDay = new Date(today.getTime());
+    loopDay.setDate(loopDay.getDate() + d);
 
-    const dayOfWeek = day.getDay();
-    if (!workDays.includes(dayOfWeek)) continue;
+    const dateStr = toLocalDate(loopDay, timezone);
+    const [y, m, dayNum] = dateStr.split('-').map(Number);
+    const dayOfWeek = new Date(Date.UTC(y, m - 1, dayNum)).getUTCDay();
+
+    // Verificar si el negocio está abierto este día de la semana
+    const specificDayHours = bizHours?.find((h: any) => h.dayOfWeek === dayOfWeek);
+    const isDayOpen = specificDayHours ? specificDayHours.isOpen : computedHours.workDays.includes(dayOfWeek);
+
+    if (!isDayOpen) continue;
+
+    const openTimeStr = specificDayHours ? specificDayHours.openTime : "09:00";
+    const closeTimeStr = specificDayHours ? specificDayHours.closeTime : "18:00";
+
+    const [openH, openM] = openTimeStr.split(':').map(Number);
+    const [closeH, closeM] = closeTimeStr.split(':').map(Number);
+
+    const startTotalMinutes = openH * 60 + openM;
+    const endTotalMinutes = closeH * 60 + closeM;
+
+    // Obtener medianoche local en UTC para este día
+    const { start: dayStartUtcStr } = dayRangeUTC(dateStr, timezone);
+    const dayStartUtc = new Date(dayStartUtcStr);
 
     let minuteOffset = 0;
     while (true) {
-      const slotStart = new Date(day);
-      slotStart.setHours(startHour, 0, 0, 0);
-      slotStart.setMinutes(slotStart.getMinutes() + minuteOffset);
-
+      const slotStart = new Date(dayStartUtc.getTime() + (startTotalMinutes + minuteOffset) * 60000);
       const slotEnd = new Date(slotStart.getTime() + serviceDurationMin * 60000);
 
+      const closeTimeLimit = new Date(dayStartUtc.getTime() + endTotalMinutes * 60000);
+
       // Si el slot excede la hora de cierre, terminamos el día
-      if (slotEnd.getHours() > endHour || (slotEnd.getHours() === endHour && slotEnd.getMinutes() > 0)) break;
-      if (slotStart.getHours() >= endHour) break;
+      if (slotEnd.getTime() > closeTimeLimit.getTime()) break;
 
       const hasConflict = existingAppointments?.some(
-        (existing: any) =>
-          slotStart < new Date(existing.endTime) && slotEnd > new Date(existing.startTime)
+        (existing: any) => {
+          const apptStart = new Date(existing.startTime).getTime();
+          const apptEnd = new Date(existing.endTime).getTime();
+          return slotStart.getTime() < apptEnd && slotEnd.getTime() > apptStart;
+        }
       );
 
       const isBlocked = isSlotBlocked(slotStart, slotEnd, activeBlocks);
 
-      const sTime = new Date(slotStart).getTime();
+      const sTime = slotStart.getTime();
       const aStart = new Date(appointment.startTime).getTime();
       const aEnd = new Date(appointment.endTime).getTime();
       const isCurrent = sTime >= aStart && sTime < aEnd;
@@ -115,7 +147,7 @@ export async function GET(req: NextRequest, { params }: Params) {
         isCurrent: isCurrent
       });
 
-      minuteOffset += slotDuration;
+      minuteOffset += settings.slotDuration;
     }
   }
 

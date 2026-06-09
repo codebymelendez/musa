@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
-import { generateTimeSlots, dayRangeUTC, DEFAULT_TZ } from "@/lib/utils";
+import { generateTimeSlots, dayRangeUTC, DEFAULT_TZ, parseBusinessHoursToSettings } from "@/lib/utils";
 import { ProfessionalSettings } from "@/types";
 import { getBlocksInRange } from "@/lib/availability";
 
@@ -34,20 +34,26 @@ export async function GET(req: NextRequest, { params }: Params) {
       rawSettings = rawSettings[0] || null;
     }
 
-    let workDays = [1, 2, 3, 4, 5];
-    if (rawSettings && rawSettings.workDays) {
-      workDays = typeof rawSettings.workDays === 'string' 
-        ? JSON.parse(rawSettings.workDays) 
-        : rawSettings.workDays;
+    // Query BusinessHours
+    let bizHours = null;
+    if (user.businessId) {
+      const { data } = await admin
+        .from('BusinessHours')
+        .select('*')
+        .eq('businessId', user.businessId)
+        .is('userId', null);
+      bizHours = data;
     }
+    const computedHours = parseBusinessHoursToSettings(bizHours);
 
     const settings = {
-      workDays,
-      startHour: rawSettings?.startHour ?? 9,
-      endHour: rawSettings?.endHour ?? 18,
+      workDays: computedHours.workDays,
+      startHour: computedHours.startHour,
+      endHour: computedHours.endHour,
       slotDuration: rawSettings?.slotDuration ?? 30,
       currency: rawSettings?.currency ?? "USD",
       bookingEnabled: rawSettings?.bookingEnabled ?? true,
+      timezone: rawSettings?.timezone ?? DEFAULT_TZ,
     };
 
     if (settings.bookingEnabled === false) {
@@ -61,7 +67,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     let slots = null;
     if (dateParam && serviceId) {
       const selectedDate = new Date(dateParam);
-      const bizTz = rawSettings?.timezone ?? DEFAULT_TZ;
+      const bizTz = settings.timezone;
       const { start, end } = dayRangeUTC(dateParam, bizTz);
 
       const services = user.services || [];
@@ -70,30 +76,52 @@ export async function GET(req: NextRequest, { params }: Params) {
         return NextResponse.json({ error: "Servicio no encontrado" }, { status: 404 });
       }
 
-      // Citas existentes en el día
-      const { data: bookedAppointments, error: appointmentsError } = await admin
-        .from('Appointment')
-        .select('startTime, endTime, service:Service(durationMin)')
-        .eq('userId', user.id)
-        .not('status', 'in', '(cancelled,no_show)')
-        .gte('startTime', start)
-        .lte('startTime', end);
+      const dayOfWeek = selectedDate.getUTCDay();
+      const specificDayHours = bizHours?.find((h: any) => h.dayOfWeek === dayOfWeek);
+      const isDayOpen = specificDayHours ? specificDayHours.isOpen : settings.workDays.includes(dayOfWeek);
 
-      if (appointmentsError) {
-        console.error("[fetch appointments error]", appointmentsError);
+      let rawSlots: any[] = [];
+
+      if (isDayOpen) {
+        const parseToHhmmInt = (timeStr: string) => {
+          const [h, m] = timeStr.split(':').map(Number);
+          return h * 100 + m;
+        };
+
+        const dayStartHour = specificDayHours ? parseToHhmmInt(specificDayHours.openTime) : settings.startHour;
+        const dayEndHour = specificDayHours ? parseToHhmmInt(specificDayHours.closeTime) : settings.endHour;
+
+        const daySettings = {
+          ...settings,
+          startHour: dayStartHour,
+          endHour: dayEndHour,
+        };
+
+        // Citas existentes en el día
+        const { data: bookedAppointments, error: appointmentsError } = await admin
+          .from('Appointment')
+          .select('startTime, endTime, service:Service(durationMin)')
+          .eq('userId', user.id)
+          .not('status', 'in', '(cancelled,no_show)')
+          .gte('startTime', start)
+          .lte('startTime', end);
+
+        if (appointmentsError) {
+          console.error("[fetch appointments error]", appointmentsError);
+        }
+
+        rawSlots = generateTimeSlots(
+          selectedDate,
+          daySettings as unknown as ProfessionalSettings,
+          (bookedAppointments || []).map((a: any) => ({
+            startTime: a.startTime,
+            endTime: a.endTime,
+            durationMin: a.service?.durationMin || 0,
+          })),
+          selectedService.durationMin,
+          bizTz
+        );
       }
-
-      const rawSlots = generateTimeSlots(
-        selectedDate,
-        settings as ProfessionalSettings,
-        (bookedAppointments || []).map((a: any) => ({
-          startTime: a.startTime,
-          endTime: a.endTime,
-          durationMin: a.service?.durationMin || 0,
-        })),
-        selectedService.durationMin,
-        bizTz
-      );
 
       // Excluir slots bloqueados por la profesional
       const activeBlocks = await getBlocksInRange(user.id, new Date(start), new Date(end));

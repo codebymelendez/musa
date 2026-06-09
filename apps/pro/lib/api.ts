@@ -3,8 +3,13 @@ import { supabase } from './supabase'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
-export function toVenezuelaDate(date: Date): string {
-  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Caracas' }).format(date)
+export function toVenezuelaDate(date: Date, tz = 'America/Caracas'): string {
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: tz })
+    return new Intl.DateTimeFormat('sv-SE', { timeZone: tz }).format(date)
+  } catch {
+    return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Caracas' }).format(date)
+  }
 }
 
 // Supabase returns timestamps without timezone suffix ("2026-06-05 13:00:00").
@@ -267,6 +272,32 @@ export async function getStats(year: number, month: number): Promise<StatsData> 
   return res.json()
 }
 
+export interface DashboardData {
+  businessTz: string
+  userName: string
+  avatarUrl: string | null
+  appointments: AppointmentItem[]
+  promos: PromotionItem[]
+  loyaltyProgram: LoyaltyProgram | null
+  loyaltyStats: { clientsWithPoints: number; totalPoints: number }
+  monthlyRevenue: number | null
+  weeklyRevenue: number | null
+  newClientsCount: number | null
+}
+
+export async function getDashboardData(): Promise<DashboardData> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); throw new Error('No auth') }
+  const res = await fetch(`${API_URL}/api/dashboard`, { headers })
+  if (res.status === 401) { await handle401(); throw new Error('Unauthorized') }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const data: DashboardData = await res.json()
+  return {
+    ...data,
+    appointments: (data.appointments || []).map(normalizeAppointment),
+  }
+}
+
 // ─── Settings / Profile ───────────────────────────────────────────────────────
 
 export interface SettingsData {
@@ -305,7 +336,13 @@ export interface SettingsData {
 }
 
 export function getBusinessTZ(settings: SettingsData | null): string {
-  return settings?.settings?.timezone ?? 'America/Caracas'
+  const tz = settings?.settings?.timezone ?? 'America/Caracas'
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: tz })
+    return tz
+  } catch {
+    return 'America/Caracas'
+  }
 }
 
 export async function getSettings(): Promise<SettingsData | null> {

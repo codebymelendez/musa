@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   StyleSheet, RefreshControl, Animated, Modal,
@@ -11,6 +11,8 @@ import { router } from 'expo-router'
 import { getClients, createClient, type ClientItem } from '../../lib/api'
 import { PRIMARY, DARK, BORDER, GRAY, MONO, SERIF, SURFACE, initials } from '../../lib/utils'
 import DatePickerModal, { formatDateSpanish } from '../../components/DatePickerModal'
+import { cacheManager } from '../../lib/cache'
+import { ob } from '../../lib/observability'
 
 // ─── skeleton ─────────────────────────────────────────────────────────────────
 
@@ -56,11 +58,17 @@ function EmptyState({ searching }: { searching: boolean }) {
 
 // ─── client row ───────────────────────────────────────────────────────────────
 
-function ClientRow({ item, onPress }: { item: ClientItem; onPress: () => void }) {
+const ClientRow = memo(function ClientRow({
+  item,
+  onPress,
+}: {
+  item: ClientItem
+  onPress: (id: string) => void
+}) {
   const count = item.appointments?.length ?? 0
 
   return (
-    <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.72}>
+    <TouchableOpacity style={styles.row} onPress={() => onPress(item.id)} activeOpacity={0.72}>
       <View style={styles.avatar}>
         <Text style={styles.avatarText}>{initials(item.name)}</Text>
       </View>
@@ -83,7 +91,7 @@ function ClientRow({ item, onPress }: { item: ClientItem; onPress: () => void })
       <Ionicons name="chevron-forward-outline" size={16} color="#CCCCCC" />
     </TouchableOpacity>
   )
-}
+})
 
 // ─── add client modal ─────────────────────────────────────────────────────────
 
@@ -252,23 +260,60 @@ function AddClientModal({
 type State = { kind: 'loading' } | { kind: 'error' } | { kind: 'ok'; data: ClientItem[] }
 
 export default function ClientsScreen() {
-  const [state, setState] = useState<State>({ kind: 'loading' })
+  const [state, setState] = useState<State>(() => {
+    const cache = cacheManager.get('clients') as ClientItem[] | null
+    if (cache) {
+      return { kind: 'ok', data: cache }
+    }
+    return { kind: 'loading' }
+  })
   const [query, setQuery] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
 
-  const load = useCallback(async () => {
-    setState({ kind: 'loading' })
+  const load = useCallback(async (force = false) => {
+    const cache = cacheManager.get('clients') as ClientItem[] | null
+    const timestamp = cacheManager.getTimestamp('clients')
+
+    if (cache) {
+      setState({ kind: 'ok', data: cache })
+      if (!force && (Date.now() - timestamp < 30000)) {
+        return
+      }
+    } else {
+      setState({ kind: 'loading' })
+    }
+
     try {
-      setState({ kind: 'ok', data: await getClients() })
-    } catch {
-      setState({ kind: 'error' })
+      const data = await getClients()
+      cacheManager.set('clients', data)
+      setState({ kind: 'ok', data })
+    } catch (e) {
+      ob.logError('ClientsScreen load', e)
+      if (!cache) {
+        setState({ kind: 'error' })
+      }
     }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  // Telemetry of render time
+  useEffect(() => {
+    const endTrack = ob.trackTime()
+    load(false).then(() => {
+      ob.logPerformance('ClientsScreen', endTrack())
+    })
+  }, [load])
 
-  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false) }
+  // Reactive subscription
+  useEffect(() => {
+    return cacheManager.subscribe('clients', () => {
+      if (!cacheManager.has('clients')) {
+        load(true)
+      }
+    })
+  }, [load])
+
+  const onRefresh = async () => { setRefreshing(true); await load(true); setRefreshing(false) }
 
   const filtered = state.kind === 'ok'
     ? state.data.filter(c => {
@@ -278,13 +323,27 @@ export default function ClientsScreen() {
     : []
 
   function handleCreated(client: ClientItem) {
-    setState(prev =>
-      prev.kind === 'ok'
-        ? { kind: 'ok', data: [client, ...prev.data] }
-        : { kind: 'ok', data: [client] }
-    )
+    setState(prev => {
+      const nextData = prev.kind === 'ok'
+        ? [client, ...prev.data]
+        : [client]
+      cacheManager.set('clients', nextData)
+      return { kind: 'ok', data: nextData }
+    })
+    cacheManager.invalidate('dashboard')
     setShowAddModal(false)
   }
+
+  const handleClientPress = useCallback((id: string) => {
+    router.push(`/clients/${id}` as Parameters<typeof router.push>[0])
+  }, [])
+
+  const renderItem = useCallback(({ item }: { item: ClientItem }) => (
+    <ClientRow
+      item={item}
+      onPress={handleClientPress}
+    />
+  ), [handleClientPress])
 
   const totalAppointments = filtered.reduce((acc, c) => acc + (c.appointments?.length ?? 0), 0)
   const activeClients = filtered.length
@@ -335,7 +394,7 @@ export default function ClientsScreen() {
       {state.kind === 'error' && (
         <View style={styles.centerState}>
           <Text style={styles.emptyText}>No se pudieron cargar las clientas</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={load} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => load(true)} activeOpacity={0.85}>
             <Text style={styles.retryText}>Reintentar</Text>
           </TouchableOpacity>
         </View>
@@ -348,12 +407,7 @@ export default function ClientsScreen() {
           contentContainerStyle={filtered.length === 0 ? { flex: 1 } : styles.listPad}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           ListEmptyComponent={<EmptyState searching={query.length > 0} />}
-          renderItem={({ item }) => (
-            <ClientRow
-              item={item}
-              onPress={() => router.push(`/clients/${item.id}` as Parameters<typeof router.push>[0])}
-            />
-          )}
+          renderItem={renderItem}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} colors={[PRIMARY]} />}
           showsVerticalScrollIndicator={false}
         />

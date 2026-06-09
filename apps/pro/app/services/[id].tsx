@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, router } from 'expo-router'
 import { getServices, updateService, deleteService, type ServiceItem } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, SERIF, MONO, formatMoney } from '../../lib/utils'
+import { cacheManager } from '../../lib/cache'
 
 const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120]
 
@@ -74,6 +75,8 @@ export default function ServiceEditScreen() {
         price: parseFloat(price) || 0,
         description: description.trim() || undefined,
       })
+      cacheManager.invalidate('business')
+      cacheManager.invalidate('dashboard')
       setSavedMsg(true)
       setTimeout(() => setSavedMsg(false), 2000)
     } catch {
@@ -93,6 +96,8 @@ export default function ServiceEditScreen() {
             setDeleting(true)
             try {
               await deleteService(id!)
+              cacheManager.invalidate('business')
+              cacheManager.invalidate('dashboard')
               router.back()
             } catch {
               Alert.alert('Error', 'No se pudo eliminar el servicio')

@@ -16,6 +16,7 @@ import DatePickerModal from '../../components/DatePickerModal'
 import { getAvailableSlots } from '@musa/availability'
 import { supabase } from '../../lib/supabase'
 import { toZonedTime, format } from 'date-fns-tz'
+import { cacheManager } from '../../lib/cache'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -172,6 +173,9 @@ export default function NewAppointmentScreen() {
         businessId: businessId,
         businessTimezone: businessTz,
       })
+      cacheManager.invalidate('dashboard')
+      cacheManager.invalidate('calendar')
+      cacheManager.invalidate('stats')
       router.back()
     } catch (e) {
       Alert.alert('Error', 'No se pudo crear la cita. Intenta de nuevo.')

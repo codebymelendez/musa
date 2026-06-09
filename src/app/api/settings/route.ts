@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase-admin";
+import { parseBusinessHoursToSettings } from "@/lib/utils";
 
 const updateSchema = z.object({
   name: z.string().min(2).optional(),
@@ -44,6 +45,18 @@ export async function GET(req: NextRequest) {
     if (error || !user) return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
 
     const s = Array.isArray(user.settings) ? user.settings[0] : user.settings;
+
+    let bizHours = null;
+    if (user.businessId) {
+      const { data } = await admin
+        .from('BusinessHours')
+        .select('*')
+        .eq('businessId', user.businessId)
+        .is('userId', null);
+      bizHours = data;
+    }
+    const computedHours = parseBusinessHoursToSettings(bizHours);
+
     const userToReturn = {
       id: user.id,
       name: user.name,
@@ -62,7 +75,9 @@ export async function GET(req: NextRequest) {
       settings: s
         ? {
             ...s,
-            workDays: JSON.parse(s.workDays || "[1,2,3,4,5]"),
+            workDays: computedHours.workDays,
+            startHour: computedHours.startHour,
+            endHour: computedHours.endHour,
             paymentMethods: s.paymentMethods ? JSON.parse(s.paymentMethods) : [],
             timezone: user.business?.timezone || "America/Caracas",
           }
@@ -238,9 +253,14 @@ export async function PATCH(req: NextRequest) {
           const endVal = settings.endHour !== undefined ? settings.endHour : (currentSettings?.endHour ?? 1800);
 
           const formatHour = (val: number) => {
-            const h = String(Math.floor(val / 100)).padStart(2, '0');
-            const m = String(val % 100).padStart(2, '0');
-            return `${h}:${m}`;
+            if (val > 24) {
+              const h = String(Math.floor(val / 100)).padStart(2, '0');
+              const m = String(val % 100).padStart(2, '0');
+              return `${h}:${m}`;
+            } else {
+              const h = String(val).padStart(2, '0');
+              return `${h}:00`;
+            }
           };
 
           const openTime = formatHour(startVal);
@@ -274,13 +294,26 @@ export async function PATCH(req: NextRequest) {
       .eq('id', session.userId)
       .single();
 
+    let bizHours = null;
+    if (updated?.businessId) {
+      const { data } = await admin
+        .from('BusinessHours')
+        .select('*')
+        .eq('businessId', updated.businessId)
+        .is('userId', null);
+      bizHours = data;
+    }
+    const computedHours = parseBusinessHoursToSettings(bizHours);
+
     const s = Array.isArray(updated?.settings) ? updated.settings[0] : updated?.settings;
     const result = {
       ...updated,
       settings: s
         ? {
             ...s,
-            workDays: JSON.parse(s.workDays || "[1,2,3,4,5]"),
+            workDays: computedHours.workDays,
+            startHour: computedHours.startHour,
+            endHour: computedHours.endHour,
             paymentMethods: s.paymentMethods ? JSON.parse(s.paymentMethods) : [],
             timezone: updated?.business?.timezone || "America/Caracas",
           }

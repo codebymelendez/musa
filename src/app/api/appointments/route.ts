@@ -27,12 +27,12 @@ export async function GET(req: NextRequest) {
   let endFilter: string;
 
   if (date) {
-    const { data: ps } = await createAdminClient()
-      .from('ProfessionalSettings')
-      .select('timezone')
-      .eq('userId', session.userId)
+    const { data: user } = await createAdminClient()
+      .from('User')
+      .select('business:Business(timezone)')
+      .eq('id', session.userId)
       .maybeSingle();
-    const tz = ps?.timezone ?? DEFAULT_TZ;
+    const tz = (user?.business as any)?.timezone ?? DEFAULT_TZ;
     ({ start: startFilter, end: endFilter } = dayRangeUTC(date, tz));
   } else if (from && to) {
     startFilter = new Date(from).toISOString();

@@ -12,6 +12,8 @@ import {
 } from '../../lib/api'
 import { useBusinessDay } from '../../hooks/useBusinessDay'
 import { toZonedTime } from 'date-fns-tz'
+import { cacheManager } from '../../lib/cache'
+import { ob } from '../../lib/observability'
 
 // ─── module-level cache (survives view switches) ──────────────────────────────
 
@@ -28,43 +30,55 @@ const MONO    = Platform.select({ ios: 'Courier New', android: 'monospace' }) as
 
 function cap(s: string): string { return s.charAt(0).toUpperCase() + s.slice(1) }
 
+function getTodayInTZ(tz: string): Date {
+  const todayStr = new Intl.DateTimeFormat('sv-SE', { timeZone: tz }).format(new Date())
+  return new Date(todayStr + 'T00:00:00Z')
+}
+
 function formatWeekday(d: Date): string {
-  return cap(new Intl.DateTimeFormat('es-ES', { weekday: 'long' }).format(d))
+  return cap(new Intl.DateTimeFormat('es-ES', { weekday: 'long', timeZone: 'UTC' }).format(d))
 }
 function formatFullDate(d: Date): string {
-  return new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).format(d)
+  return new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(d)
 }
 function formatTime(iso: string, tz = 'America/Caracas'): string {
   return new Intl.DateTimeFormat('es-VE', {
     hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz,
   }).format(new Date(iso))
 }
-function isToday(d: Date): boolean {
-  const n = new Date()
-  return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate()
+function isToday(d: Date, tz: string): boolean {
+  const todayStr = new Intl.DateTimeFormat('sv-SE', { timeZone: tz }).format(new Date())
+  const dayStr = d.toISOString().split('T')[0]
+  return todayStr === dayStr
 }
 function addDays(d: Date, n: number): Date {
-  const r = new Date(d); r.setDate(r.getDate() + n); return r
+  const r = new Date(d.getTime())
+  r.setUTCDate(r.getUTCDate() + n)
+  return r
 }
 function addMonths(d: Date, n: number): Date {
-  const r = new Date(d); r.setMonth(r.getMonth() + n); return r
+  const r = new Date(d.getTime())
+  r.setUTCMonth(r.getUTCMonth() + n)
+  return r
 }
 function startOfWeek(d: Date): Date {
-  const r = new Date(d); r.setHours(0, 0, 0, 0)
-  const day = r.getDay()
-  r.setDate(r.getDate() + (day === 0 ? -6 : 1 - day))
+  const r = new Date(d.getTime())
+  r.setUTCHours(0, 0, 0, 0)
+  const day = r.getUTCDay()
+  r.setUTCDate(r.getUTCDate() + (day === 0 ? -6 : 1 - day))
   return r
 }
 function weekDays(monday: Date): Date[] {
   return Array.from({ length: 7 }, (_, i) => addDays(monday, i))
 }
 function monthCells(year: number, month: number): Date[] {
-  const first = new Date(year, month, 1)
-  const last  = new Date(year, month + 1, 0)
-  const offset = (first.getDay() === 0 ? 7 : first.getDay()) - 1
+  const first = new Date(Date.UTC(year, month, 1))
+  const last  = new Date(Date.UTC(year, month + 1, 0))
+  const firstDay = first.getUTCDay()
+  const offset = (firstDay === 0 ? 7 : firstDay) - 1
   const cells: Date[] = []
   for (let i = offset; i > 0; i--) cells.push(addDays(first, -i))
-  for (let d = 1; d <= last.getDate(); d++) cells.push(new Date(year, month, d))
+  for (let d = 1; d <= last.getUTCDate(); d++) cells.push(new Date(Date.UTC(year, month, d)))
   let extra = 1
   while (cells.length % 7 !== 0) cells.push(addDays(last, extra++))
   return cells
@@ -76,15 +90,15 @@ function chunk<T>(arr: T[], n: number): T[][] {
 }
 function weekRangeLabel(monday: Date): string {
   const sunday = addDays(monday, 6)
-  const sm = new Intl.DateTimeFormat('es-ES', { month: 'short' }).format(monday)
-  const em = new Intl.DateTimeFormat('es-ES', { month: 'short' }).format(sunday)
-  const yr = sunday.getFullYear()
-  if (monday.getMonth() === sunday.getMonth())
-    return `${monday.getDate()} – ${sunday.getDate()} ${em} ${yr}`
-  return `${monday.getDate()} ${sm} – ${sunday.getDate()} ${em} ${yr}`
+  const sm = new Intl.DateTimeFormat('es-ES', { month: 'short', timeZone: 'UTC' }).format(monday)
+  const em = new Intl.DateTimeFormat('es-ES', { month: 'short', timeZone: 'UTC' }).format(sunday)
+  const yr = sunday.getUTCFullYear()
+  if (monday.getUTCMonth() === sunday.getUTCMonth())
+    return `${monday.getUTCDate()} – ${sunday.getUTCDate()} ${em} ${yr}`
+  return `${monday.getUTCDate()} ${sm} – ${sunday.getUTCDate()} ${em} ${yr}`
 }
 function monthLabel(d: Date): string {
-  return cap(new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' }).format(d))
+  return cap(new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(d))
 }
 
 // ─── status pill ─────────────────────────────────────────────────────────────
@@ -183,17 +197,20 @@ function WeekView({
 }: {
   weekStart: Date; selectedDate: Date; cacheVersion: number; onSelectDay: (d: Date) => void; businessTz: string
 }) {
-  const todayKey    = toVenezuelaDate(new Date())
-  const selectedKey = toVenezuelaDate(selectedDate)
+  const todayKey    = new Intl.DateTimeFormat('sv-SE', { timeZone: businessTz }).format(new Date())
+  const selectedKey = selectedDate.toISOString().split('T')[0]
   const days        = weekDays(weekStart)
 
   const groups = days
-    .map(day => ({
-      day,
-      appts: (_cache.get(toVenezuelaDate(day)) ?? [])
-        .filter(a => a.status !== 'cancelled')
-        .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()),
-    }))
+    .map(day => {
+      const key = day.toISOString().split('T')[0]
+      return {
+        day,
+        appts: (_cache.get(key) ?? [])
+          .filter(a => a.status !== 'cancelled')
+          .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()),
+      }
+    })
     .filter(g => g.appts.length > 0)
 
   return (
@@ -201,14 +218,14 @@ function WeekView({
       {/* Horizontal Date Picker Capsule strip */}
       <View style={s.weekGrid}>
         {days.map((day, i) => {
-          const key       = toVenezuelaDate(day)
+          const key       = day.toISOString().split('T')[0]
           const appts     = _cache.get(key) ?? []
           const hasDot    = appts.filter(a => a.status !== 'cancelled').length > 0
           const isT       = key === todayKey
           const isSel     = key === selectedKey
 
           // Month short representation
-          const monShort  = new Intl.DateTimeFormat('es-ES', { month: 'short' }).format(day).toUpperCase().slice(0, 3)
+          const monShort  = new Intl.DateTimeFormat('es-ES', { month: 'short', timeZone: 'UTC' }).format(day).toUpperCase().slice(0, 3)
           // Day name representation
           const dayName   = WLABELS[i]
 
@@ -220,7 +237,7 @@ function WeekView({
               activeOpacity={0.7}
             >
               <Text style={[s.wkLabelCapsule, (isT || isSel) && { color: 'rgba(255,255,255,0.7)' }]}>{monShort}</Text>
-              <Text style={[s.wkNumCapsule, (isT || isSel) && { color: '#fff' }]}>{day.getDate()}</Text>
+              <Text style={[s.wkNumCapsule, (isT || isSel) && { color: '#fff' }]}>{day.getUTCDate()}</Text>
               <Text style={[s.wkDayNameCapsule, (isT || isSel) && { color: 'rgba(255,255,255,0.8)' }]}>{dayName}</Text>
               {hasDot && <View style={[s.dotCapsule, (isT || isSel) && { backgroundColor: '#fff' }]} />}
             </TouchableOpacity>
@@ -236,9 +253,9 @@ function WeekView({
             <Text style={s.emptyText}>Sin citas esta semana</Text>
           </View>
         ) : groups.map(({ day, appts }) => (
-          <View key={toVenezuelaDate(day)}>
+          <View key={day.toISOString().split('T')[0]}>
             <Text style={s.groupLabel}>
-              {cap(new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }).format(day))}
+              {cap(new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(day))}
             </Text>
             {appts.map(item => <AppointmentCard key={item.id} item={item} tz={businessTz} />)}
           </View>
@@ -251,11 +268,11 @@ function WeekView({
 // ─── month view ───────────────────────────────────────────────────────────────
 
 function MonthView({
-  year, month, cacheVersion, onSelectDay,
+  year, month, cacheVersion, onSelectDay, businessTz,
 }: {
-  year: number; month: number; cacheVersion: number; onSelectDay: (d: Date) => void
+  year: number; month: number; cacheVersion: number; onSelectDay: (d: Date) => void; businessTz: string
 }) {
-  const todayKey = toVenezuelaDate(new Date())
+  const todayKey = new Intl.DateTimeFormat('sv-SE', { timeZone: businessTz }).format(new Date())
   const rows     = chunk(monthCells(year, month), 7)
 
   return (
@@ -273,16 +290,16 @@ function MonthView({
       {rows.map((row, ri) => (
         <View key={ri} style={s.monthRow}>
           {row.map((day, ci) => {
-            const key      = toVenezuelaDate(day)
+            const key      = day.toISOString().split('T')[0]
             const appts    = _cache.get(key) ?? []
-            const hasDot   = day.getMonth() === month && appts.filter(a => a.status !== 'cancelled').length > 0
-            const isCur    = day.getMonth() === month
+            const hasDot   = day.getUTCMonth() === month && appts.filter(a => a.status !== 'cancelled').length > 0
+            const isCur    = day.getUTCMonth() === month
             const isT      = key === todayKey
             return (
               <TouchableOpacity key={ci} style={s.monthCell} onPress={() => onSelectDay(day)} activeOpacity={0.7}>
                 <View style={[s.mnCircle, isT && s.mnCircleToday]}>
                   <Text style={[s.mnNum, !isCur && s.mnNumFaded, isT && s.mnNumToday]}>
-                    {day.getDate()}
+                    {day.getUTCDate()}
                   </Text>
                 </View>
                 <View style={hasDot ? s.dot : s.dotEmpty} />
@@ -301,46 +318,116 @@ type ViewMode    = 'day' | 'week' | 'month'
 type ScreenState = { kind: 'loading' } | { kind: 'error' } | { kind: 'ok'; data: AppointmentItem[] }
 
 export default function CalendarScreen() {
-  const today0 = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }
-
   const [view,         setView]         = useState<ViewMode>('day')
-  const [date,         setDate]         = useState(today0)
-  const [weekStart,    setWeekStart]    = useState(() => startOfWeek(new Date()))
-  const [monthViewDt,  setMonthViewDt]  = useState(new Date())
-  const [state,        setState]        = useState<ScreenState>({ kind: 'loading' })
+  const [businessTz,   setBusinessTz]   = useState(() => {
+    const s = cacheManager.get('settings')
+    return s ? getBusinessTZ(s) : 'America/Caracas'
+  })
+  const [date,         setDate]         = useState(() => {
+    const s = cacheManager.get('settings')
+    const tz = s ? getBusinessTZ(s) : 'America/Caracas'
+    return getTodayInTZ(tz)
+  })
+  const [weekStart,    setWeekStart]    = useState(() => {
+    const s = cacheManager.get('settings')
+    const tz = s ? getBusinessTZ(s) : 'America/Caracas'
+    return startOfWeek(getTodayInTZ(tz))
+  })
+  const [monthViewDt,  setMonthViewDt]  = useState(() => {
+    const s = cacheManager.get('settings')
+    const tz = s ? getBusinessTZ(s) : 'America/Caracas'
+    return getTodayInTZ(tz)
+  })
+  const [state,        setState]        = useState<ScreenState>(() => {
+    const s = cacheManager.get('settings')
+    const key = s ? getBusinessTZ(s) : 'America/Caracas'
+    const todayKey = new Intl.DateTimeFormat('sv-SE', { timeZone: key }).format(new Date())
+    if (_cache.has(todayKey)) {
+      return { kind: 'ok', data: _cache.get(todayKey)! }
+    }
+    return { kind: 'loading' }
+  })
   const [refreshing,   setRefreshing]   = useState(false)
   const [cacheVersion, setCacheVersion] = useState(0)
-  const [businessTz,   setBusinessTz]   = useState('America/Caracas')
-  const [businessId,   setBusinessId]   = useState<string | null>(null)
+  const [businessId,   setBusinessId]   = useState<string | null>(() => {
+    const s = cacheManager.get('settings')
+    return s ? (s.businessId || s.business?.id || null) : null
+  })
 
   useEffect(() => {
-    getSettings()
-      .then(s => {
-        if (s) {
-          setBusinessTz(getBusinessTZ(s))
-          setBusinessId(s.businessId || s.business?.id || null)
+    // 1. Load settings from disk cache
+    cacheManager.loadFromDisk('settings').then(s => {
+      if (s) {
+        const tz = getBusinessTZ(s)
+        setBusinessTz(tz)
+        setBusinessId(s.businessId || s.business?.id || null)
+        
+        const todayZoned = getTodayInTZ(tz)
+        setDate(todayZoned)
+        setWeekStart(startOfWeek(todayZoned))
+        setMonthViewDt(todayZoned)
+      }
+      // 2. Fetch fresh settings
+      return getSettings()
+    })
+    .then(s => {
+      if (s) {
+        const firstLoad = !cacheManager.has('settings')
+        cacheManager.saveToDisk('settings', s)
+        const tz = getBusinessTZ(s)
+        setBusinessTz(tz)
+        setBusinessId(s.businessId || s.business?.id || null)
+        
+        if (firstLoad) {
+          const todayZoned = getTodayInTZ(tz)
+          setDate(todayZoned)
+          setWeekStart(startOfWeek(todayZoned))
+          setMonthViewDt(todayZoned)
         }
-      })
-      .catch(() => {})
+      }
+    })
+    .catch(e => {
+      ob.logError('CalendarScreen settings load', e)
+    })
   }, [])
 
   const load = useCallback(async (d: Date, force = false) => {
-    const key = toVenezuelaDate(d)
-    if (!force && _cache.has(key)) {
+    const key = d.toISOString().split('T')[0]
+    const hasCache = _cache.has(key)
+
+    if (hasCache) {
       setState({ kind: 'ok', data: _cache.get(key)! })
-      return
+    } else {
+      setState({ kind: 'loading' })
     }
-    setState({ kind: 'loading' })
+
     try {
       const data = await getAppointments(key)
       _cache.set(key, data)
       setState({ kind: 'ok', data })
-    } catch {
-      setState({ kind: 'error' })
+    } catch (e) {
+      ob.logError('CalendarScreen load appointments', e)
+      if (!hasCache) {
+        setState({ kind: 'error' })
+      }
     }
   }, [])
 
-  useEffect(() => { load(date) }, [date, load])
+  // Telemetry of render time
+  useEffect(() => {
+    const endTrack = ob.trackTime()
+    load(date).then(() => {
+      ob.logPerformance('CalendarScreen', endTrack())
+    })
+  }, [date, load])
+
+  // Reactive subscription
+  useEffect(() => {
+    return cacheManager.subscribe('calendar', () => {
+      _cache.clear()
+      load(date, true)
+    })
+  }, [date, load])
 
   const dateStr = date.toISOString().split('T')[0]
   const businessDay = useBusinessDay(businessId, dateStr, businessTz)
@@ -348,27 +435,28 @@ export default function CalendarScreen() {
   // Background fetch for week view
   useEffect(() => {
     if (view !== 'week') return
-    const uncached = weekDays(weekStart).filter(d => !_cache.has(toVenezuelaDate(d)))
+    const uncached = weekDays(weekStart).filter(d => !_cache.has(d.toISOString().split('T')[0]))
     if (!uncached.length) return
     Promise.all(
-      uncached.map(d =>
-        getAppointments(toVenezuelaDate(d))
-          .then(data => { _cache.set(toVenezuelaDate(d), data) })
+      uncached.map(d => {
+        const key = d.toISOString().split('T')[0]
+        return getAppointments(key)
+          .then(data => { _cache.set(key, data) })
           .catch(() => {})
-      )
+      })
     ).then(() => setCacheVersion(v => v + 1))
   }, [view, weekStart])
 
   const onRefresh = async () => {
     setRefreshing(true)
-    _cache.delete(toVenezuelaDate(date))
+    const key = date.toISOString().split('T')[0]
+    _cache.delete(key)
     await load(date, true)
     setRefreshing(false)
   }
 
   function selectDay(d: Date) {
-    const n = new Date(d); n.setHours(0, 0, 0, 0)
-    setDate(n)
+    setDate(d)
     setView('day')
   }
 
@@ -398,7 +486,7 @@ export default function CalendarScreen() {
           )}
           {view === 'day' && (
             <>
-              <Text style={[s.weekday, isToday(date) && s.weekdayActive]}>{formatWeekday(date)}</Text>
+              <Text style={[s.weekday, isToday(date, businessTz) && s.weekdayActive]}>{formatWeekday(date)}</Text>
               <Text style={s.headerDate}>{formatFullDate(date)}</Text>
             </>
           )}
@@ -491,7 +579,7 @@ export default function CalendarScreen() {
 
       {/* ── month view ── */}
       {view === 'month' && (
-        <MonthView year={monthViewDt.getFullYear()} month={monthViewDt.getMonth()} cacheVersion={cacheVersion} onSelectDay={selectDay} />
+        <MonthView year={monthViewDt.getUTCFullYear()} month={monthViewDt.getUTCMonth()} cacheVersion={cacheVersion} onSelectDay={selectDay} businessTz={businessTz} />
       )}
 
       {/* ── FAB ── */}

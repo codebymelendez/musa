@@ -49,7 +49,8 @@ export function useBusinessDay(businessId: string | null, date: string, timezone
 
         // 2. Check Regular Business Hours
         // Respect business timezone to interpret the day of week
-        const dayOfWeek = new Date(`${date}T12:00:00`).getDay()
+        const [y, m, d] = date.split('-').map(Number)
+        const dayOfWeek = new Date(Date.UTC(y, m - 1, d)).getUTCDay()
 
         const { data: hours } = await supabase
           .from('BusinessHours')

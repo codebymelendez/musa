@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { getSession } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase-admin";
+import { parseBusinessHoursToSettings } from "@/lib/utils";
 
 export async function GET(req: NextRequest) {
   const response = NextResponse.json({ user: null });
@@ -24,6 +25,18 @@ export async function GET(req: NextRequest) {
     }
 
     const s = Array.isArray(user.settings) ? user.settings[0] : user.settings;
+
+    let bizHours = null;
+    if (user.businessId) {
+      const { data } = await admin
+        .from('BusinessHours')
+        .select('*')
+        .eq('businessId', user.businessId)
+        .is('userId', null);
+      bizHours = data;
+    }
+    const computedHours = parseBusinessHoursToSettings(bizHours);
+
     const userToReturn = {
       id: user.id,
       name: user.name,
@@ -40,7 +53,12 @@ export async function GET(req: NextRequest) {
       businessId: user.businessId,
       business: user.business,
       settings: s
-        ? { ...s, workDays: JSON.parse(s.workDays || "[1,2,3,4,5]") }
+        ? { 
+            ...s, 
+            workDays: computedHours.workDays,
+            startHour: computedHours.startHour,
+            endHour: computedHours.endHour,
+          }
         : null,
     };
 

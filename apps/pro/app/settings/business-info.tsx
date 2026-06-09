@@ -17,6 +17,7 @@ import { randomUUID } from 'expo-crypto'
 import { supabase } from '../../lib/supabase'
 import { getSettings } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials } from '../../lib/utils'
+import { cacheManager } from '../../lib/cache'
 
 const GOOGLE_PLACES_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_KEY ?? ''
 
@@ -393,6 +394,11 @@ export default function BusinessInfoScreen() {
       } catch (syncErr) {
         console.error('Error syncing to ProfessionalSettings:', syncErr)
       }
+
+      cacheManager.invalidate('business')
+      cacheManager.invalidate('dashboard')
+      cacheManager.invalidate('settings')
+      cacheManager.invalidate('calendar')
 
       Alert.alert('Éxito', 'Configuración del negocio guardada correctamente')
       loadData()
