@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     // 2. Obtener lista de pagos registrados ordenados por fecha
     const { data: payments, error } = await admin
       .from('SubscriptionPayment')
-      .select('*, business:Business(name, slug), user:User(name, email), plan:Plan(name)')
+      .select('*, business:Business(name, slug), user:User!SubscriptionPayment_userId_fkey(name, email), plan:Plan(name)')
       .order('createdAt', { ascending: false });
 
     if (error) {
