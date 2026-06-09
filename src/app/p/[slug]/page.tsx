@@ -202,7 +202,7 @@ export default function PublicBookingPage() {
 
   // Cargar slots al cambiar de fecha/servicio
   useEffect(() => {
-    if (!selectedService || step !== "datetime") return;
+    if (!selectedService || step !== "datetime" || !data) return;
     const fetchSlots = async () => {
       setSlotsLoading(true);
       setSelectedSlot(null);
