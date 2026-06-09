@@ -78,11 +78,12 @@ export async function GET(req: NextRequest) {
       latestPayment,
       isAdmin: user.isAdmin,
       settings: s
-        ? { 
-            ...s, 
+        ? {
+            ...s,
             workDays: computedHours.workDays,
             startHour: computedHours.startHour,
             endHour: computedHours.endHour,
+            paymentMethods: s.paymentMethods ? JSON.parse(s.paymentMethods) : [],
           }
         : null,
     };

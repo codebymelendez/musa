@@ -17,13 +17,12 @@ type Method = {
 }
 
 const METHODS: Method[] = [
-  { key: 'Efectivo',               label: 'Efectivo',                icon: 'cash-outline' },
-  { key: 'Transferencia Bancaria', label: 'Transferencia Bancaria',  icon: 'swap-horizontal-outline' },
-  { key: 'Pago Móvil',             label: 'Pago Móvil',              icon: 'phone-portrait-outline', hint: 'Venezuela' },
-  { key: 'Zelle',                  label: 'Zelle',                   icon: 'repeat-outline' },
-  { key: 'PayPal',                 label: 'PayPal',                  icon: 'globe-outline' },
-  { key: 'Tarjeta',                label: 'Tarjeta de Débito/Crédito', icon: 'card-outline' },
-  { key: 'Divisas',                label: 'Divisas (USD / EUR)',     icon: 'trending-up-outline' },
+  { key: 'efectivo_usd',  label: 'Efectivo USD',           icon: 'cash-outline',                hint: 'Billetes dólares'   },
+  { key: 'efectivo_bs',   label: 'Efectivo Bs.',           icon: 'cash-outline',                hint: 'Billetes bolívares' },
+  { key: 'pago_movil',    label: 'Pago Móvil',             icon: 'phone-portrait-outline',      hint: 'Venezuela'          },
+  { key: 'zelle',         label: 'Zelle',                  icon: 'repeat-outline',              hint: 'USD digital'        },
+  { key: 'transferencia', label: 'Transferencia Bancaria', icon: 'swap-horizontal-outline'                                 },
+  { key: 'otro',          label: 'Otro',                   icon: 'ellipsis-horizontal-outline'                             },
 ]
 
 function Skeleton() {

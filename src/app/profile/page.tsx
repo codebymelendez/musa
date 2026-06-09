@@ -5,8 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppStore } from "@/store/useAppStore";
-import { User, ProfessionalSettings } from "@/types";
-import { formatCurrency } from "@/lib/utils";
+import { User, ProfessionalSettings, PaymentMethod } from "@/types";
 import ImageUploader from "@/components/ui/ImageUploader";
 import {
   PencilIcon,
@@ -18,7 +17,16 @@ import {
   ChatBubbleLeftEllipsisIcon,
   StarIcon,
   ArrowRightStartOnRectangleIcon,
+  BanknotesIcon,
 } from "@heroicons/react/24/outline";
+
+const ALL_PAYMENT_METHODS: { value: PaymentMethod; label: string; hint: string }[] = [
+  { value: "efectivo_usd", label: "Efectivo USD",  hint: "Billetes dólares"   },
+  { value: "efectivo_bs",  label: "Efectivo Bs",   hint: "Billetes bolívares" },
+  { value: "pago_movil",   label: "Pago Móvil",    hint: "Bs via banco"       },
+  { value: "zelle",        label: "Zelle",          hint: "USD digital"        },
+  { value: "otro",         label: "Otro",           hint: "Cualquier otro"     },
+];
 
 const DAY_NAMES = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
@@ -27,7 +35,7 @@ export default function Profile() {
   const { setUser } = useAppStore();
   const router = useRouter();
   const [user, setLocalUser] = useState<User | null>(storeUser);
-  const [editMode, setEditMode] = useState<"none" | "profile" | "hours" | "contact" | "business">("none");
+  const [editMode, setEditMode] = useState<"none" | "profile" | "hours" | "contact" | "business" | "payments">("none");
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -42,6 +50,7 @@ export default function Profile() {
   const [formWorkDays, setFormWorkDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [formBusinessName, setFormBusinessName] = useState("");
   const [formCity, setFormCity] = useState("");
+  const [formPaymentMethods, setFormPaymentMethods] = useState<PaymentMethod[]>([]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -69,6 +78,7 @@ export default function Profile() {
       setFormStartHour(toHHmm(u.settings.startHour));
       setFormEndHour(toHHmm(u.settings.endHour));
       setFormWorkDays(u.settings.workDays);
+      setFormPaymentMethods(u.settings.paymentMethods ?? []);
     }
   };
 
@@ -98,6 +108,8 @@ export default function Profile() {
       } else if (editMode === "business") {
         payload.businessName = formBusinessName;
         payload.city = formCity;
+      } else if (editMode === "payments") {
+        payload.settings = { paymentMethods: formPaymentMethods };
       }
 
       const res = await fetch("/api/settings", {
@@ -303,6 +315,44 @@ export default function Profile() {
         </section>
       </div>
 
+      {/* ── Métodos de Pago ── */}
+      <section className="bg-surface border border-outline-variant/30 rounded-xl p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <BanknotesIcon className="w-5 h-5 text-on-surface-variant" />
+            <h3 className="font-ui font-medium text-[15px] text-on-surface">Métodos de Pago</h3>
+          </div>
+          <button
+            onClick={() => { fillForm(user!); setEditMode("payments"); }}
+            className="p-2 text-on-surface-variant hover:text-primary transition-colors"
+          >
+            <PencilIcon className="w-4 h-4" />
+          </button>
+        </div>
+        {settings?.paymentMethods && settings.paymentMethods.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {settings.paymentMethods.map((m) => {
+              const found = ALL_PAYMENT_METHODS.find((x) => x.value === m);
+              return found ? (
+                <span key={m} className="px-3 py-1 bg-primary/10 text-primary rounded-full font-ui text-[12px] font-medium">
+                  {found.label}
+                </span>
+              ) : null;
+            })}
+          </div>
+        ) : (
+          <p className="font-ui text-[13px] text-on-surface-muted">
+            No configurados — se mostrarán todos los métodos al cobrar.
+          </p>
+        )}
+        <button
+          onClick={() => { fillForm(user!); setEditMode("payments"); }}
+          className="w-full py-2.5 text-sm font-medium text-on-surface-variant border border-outline-variant/30 rounded-full hover:border-primary hover:text-primary transition-colors"
+        >
+          Editar Métodos
+        </button>
+      </section>
+
       {/* ── Enlace de Reserva ── */}
       <section className="relative overflow-hidden bg-primary/5 rounded-2xl p-6 border border-primary/10">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -499,6 +549,58 @@ export default function Profile() {
                   </select>
                 </div>
               </div>
+            </div>
+          </div>
+          <div className="flex gap-3 px-6 py-4 shrink-0 border-t border-outline-variant/10">
+            <button onClick={() => setEditMode("none")} className="flex-1 py-3 font-ui font-medium text-[14px] text-on-surface-variant border border-outline-variant/30 rounded-full">Cancelar</button>
+            <button onClick={handleSave} disabled={saving} className="flex-1 py-3 font-ui font-medium text-[14px] bg-primary text-on-primary rounded-full disabled:opacity-50">
+              {saving ? "Guardando…" : "Guardar"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ── Modal: Métodos de Pago ── */}
+    {editMode === "payments" && (
+      <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center">
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditMode("none")} />
+        <div className="relative w-full sm:max-w-md bg-surface rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[90dvh]">
+          <div className="px-6 pt-6 overflow-y-auto flex-1 min-h-0">
+            <h2 className="font-cormorant text-[22px] text-on-surface mb-2">Métodos de Pago</h2>
+            <p className="font-ui text-[13px] text-on-surface-muted mb-6">
+              Selecciona los métodos que aceptas. Si no seleccionas ninguno se mostrarán todos.
+            </p>
+            <div className="space-y-2">
+              {ALL_PAYMENT_METHODS.map(({ value, label, hint }) => {
+                const active = formPaymentMethods.includes(value);
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() =>
+                      setFormPaymentMethods((prev) =>
+                        prev.includes(value) ? prev.filter((m) => m !== value) : [...prev, value]
+                      )
+                    }
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-colors ${
+                      active
+                        ? "bg-primary/10 border-primary text-primary"
+                        : "bg-surface-sunken border-outline-variant/30 text-on-surface-variant"
+                    }`}
+                  >
+                    <div className="text-left">
+                      <p className="font-ui text-[14px] font-medium">{label}</p>
+                      <p className="font-ui text-[11px] opacity-70">{hint}</p>
+                    </div>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                      active ? "border-primary bg-primary" : "border-outline-variant/50"
+                    }`}>
+                      {active && <CheckIcon className="w-3 h-3 text-on-primary" />}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
           <div className="flex gap-3 px-6 py-4 shrink-0 border-t border-outline-variant/10">

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, Switch,
   StyleSheet, Linking, ActivityIndicator, Platform, Alert, KeyboardAvoidingView,
@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, router } from 'expo-router'
 import {
   getAppointmentById, triggerAppointmentAction, completeAppointment, registerPayment,
-  getSettings, getBusinessTZ,
+  getSettings, getBusinessTZ, getBcvRate,
   type AppointmentItem, type AppointmentStatus, type AppointmentPayment, type SettingsData,
 } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, formatTime, formatDate, formatMoney } from '../../lib/utils'
@@ -98,7 +98,7 @@ function PaymentSummary({
   businessTz: string
   onEdit?: () => void
 }) {
-  const isBs = payment.currency === 'Bs'
+  const isBs = ['Bs', 'BS'].includes(payment.currency)
   const formattedAmount = isBs
     ? `Bs. ${payment.amount.toFixed(2)}`
     : `$${payment.amount.toFixed(2)} USD`
@@ -170,12 +170,20 @@ export default function AppointmentDetailScreen() {
 
   // Payment form state
   const [amount, setAmount] = useState('')
-  const [currency, setCurrency] = useState<'USD' | 'Bs'>('USD')
+  const [currency, setCurrency] = useState<'USD' | 'BS'>('USD')
   const [method, setMethod] = useState<string | null>(null)
   const [isPaid, setIsPaid] = useState(true)
   const [payNotes, setPayNotes] = useState('')
   const [editingPayment, setEditingPayment] = useState(false)
   const [registering, setRegistering] = useState(false)
+
+  // BCV state
+  const [bcvRate, setBcvRate]     = useState<number | null>(null)
+  const [bcvDate, setBcvDate]     = useState<string | null>(null)
+  const [bcvFetching, setBcvFetching] = useState(false)
+  const [bcvError, setBcvError]   = useState<string | null>(null)
+  // usdBase stores the USD service price so we can restore it when switching back
+  const usdBaseRef = useRef<string>('')
 
   const load = useCallback(async () => {
     if (!id) return
@@ -184,7 +192,9 @@ export default function AppointmentDetailScreen() {
       const data = await getAppointmentById(id)
       setState(data ? { kind: 'ok', data } : { kind: 'error' })
       if (data && !data.payment) {
-        setAmount(data.service?.price ? String(data.service.price) : '')
+        const priceStr = data.service?.price ? String(data.service.price) : ''
+        usdBaseRef.current = priceStr
+        setAmount(priceStr)
         setCurrency('USD')
         setMethod(null)
         setIsPaid(true)
@@ -199,12 +209,50 @@ export default function AppointmentDetailScreen() {
   useEffect(() => { load() }, [load])
 
   function startEditPayment(payment: AppointmentPayment) {
-    setAmount(String(payment.amount))
-    setCurrency((payment.currency === 'Bs' ? 'Bs' : 'USD') as 'USD' | 'Bs')
+    const amtStr = String(payment.amount)
+    usdBaseRef.current = amtStr
+    setAmount(amtStr)
+    const c = ['Bs', 'BS'].includes(payment.currency) ? 'BS' : 'USD'
+    setCurrency(c as 'USD' | 'BS')
     setMethod(payment.method)
     setIsPaid(payment.isPaid)
     setPayNotes(payment.notes ?? '')
     setEditingPayment(true)
+  }
+
+  async function handleCurrencyChange(c: 'USD' | 'BS') {
+    setCurrency(c)
+    setBcvError(null)
+    if (c === 'USD') {
+      // Restore original USD amount
+      setAmount(usdBaseRef.current)
+      return
+    }
+    // c === 'BS': fetch BCV and auto-convert
+    if (bcvRate !== null) {
+      // Rate already cached — just convert
+      const usd = parseFloat(usdBaseRef.current.replace(',', '.'))
+      if (!isNaN(usd) && usd > 0) {
+        setAmount((usd * bcvRate).toFixed(2))
+      }
+      return
+    }
+    setBcvFetching(true)
+    try {
+      const data = await getBcvRate()
+      setBcvRate(data.usd)
+      setBcvDate(data.fecha ?? null)
+      const usd = parseFloat(usdBaseRef.current.replace(',', '.'))
+      if (!isNaN(usd) && usd > 0) {
+        setAmount((usd * data.usd).toFixed(2))
+      }
+    } catch (err) {
+      setBcvError('No se pudo obtener la tasa BCV')
+      setCurrency('USD')           // revert to USD if fetch fails
+      setAmount(usdBaseRef.current)
+    } finally {
+      setBcvFetching(false)
+    }
   }
 
   async function doAction(action: 'confirm' | 'cancel') {
@@ -284,7 +332,7 @@ export default function AppointmentDetailScreen() {
     )
   }
 
-  const symbol = currency === 'Bs' ? 'Bs.' : '$'
+  const symbol = currency === 'BS' ? 'Bs.' : '$'
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -434,19 +482,32 @@ export default function AppointmentDetailScreen() {
 
                         {/* Currency pills */}
                         <View style={pf.currencyRow}>
-                          {(['USD', 'Bs'] as const).map(c => (
+                          {(['USD', 'BS'] as const).map(c => (
                             <TouchableOpacity
                               key={c}
                               style={[pf.currencyPill, currency === c && pf.currencyPillActive]}
-                              onPress={() => setCurrency(c)}
+                              onPress={() => handleCurrencyChange(c)}
+                              disabled={bcvFetching}
                               activeOpacity={0.8}
                             >
-                              <Text style={[pf.currencyPillText, currency === c && pf.currencyPillTextActive]}>
-                                {c}
-                              </Text>
+                              {bcvFetching && c === 'BS'
+                                ? <ActivityIndicator size="small" color={currency === 'BS' ? '#fff' : PRIMARY} />
+                                : <Text style={[pf.currencyPillText, currency === c && pf.currencyPillTextActive]}>
+                                    {c === 'BS' ? 'Bs.' : 'USD'}
+                                  </Text>
+                              }
                             </TouchableOpacity>
                           ))}
                         </View>
+                        {currency === 'BS' && bcvRate !== null && !bcvError && (
+                          <Text style={pf.bcvInfo}>
+                            Tasa BCV: {bcvRate.toLocaleString('es-VE', { minimumFractionDigits: 2 })} Bs/$
+                            {bcvDate ? `  ·  ${bcvDate}` : ''}
+                          </Text>
+                        )}
+                        {bcvError && (
+                          <Text style={pf.bcvError}>{bcvError} — selecciona USD para continuar</Text>
+                        )}
 
                         {/* Payment method grid — filtered by business settings */}
                         <Text style={[pf.label, { marginTop: 16 }]}>MÉTODO DE PAGO</Text>
@@ -726,6 +787,12 @@ const pf = StyleSheet.create({
   },
   secondaryBtnText: { fontSize: 13, fontWeight: '500', color: DARK },
   btnDisabled: { opacity: 0.55 },
+  bcvInfo: {
+    fontSize: 11, color: GRAY, marginTop: 4, marginBottom: 4,
+  },
+  bcvError: {
+    fontSize: 11, color: '#C62828', marginTop: 4, marginBottom: 4,
+  },
   noMethodsBox: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 10,
     backgroundColor: '#FFF8F5', borderRadius: 10,

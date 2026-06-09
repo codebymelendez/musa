@@ -30,6 +30,7 @@ export type PaymentMethod =
   | "efectivo_usd"
   | "pago_movil"
   | "zelle"
+  | "transferencia"
   | "otro";
 
 export type PlanName = "FREE" | "PRO" | "TEAM";
@@ -175,6 +176,7 @@ export interface ProfessionalSettings {
   slotDuration: number; // 30 = 30 min
   currency: string;
   bookingEnabled: boolean;
+  paymentMethods?: PaymentMethod[];
 }
 
 

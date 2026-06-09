@@ -88,7 +88,7 @@ export function useAppointments() {
   const registerPayment = useCallback(
     async (
       id: string,
-      payment: { amount: number; method: string; isPaid?: boolean; notes?: string }
+      payment: { amount: number; currency?: string; method: string; isPaid?: boolean; notes?: string }
     ): Promise<Appointment> => {
       const res = await fetch(`/api/appointments/${id}`, {
         method: "PATCH",

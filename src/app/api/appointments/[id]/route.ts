@@ -13,11 +13,13 @@ const patchSchema = z.object({
   payment: z
     .object({
       amount: z.number(),
+      currency: z.enum(["USD", "BS", "Bs"]).optional().default("USD"),
       method: z.enum([
         "efectivo_bs",
         "efectivo_usd",
         "pago_movil",
         "zelle",
+        "transferencia",
         "otro",
       ]),
       isPaid: z.boolean().optional(),
@@ -104,7 +106,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     // Registrar/actualizar pago si se envía
     // Usamos adminClient para Payment porque la tabla no tiene RLS de escritura para staff
     if (payment) {
-      const { amount, method, isPaid = true, notes: payNotes } = payment;
+      const { amount, currency = "USD", method, isPaid = true, notes: payNotes } = payment;
       const adminForPayment = createAdminClient();
 
       // Verificar si ya existe un pago para esta cita
@@ -119,6 +121,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           .from('Payment')
           .update({
             amount,
+            currency,
             method,
             isPaid,
             notes: payNotes ?? null,
@@ -133,7 +136,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
             id: crypto.randomUUID(),
             appointmentId: id,
             amount,
-            currency: 'USD',
+            currency,
             method,
             isPaid,
             notes: payNotes ?? null,

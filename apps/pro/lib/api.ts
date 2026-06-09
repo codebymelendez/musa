@@ -388,6 +388,20 @@ export async function updateSettings(data: SettingsPatch): Promise<void> {
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
 }
 
+// ─── BCV Rate ────────────────────────────────────────────────────────────────
+
+export interface BcvRate { usd: number; fecha: string; stale?: boolean }
+
+export async function getBcvRate(): Promise<BcvRate> {
+  const headers = await authHeaders()
+  if (!headers) throw new Error('No autenticado')
+  const res = await fetch(`${API_URL}/api/bcv-rate`, { headers })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const data = await res.json()
+  if (data.error) throw new Error(data.error)
+  return data as BcvRate
+}
+
 // ─── Services ─────────────────────────────────────────────────────────────────
 
 export interface ServiceItem {

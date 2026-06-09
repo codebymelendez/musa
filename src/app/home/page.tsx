@@ -611,6 +611,7 @@ export default function Home() {
       {paymentTarget && (
         <PaymentModal
           appointment={paymentTarget}
+          paymentMethods={user?.settings?.paymentMethods}
           onClose={() => setPaymentTarget(null)}
           onSaved={async (paymentData) => {
             await registerPayment(paymentTarget.id, paymentData);
