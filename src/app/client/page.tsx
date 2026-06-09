@@ -47,7 +47,7 @@ interface BookingAppointment {
     avatarUrl: string | null;
     serviceType: string | null;
     whatsapp: string | null;
-    business: { name: string; city: string | null } | null;
+    business: { name: string; city: string | null; timezone?: string | null } | null;
   };
   client: { name: string; phone: string };
 }
@@ -60,8 +60,8 @@ const STATUS_LABEL: Record<string, { label: string; color: string }> = {
   no_show:   { label: "No asistí",   color: "bg-orange-100 text-orange-700"  },
 };
 
-function formatDateShort(iso: string) {
-  return new Date(iso).toLocaleDateString("es-VE", { weekday: "short", day: "numeric", month: "short" });
+function formatDateShort(iso: string, tz: string = "America/Caracas") {
+  return new Date(iso).toLocaleDateString("es-VE", { weekday: "short", day: "numeric", month: "short", timeZone: tz });
 }
 
 export default function ClientPortalPage() {
@@ -350,7 +350,7 @@ export default function ClientPortalPage() {
                   <div className="bg-surface-container rounded-xl px-4 py-3 space-y-1">
                     <p className="font-medium text-on-surface text-sm">{appt.service.name}</p>
                     <p className="text-xs text-on-surface-variant">
-                      {formatDateShort(appt.startTime)} · {formatTimeES(appt.startTime)} · {appt.service.durationMin} min
+                      {formatDateShort(appt.startTime, appt.user.business?.timezone || "America/Caracas")} · {formatTimeES(appt.startTime, appt.user.business?.timezone || "America/Caracas")} · {appt.service.durationMin} min
                     </p>
                   </div>
                   <div className="flex gap-2">

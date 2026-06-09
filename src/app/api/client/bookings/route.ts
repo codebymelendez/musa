@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
           avatarUrl,
           serviceType,
           whatsapp,
-          business:Business(name, city)
+          business:Business(name, city, timezone)
         ),
         client:Client(name, phone)
       `)

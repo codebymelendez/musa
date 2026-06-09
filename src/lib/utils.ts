@@ -33,24 +33,26 @@ export const VE_TZ = "America/Caracas";
 export const VE_UTC_OFFSET_H = 4;
 
 // ─── Formatear fecha en español ───────────────────────────────────────────────
-export function formatDateES(date: Date | string): string {
+export function formatDateES(date: Date | string, tz?: string): string {
   const d = typeof date === "string" ? new Date(date) : date;
+  const safeTz = tz ? getSafeTimezone(tz) : VE_TZ;
   return d.toLocaleDateString("es-VE", {
     weekday: "long",
     year: "numeric",
     month: "long",
     day: "numeric",
-    timeZone: VE_TZ,
+    timeZone: safeTz,
   });
 }
 
-export function formatTimeES(date: Date | string): string {
+export function formatTimeES(date: Date | string, tz?: string): string {
   const d = typeof date === "string" ? new Date(date) : date;
+  const safeTz = tz ? getSafeTimezone(tz) : VE_TZ;
   return d.toLocaleTimeString("es-VE", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: true,
-    timeZone: VE_TZ,
+    timeZone: safeTz,
   });
 }
 
@@ -130,8 +132,11 @@ export function generateTimeSlots(
 
   const now = new Date();
 
-  while (current.getTime() + serviceDuration * 60_000 <= endLimit.getTime()) {
-    const slotEnd = new Date(current.getTime() + serviceDuration * 60_000);
+  // Guard: null durationMin from DB makes serviceDuration = 0, which degenerates
+  // the condition to slotStart <= closeTime. Fall back to slotDuration.
+  const effectiveDuration = serviceDuration > 0 ? serviceDuration : slotDuration;
+  while (current.getTime() + effectiveDuration * 60_000 <= endLimit.getTime()) {
+    const slotEnd = new Date(current.getTime() + effectiveDuration * 60_000);
 
     // Colisión con citas existentes
     const isBooked = bookedTimes.some(({ startTime, endTime }) => {

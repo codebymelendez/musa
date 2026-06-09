@@ -73,6 +73,37 @@ function getNext14Days() {
   });
 }
 
+function getBizDateParts(date: Date, timezone: string) {
+  try {
+    const formatter = new Intl.DateTimeFormat('sv-SE', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+    const parts = formatter.format(date);
+    const [datePart, timePart] = parts.split(' ');
+    const [y, m, d] = datePart.split('-').map(Number);
+    const bizDate = new Date(Date.UTC(y, m - 1, d));
+    return {
+      dayOfWeek: bizDate.getUTCDay(),
+      dayOfMonth: d,
+      month: m - 1,
+      year: y,
+    };
+  } catch (e) {
+    return {
+      dayOfWeek: date.getDay(),
+      dayOfMonth: date.getDate(),
+      month: date.getMonth(),
+      year: date.getFullYear(),
+    };
+  }
+}
+
 export default function PublicBookingPage() {
   const params = useParams();
   const slug   = params.slug as string;
@@ -176,10 +207,13 @@ export default function PublicBookingPage() {
       setSlotsLoading(true);
       setSelectedSlot(null);
       try {
+        // Use business TZ date, not browser-local date — avoids off-by-one day
+        // for users in timezones behind the business near midnight.
+        const _bp = getBizDateParts(selectedDate, data.settings.timezone || 'America/Caracas');
         const dateStr = [
-          selectedDate.getFullYear(),
-          String(selectedDate.getMonth() + 1).padStart(2, "0"),
-          String(selectedDate.getDate()).padStart(2, "0"),
+          String(_bp.year),
+          String(_bp.month + 1).padStart(2, "0"),
+          String(_bp.dayOfMonth).padStart(2, "0"),
         ].join("-");
         const res = await fetch(`/api/public/${slug}?date=${dateStr}&serviceId=${selectedService.id}`);
         const d   = await res.json();
@@ -474,22 +508,18 @@ export default function PublicBookingPage() {
               <span className="musa-sublabel">02 / 03</span>
             </div>
 
+            <p className="text-[12px] text-on-surface-muted">
+              Horarios mostrados en la zona horaria del negocio: <strong>{data.settings.timezone || 'America/Caracas'}</strong>
+            </p>
+
             {/* Selector de día */}
             <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
               {next14Days.map((day, i) => {
                 const isSelected = day.toDateString() === selectedDate.toDateString();
                 const isToday    = i === 0;
                 
-                // Evaluar día de la semana en la zona horaria del negocio
-                let dayOfWeek = day.getDay();
-                try {
-                  const localStr = new Intl.DateTimeFormat('sv-SE', { timeZone: data.settings.timezone || 'America/Caracas' }).format(day);
-                  const [y, m, d] = localStr.split('-').map(Number);
-                  dayOfWeek = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
-                } catch {
-                  dayOfWeek = day.getDay();
-                }
-                const isWorkday  = data.settings.workDays.includes(dayOfWeek);
+                const bizParts = getBizDateParts(day, data.settings.timezone || 'America/Caracas');
+                const isWorkday  = data.settings.workDays.includes(bizParts.dayOfWeek);
                 return (
                   <button
                     key={i}
@@ -506,10 +536,10 @@ export default function PublicBookingPage() {
                     )}
                   >
                     <span className="font-ui text-[10px] font-medium uppercase tracking-[0.08em]">
-                      {isToday ? "Hoy" : DAYS_ES[day.getDay()]}
+                      {isToday ? "Hoy" : DAYS_ES[bizParts.dayOfWeek]}
                     </span>
-                    <span className="font-display font-normal leading-none" style={{ fontSize: "20px" }}>{day.getDate()}</span>
-                    <span className="font-ui text-[10px]">{MONTHS_ES[day.getMonth()]}</span>
+                    <span className="font-display font-normal leading-none" style={{ fontSize: "20px" }}>{bizParts.dayOfMonth}</span>
+                    <span className="font-ui text-[10px]">{MONTHS_ES[bizParts.month]}</span>
                   </button>
                 );
               })}
@@ -529,7 +559,12 @@ export default function PublicBookingPage() {
             ) : (
               <div className="grid grid-cols-3 gap-2">
                 {slots.map((slot) => {
-                  const displayTime = new Date(slot.datetime).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit", hour12: true });
+                  const displayTime = new Date(slot.datetime).toLocaleTimeString("es-VE", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: true,
+                    timeZone: data.settings.timezone || "America/Caracas",
+                  });
                   const isSelected  = selectedSlot?.datetime === slot.datetime;
                   return (
                     <button
@@ -567,8 +602,8 @@ export default function PublicBookingPage() {
             <div className="bg-primary-surface border border-primary-border rounded-xl p-4 space-y-1">
               <p className="font-ui font-medium text-[14px] text-primary">{selectedService?.name}</p>
               <p className="font-ui text-[13px] text-on-surface-muted">
-                {selectedDate.toLocaleDateString("es-VE", { weekday: "long", day: "numeric", month: "long" })}{" "}
-                · {selectedSlot ? formatTimeES(selectedSlot.datetime) : ""}
+                {selectedDate.toLocaleDateString("es-VE", { weekday: "long", day: "numeric", month: "long", timeZone: data.settings.timezone || "America/Caracas" })}{" "}
+                · {selectedSlot ? formatTimeES(selectedSlot.datetime, data.settings.timezone) : ""}
                 {" · "}
                 <span className="font-mono-num">{formatCurrency(selectedService?.price ?? 0, selectedService?.currency)}</span>
               </p>
@@ -741,8 +776,11 @@ export default function PublicBookingPage() {
                 </h2>
                 <p className="font-ui text-[14px] text-on-surface-muted leading-relaxed">
                   {professional.name} te espera el{" "}
-                  {new Date(confirmed.startTime).toLocaleDateString("es-VE", { day: "numeric", month: "long" })}{" "}
-                  a las {formatTimeES(confirmed.startTime)}.
+                  {new Date(confirmed.startTime).toLocaleDateString("es-VE", { day: "numeric", month: "long", timeZone: data.settings.timezone || "America/Caracas" })}{" "}
+                  a las {formatTimeES(confirmed.startTime, data.settings.timezone)}.
+                </p>
+                <p className="text-[11px] text-on-surface-subtle">
+                  La hora indicada corresponde a la zona horaria de {professional.name} ({data.settings.timezone || 'America/Caracas'}).
                 </p>
               </div>
               <div className="bg-surface-sunken rounded-xl p-4 text-left space-y-1">

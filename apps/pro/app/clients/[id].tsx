@@ -17,21 +17,30 @@ import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials, formatShor
 
 // ─── status pill (mini) ───────────────────────────────────────────────────────
 
-const STATUS_COLORS: Record<AppointmentStatus, { bg: string; text: string }> = {
-  confirmed: { bg: '#E8F5E9', text: '#2E7D32' },
-  pending:   { bg: '#FFF8E1', text: '#8B6914' },
-  cancelled: { bg: '#FDECEA', text: '#C62828' },
-  completed: { bg: '#F5F5F5', text: '#757575' },
+const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
+  confirmed:    { bg: '#E8F5E9', text: '#2E7D32' },
+  pending:      { bg: '#FFF8E1', text: '#8B6914' },
+  cancelled:    { bg: '#FDECEA', text: '#C62828' },
+  completed:    { bg: '#F5F5F5', text: '#757575' },
+  no_show:      { bg: '#FFF3E0', text: '#E65100' },
+  rescheduled:  { bg: '#E3F2FD', text: '#1565C0' },
+  reprogrammed: { bg: '#E3F2FD', text: '#1565C0' },
 }
-const STATUS_LABEL: Record<AppointmentStatus, string> = {
-  confirmed: 'Confirmada', pending: 'Pendiente', cancelled: 'Cancelada', completed: 'Completada',
+const STATUS_LABEL: Record<string, string> = {
+  confirmed:    'Confirmada',
+  pending:      'Pendiente',
+  cancelled:    'Cancelada',
+  completed:    'Completada',
+  no_show:      'No asistió',
+  rescheduled:  'Reprogramada',
+  reprogrammed: 'Reprogramada',
 }
 
 function MiniPill({ status }: { status: AppointmentStatus }) {
-  const { bg, text } = STATUS_COLORS[status]
+  const colors = STATUS_COLORS[status] ?? { bg: '#F5F5F5', text: '#757575' }
   return (
-    <View style={[styles.pill, { backgroundColor: bg }]}>
-      <Text style={[styles.pillText, { color: text }]}>{STATUS_LABEL[status]}</Text>
+    <View style={[styles.pill, { backgroundColor: colors.bg }]}>
+      <Text style={[styles.pillText, { color: colors.text }]}>{STATUS_LABEL[status] ?? status}</Text>
     </View>
   )
 }

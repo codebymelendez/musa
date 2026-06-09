@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     const supabase = createAdminClient();
 
     // Buscamos por rescheduleToken o ID
-    const { data: appointment, error: aError } = await supabase
+    const { data: rawAppointment, error: aError } = await supabase
       .from('Appointment')
       .select('*, client:Client(*), service:Service(*), user:User(id, name, email, slug)')
       .or(`rescheduleToken.eq.${token},id.eq.${token}`)
@@ -39,9 +39,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Error en base de datos" }, { status: 500 });
     }
 
-    if (!appointment) {
+    if (!rawAppointment) {
       return NextResponse.json({ error: "Cita no encontrada" }, { status: 404 });
     }
+
+    const appointment = {
+      ...rawAppointment,
+      client: Array.isArray(rawAppointment.client) ? rawAppointment.client[0] : rawAppointment.client,
+      service: Array.isArray(rawAppointment.service) ? rawAppointment.service[0] : rawAppointment.service,
+      user: Array.isArray(rawAppointment.user) ? rawAppointment.user[0] : rawAppointment.user,
+    };
 
     if (["cancelled", "completed", "no_show"].includes(appointment.status)) {
       return NextResponse.json(

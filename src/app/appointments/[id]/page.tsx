@@ -13,6 +13,7 @@ import {
   CheckCircleIcon,
   UserIcon,
 } from "@heroicons/react/24/outline";
+import { useAuth } from "@/hooks/useAuth";
 import { formatTimeES, formatDateES, formatCurrency, statusLabel } from "@/lib/utils";
 import { useAppointments } from "@/hooks/useAppointments";
 import { Appointment } from "@/types";
@@ -40,6 +41,8 @@ function getInitials(name: string) {
 }
 
 export default function AppointmentDetailPage() {
+  const { user } = useAuth();
+  const tz = user?.business?.timezone || "America/Caracas";
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { updateStatus } = useAppointments();
@@ -152,6 +155,9 @@ export default function AppointmentDetailPage() {
             <h1 className="font-display text-[18px] font-light italic text-on-surface leading-none">
               Detalle de cita
             </h1>
+            <p className="text-[10px] text-on-surface-subtle mt-1">
+              Zona horaria: {tz}
+            </p>
           </div>
           <Link
             href={`/appointments/${appointment.id}/edit`}
@@ -195,13 +201,13 @@ export default function AppointmentDetailPage() {
             <CalendarDaysIcon className="w-[18px] h-[18px] text-on-surface-subtle mt-0.5 flex-shrink-0" />
             <div>
               <p className="font-ui text-[14px] text-on-surface capitalize">
-                {formatDateES(new Date(appointment.startTime))}
+                {formatDateES(new Date(appointment.startTime), tz)}
               </p>
               <p
                 className="text-[13px] text-on-surface-muted mt-px"
                 style={{ fontFamily: "var(--font-mono)" }}
               >
-                {formatTimeES(appointment.startTime)} → {formatTimeES(appointment.endTime)}
+                {formatTimeES(appointment.startTime, tz)} → {formatTimeES(appointment.endTime, tz)}
               </p>
             </div>
           </div>

@@ -46,7 +46,14 @@ export async function GET(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Cita no encontrada" }, { status: 404 });
   }
 
-  return NextResponse.json(appointment);
+  const formatted = {
+    ...appointment,
+    client: Array.isArray(appointment.client) ? appointment.client[0] : appointment.client,
+    service: Array.isArray(appointment.service) ? appointment.service[0] : appointment.service,
+    payment: Array.isArray(appointment.payment) ? appointment.payment[0] : appointment.payment,
+  };
+
+  return NextResponse.json(formatted);
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
@@ -144,6 +151,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       .eq('id', id)
       .single();
 
+    const formattedResult = result ? {
+      ...result,
+      client: Array.isArray(result.client) ? result.client[0] : result.client,
+      service: Array.isArray(result.service) ? result.service[0] : result.service,
+      payment: Array.isArray(result.payment) ? result.payment[0] : result.payment,
+    } : null;
+
     // Auto-sumar puntos de fidelización cuando la cita se marca como completada
     if (status === "completed" && result) {
       try {
@@ -178,7 +192,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       }
     }
 
-    return NextResponse.json(result);
+    return NextResponse.json(formattedResult);
   } catch (error) {
     console.error("[appointments PATCH]", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });

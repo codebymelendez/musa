@@ -45,6 +45,7 @@ export interface Business {
   city: string | null;
   logoUrl: string | null;
   planId: string;
+  timezone?: string | null;
   plan?: PlanDef;
 }
 

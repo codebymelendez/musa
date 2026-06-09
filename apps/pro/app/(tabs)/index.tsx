@@ -395,7 +395,7 @@ export default function HomeScreen() {
               </Text>
               {nextAppt ? (
                 <Text style={[styles.bentoSubText, { color: '#fff', opacity: 0.7 }]}>
-                  Siguiente a las {formatTime(nextAppt.startTime)}
+                  Siguiente a las {formatTime(nextAppt.startTime, businessTz)}
                 </Text>
               ) : (
                 <Text style={[styles.bentoSubText, { color: '#fff', opacity: 0.7 }]}>Día libre 🌿</Text>
@@ -503,7 +503,7 @@ export default function HomeScreen() {
                     activeOpacity={0.7}
                   >
                     <View style={styles.agendaTimeWrap}>
-                      <Text style={[styles.agendaTime, { fontFamily: MONO }]}>{formatTime(apt.startTime)}</Text>
+                      <Text style={[styles.agendaTime, { fontFamily: MONO }]}>{formatTime(apt.startTime, businessTz)}</Text>
                     </View>
                     <View style={styles.agendaContent}>
                       <Text style={styles.agendaClient}>{apt.client?.name ?? '—'}</Text>

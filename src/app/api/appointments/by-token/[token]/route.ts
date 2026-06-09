@@ -54,8 +54,15 @@ export async function GET(_req: NextRequest, { params }: Params) {
     }
   }
 
+  const client = Array.isArray(appointment.client) ? appointment.client[0] : appointment.client;
+  const service = Array.isArray(appointment.service) ? appointment.service[0] : appointment.service;
+  const payment = Array.isArray(appointment.payment) ? appointment.payment[0] : appointment.payment;
+
   return NextResponse.json({
     ...appointment,
+    client,
+    service,
+    payment,
     user: {
       ...user,
       business,

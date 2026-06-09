@@ -15,10 +15,10 @@ export async function GET(req: NextRequest, { params }: Params) {
   try {
     const admin = createAdminClient();
 
-    // Buscar profesional por slug + servicios + settings
+    // Buscar profesional por slug + servicios + settings + business
     const { data: user, error: userError } = await admin
       .from('User')
-      .select('*, services:Service(*), settings:ProfessionalSettings(*)')
+      .select('*, services:Service(*), settings:ProfessionalSettings(*), business:Business(timezone)')
       .eq('slug', slug)
       .eq('Service.isActive', true)
       .single();
@@ -46,6 +46,9 @@ export async function GET(req: NextRequest, { params }: Params) {
     }
     const computedHours = parseBusinessHoursToSettings(bizHours);
 
+    const businessObj = Array.isArray(user.business) ? user.business[0] : user.business;
+    const businessTz = businessObj?.timezone || rawSettings?.timezone || DEFAULT_TZ;
+
     const settings = {
       workDays: computedHours.workDays,
       startHour: computedHours.startHour,
@@ -53,7 +56,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       slotDuration: rawSettings?.slotDuration ?? 30,
       currency: rawSettings?.currency ?? "USD",
       bookingEnabled: rawSettings?.bookingEnabled ?? true,
-      timezone: rawSettings?.timezone ?? DEFAULT_TZ,
+      timezone: businessTz,
     };
 
     if (settings.bookingEnabled === false) {

@@ -108,10 +108,12 @@ export default function Home() {
 
   const displayName = user?.name?.split(" ")[0] ?? "";
 
+  const tz = user?.business?.timezone || "America/Caracas";
   const dateLabel = today.toLocaleDateString("es-VE", {
     weekday: "long",
     day:     "numeric",
     month:   "long",
+    timeZone: tz,
   });
 
   /* Today's appointments (excluding cancelled/no_show from the count) */
@@ -208,7 +210,7 @@ export default function Home() {
               {greeting}{displayName ? `, ${displayName}` : ""}.
             </h1>
             <p className="font-ui text-[12px] text-on-surface-subtle mt-2 capitalize tracking-[0.01em]">
-              {dateLabel}
+              {dateLabel} · Horarios en zona horaria: <strong>{tz}</strong>
             </p>
           </>
         )}
@@ -330,7 +332,7 @@ export default function Home() {
                           {/* Time */}
                           <div className="flex-shrink-0 w-[50px] pt-px text-right">
                             <span className="font-mono-num text-[13px] text-on-surface-muted">
-                              {formatTimeES(apt.startTime)}
+                              {formatTimeES(apt.startTime, tz)}
                             </span>
                           </div>
 
@@ -572,10 +574,11 @@ export default function Home() {
                       {new Date(apt.startTime).toLocaleDateString("es-VE", {
                         day:   "numeric",
                         month: "short",
+                        timeZone: tz,
                       })}
                     </p>
                     <p className="font-mono-num text-[11px] text-on-surface-subtle">
-                      {formatTimeES(apt.startTime)}
+                      {formatTimeES(apt.startTime, tz)}
                     </p>
                   </div>
                 </Link>

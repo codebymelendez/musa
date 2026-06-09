@@ -5,7 +5,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
-import { getStats, getUpcomingAppointments, type StatsData, type AppointmentItem } from '../../lib/api'
+import { getStats, getUpcomingAppointments, getSettings, getBusinessTZ, type StatsData, type AppointmentItem } from '../../lib/api'
 import { PRIMARY, DARK, BORDER, GRAY, MONO, SERIF, formatTime, formatShortDate } from '../../lib/utils'
 import { cacheManager } from '../../lib/cache'
 import { ob } from '../../lib/observability'
@@ -94,6 +94,21 @@ export default function StatsScreen() {
     return { kind: 'loading' }
   })
   const [refreshing, setRefreshing] = useState(false)
+  const [businessTz, setBusinessTz] = useState(() => {
+    const c = cacheManager.get('dashboard') as any | null
+    return c?.businessTz ?? 'America/Caracas'
+  })
+
+  useEffect(() => {
+    const cached = cacheManager.get('dashboard') as any | null
+    if (cached?.businessTz) {
+      setBusinessTz(cached.businessTz)
+    } else {
+      getSettings().then((s) => {
+        if (s) setBusinessTz(getBusinessTZ(s))
+      }).catch(() => {})
+    }
+  }, [])
 
   const load = useCallback(async (p: Period, force = false) => {
     const cached = getCachedPeriodData(p)
@@ -155,6 +170,7 @@ export default function StatsScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Estadísticas</Text>
+        <Text style={styles.tzLabel}>Zona horaria: {businessTz}</Text>
       </View>
 
       {/* Period pills */}
@@ -247,7 +263,7 @@ export default function StatsScreen() {
                       activeOpacity={0.72}
                     >
                       <Text style={[styles.upcomingTime, { fontFamily: MONO }]}>
-                        {formatShortDate(apt.startTime)} {formatTime(apt.startTime)}
+                        {formatShortDate(apt.startTime, businessTz)} {formatTime(apt.startTime, businessTz)}
                       </Text>
                       <View style={styles.upcomingRight}>
                         <Text style={styles.upcomingClient}>{apt.client.name}</Text>
@@ -281,6 +297,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER,
   },
   headerTitle: { fontFamily: SERIF, fontSize: 28, color: DARK },
+  tzLabel: { fontSize: 11, color: GRAY, marginTop: 4 },
   periodWrap: {
     flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingVertical: 14,
     backgroundColor: '#fff',

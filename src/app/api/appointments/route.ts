@@ -211,7 +211,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Error al crear la cita" }, { status: 500 });
     }
 
-    return NextResponse.json(appointment, { status: 201 });
+    const formatted = appointment ? {
+      ...appointment,
+      client: Array.isArray(appointment.client) ? appointment.client[0] : appointment.client,
+      service: Array.isArray(appointment.service) ? appointment.service[0] : appointment.service,
+    } : null;
+
+    return NextResponse.json(formatted, { status: 201 });
   } catch (error) {
     console.error("[appointments POST]", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });

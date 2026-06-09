@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, router } from 'expo-router'
 import {
   getAppointmentById, triggerAppointmentAction, completeAppointment, registerPayment,
+  getSettings, getBusinessTZ,
   type AppointmentItem, type AppointmentStatus, type AppointmentPayment,
 } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, formatTime, formatDate, formatMoney } from '../../lib/utils'
@@ -35,22 +36,30 @@ const METHOD_LABEL: Record<string, string> = {
 
 // ─── status pill ──────────────────────────────────────────────────────────────
 
-const STATUS_LABEL: Record<AppointmentStatus, string> = {
-  confirmed: 'Confirmada', pending: 'Pendiente',
-  cancelled: 'Cancelada',  completed: 'Completada',
+const STATUS_LABEL: Record<string, string> = {
+  confirmed:    'Confirmada',
+  pending:      'Pendiente',
+  cancelled:    'Cancelada',
+  completed:    'Completada',
+  no_show:      'No asistió',
+  rescheduled:  'Reprogramada',
+  reprogrammed: 'Reprogramada',
 }
-const STATUS_COLORS: Record<AppointmentStatus, { bg: string; text: string }> = {
-  confirmed: { bg: '#E8F5E9', text: '#2E7D32' },
-  pending:   { bg: '#FFF8E1', text: '#8B6914' },
-  cancelled: { bg: '#FDECEA', text: '#C62828' },
-  completed: { bg: '#F5F5F5', text: '#757575' },
+const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
+  confirmed:    { bg: '#E8F5E9', text: '#2E7D32' },
+  pending:      { bg: '#FFF8E1', text: '#8B6914' },
+  cancelled:    { bg: '#FDECEA', text: '#C62828' },
+  completed:    { bg: '#F5F5F5', text: '#757575' },
+  no_show:      { bg: '#FFF3E0', text: '#E65100' },
+  rescheduled:  { bg: '#E3F2FD', text: '#1565C0' },
+  reprogrammed: { bg: '#E3F2FD', text: '#1565C0' },
 }
 
 function StatusPill({ status }: { status: AppointmentStatus }) {
-  const { bg, text } = STATUS_COLORS[status]
+  const colors = STATUS_COLORS[status] ?? { bg: '#F5F5F5', text: '#757575' }
   return (
-    <View style={[styles.pill, { backgroundColor: bg }]}>
-      <Text style={[styles.pillText, { color: text }]}>{STATUS_LABEL[status]}</Text>
+    <View style={[styles.pill, { backgroundColor: colors.bg }]}>
+      <Text style={[styles.pillText, { color: colors.text }]}>{STATUS_LABEL[status] ?? status}</Text>
     </View>
   )
 }
@@ -82,9 +91,11 @@ function DetailSkeleton() {
 
 function PaymentSummary({
   payment,
+  businessTz,
   onEdit,
 }: {
   payment: AppointmentPayment
+  businessTz: string
   onEdit?: () => void
 }) {
   const isBs = payment.currency === 'Bs'
@@ -112,7 +123,7 @@ function PaymentSummary({
 
       {payment.paidAt ? (
         <Text style={[ps.paidAt, { fontFamily: MONO }]}>
-          {formatDate(payment.paidAt)} · {formatTime(payment.paidAt)}
+          {formatDate(payment.paidAt, businessTz)} · {formatTime(payment.paidAt, businessTz)}
         </Text>
       ) : null}
 
@@ -141,6 +152,22 @@ export default function AppointmentDetailScreen() {
   const [state, setState] = useState<State>({ kind: 'loading' })
   const [acting, setActing] = useState(false)
   const insets = useSafeAreaInsets()
+
+  // Timezone state
+  const [businessTz, setBusinessTz] = useState('America/Caracas')
+
+  useEffect(() => {
+    const cached = cacheManager.get('settings')
+    if (cached) {
+      setBusinessTz(getBusinessTZ(cached))
+    } else {
+      getSettings().then((s) => {
+        if (s) {
+          setBusinessTz(getBusinessTZ(s))
+        }
+      }).catch(() => {})
+    }
+  }, [])
 
   // Payment form state
   const [amount, setAmount] = useState('')
@@ -344,13 +371,16 @@ export default function AppointmentDetailScreen() {
               {/* 2. Date & time */}
               <Section title="Fecha y hora">
                 <View style={styles.card}>
-                  <Text style={styles.dateText}>{formatDate(apt.startTime)}</Text>
+                  <Text style={styles.dateText}>{formatDate(apt.startTime, businessTz)}</Text>
                   <View style={styles.timeRow}>
                     <Text style={[styles.timeText, { fontFamily: MONO }]}>
-                      {formatTime(apt.startTime)} — {formatTime(apt.endTime)}
+                      {formatTime(apt.startTime, businessTz)} — {formatTime(apt.endTime, businessTz)}
                     </Text>
                     <StatusPill status={apt.status} />
                   </View>
+                  <Text style={{ fontSize: 11, color: GRAY, marginTop: 8 }}>
+                    Zona horaria del negocio: {businessTz}
+                  </Text>
                 </View>
               </Section>
 
@@ -370,6 +400,7 @@ export default function AppointmentDetailScreen() {
                     <Section title="Cobro">
                       <PaymentSummary
                         payment={apt.payment}
+                        businessTz={businessTz}
                         onEdit={apt.status === 'confirmed'
                           ? () => startEditPayment(apt.payment!)
                           : undefined

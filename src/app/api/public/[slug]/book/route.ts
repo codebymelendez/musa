@@ -250,9 +250,15 @@ export async function POST(req: NextRequest, { params }: Params) {
       tag: `booking-${appointment.id}`,
     }).catch(() => {});
 
+    const formattedAppointment = appointment ? {
+      ...appointment,
+      client: Array.isArray(appointment.client) ? appointment.client[0] : appointment.client,
+      service: Array.isArray(appointment.service) ? appointment.service[0] : appointment.service,
+    } : null;
+
     return NextResponse.json(
       {
-        appointment,
+        appointment: formattedAppointment,
         clientId: client.id,
         professional: {
           name: user.name,

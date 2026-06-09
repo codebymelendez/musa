@@ -7,7 +7,8 @@ import {
   CalendarDaysIcon,
 } from "@heroicons/react/24/outline";
 import { useAppointments } from "@/hooks/useAppointments";
-import { formatTimeES, formatCurrency } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { formatTimeES, formatCurrency, toLocalDate } from "@/lib/utils";
 import { Appointment } from "@/types";
 
 type FilterPeriod = "today" | "week" | "upcoming" | "all";
@@ -38,35 +39,32 @@ const STATUS_BORDER: Record<string, string> = {
 };
 
 /* Returns entries sorted by date key (YYYY-MM-DD → Appointment[]) */
-function groupByDate(appointments: Appointment[]): [string, Appointment[]][] {
+function groupByDate(appointments: Appointment[], tz: string): [string, Appointment[]][] {
   const map = new Map<string, Appointment[]>();
   for (const apt of appointments) {
-    const key = new Date(apt.startTime).toLocaleDateString("en-CA"); // YYYY-MM-DD
+    const key = toLocalDate(new Date(apt.startTime), tz); // YYYY-MM-DD in business timezone
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(apt);
   }
   return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
 }
 
-function formatGroupDate(dateKey: string): string {
+function formatGroupDate(dateKey: string, tz: string): string {
   const [y, m, d] = dateKey.split("-").map(Number);
-  const date     = new Date(y, m - 1, d);
-  const today    = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
+  const date     = new Date(Date.UTC(y, m - 1, d));
+  const todayStr = toLocalDate(new Date(), tz);
+  const tomorrowDate = new Date();
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrowStr = toLocalDate(tomorrowDate, tz);
 
-  const sameDay = (a: Date, b: Date) =>
-    a.getDate() === b.getDate() &&
-    a.getMonth() === b.getMonth() &&
-    a.getFullYear() === b.getFullYear();
-
-  if (sameDay(date, today))    return "Hoy";
-  if (sameDay(date, tomorrow)) return "Mañana";
+  if (dateKey === todayStr)    return "Hoy";
+  if (dateKey === tomorrowStr) return "Mañana";
 
   return date.toLocaleDateString("es-VE", {
     weekday: "long",
     day:     "numeric",
     month:   "long",
+    timeZone: "UTC",
   });
 }
 
@@ -86,6 +84,8 @@ function findNextAppointmentId(appointments: Appointment[]): string | null {
 }
 
 export default function AppointmentsPage() {
+  const { user } = useAuth();
+  const tz = user?.business?.timezone || "America/Caracas";
   const { appointments, loading, fetchByRange } = useAppointments();
   const [period, setPeriod] = useState<FilterPeriod>("upcoming");
 
@@ -129,7 +129,7 @@ export default function AppointmentsPage() {
     loadAppointments();
   }, [loadAppointments]);
 
-  const grouped    = groupByDate(appointments);
+  const grouped    = groupByDate(appointments, tz);
   const nextAptId  = findNextAppointmentId(appointments);
 
   return (
@@ -149,6 +149,9 @@ export default function AppointmentsPage() {
             <h1 className="font-display text-[18px] font-light italic text-on-surface leading-none">
               Citas
             </h1>
+            <p className="text-[11px] text-on-surface-subtle mt-1">
+              Zona horaria: {tz}
+            </p>
           </div>
           <Link
             href="/calendar"
@@ -233,7 +236,7 @@ export default function AppointmentsPage() {
                 {/* Date group header */}
                 <div className="flex items-baseline gap-3 py-4 border-t border-border-subtle">
                   <span className="musa-sublabel capitalize">
-                    {formatGroupDate(dateKey)}
+                    {formatGroupDate(dateKey, tz)}
                   </span>
                   <span className="font-ui text-[11px] text-on-surface-subtle">
                     {dayApts.length}{" "}
@@ -275,7 +278,7 @@ export default function AppointmentsPage() {
                             {/* Time */}
                             <div className="flex-shrink-0 w-[50px] pt-px text-right">
                               <span className="font-mono-num text-[13px] text-on-surface-muted">
-                                {formatTimeES(apt.startTime)}
+                                {formatTimeES(apt.startTime, tz)}
                               </span>
                             </div>
 

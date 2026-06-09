@@ -46,7 +46,7 @@ async function handle401(): Promise<void> {
 
 // ─── Appointments ─────────────────────────────────────────────────────────────
 
-export type AppointmentStatus = 'confirmed' | 'cancelled' | 'completed' | 'pending'
+export type AppointmentStatus = 'confirmed' | 'cancelled' | 'completed' | 'pending' | 'no_show' | 'rescheduled' | 'reprogrammed'
 
 export interface AppointmentClient {
   id: string; name: string; phone: string; email: string | null

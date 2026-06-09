@@ -103,20 +103,29 @@ function monthLabel(d: Date): string {
 
 // ─── status pill ─────────────────────────────────────────────────────────────
 
-const STATUS_LABEL: Record<AppointmentStatus, string> = {
-  confirmed: 'Confirmada', pending: 'Pendiente', cancelled: 'Cancelada', completed: 'Completada',
+const STATUS_LABEL: Record<string, string> = {
+  confirmed:    'Confirmada',
+  pending:      'Pendiente',
+  cancelled:    'Cancelada',
+  completed:    'Completada',
+  no_show:      'No asistió',
+  rescheduled:  'Reprogramada',
+  reprogrammed: 'Reprogramada',
 }
-const STATUS_COLORS: Record<AppointmentStatus, { bg: string; text: string }> = {
-  confirmed: { bg: 'rgba(181, 89, 62, 0.1)', text: PRIMARY },
-  pending:   { bg: 'rgba(217, 139, 115, 0.1)', text: '#D98B73' },
-  cancelled: { bg: 'rgba(155, 35, 53, 0.1)', text: '#9B2335' },
-  completed: { bg: 'rgba(45, 106, 79, 0.1)', text: '#2D6A4F' },
+const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
+  confirmed:    { bg: 'rgba(181, 89, 62, 0.1)', text: PRIMARY },
+  pending:      { bg: 'rgba(217, 139, 115, 0.1)', text: '#D98B73' },
+  cancelled:    { bg: 'rgba(155, 35, 53, 0.1)', text: '#9B2335' },
+  completed:    { bg: 'rgba(45, 106, 79, 0.1)', text: '#2D6A4F' },
+  no_show:      { bg: 'rgba(155, 35, 53, 0.08)', text: '#9B2335' },
+  rescheduled:  { bg: 'rgba(21, 101, 192, 0.1)', text: '#1565C0' },
+  reprogrammed: { bg: 'rgba(21, 101, 192, 0.1)', text: '#1565C0' },
 }
 function StatusPill({ status }: { status: AppointmentStatus }) {
-  const { bg, text } = STATUS_COLORS[status]
+  const colors = STATUS_COLORS[status] ?? { bg: 'rgba(45, 106, 79, 0.1)', text: '#2D6A4F' }
   return (
-    <View style={[s.pill, { backgroundColor: bg }]}>
-      <Text style={[s.pillText, { color: text }]}>{STATUS_LABEL[status]}</Text>
+    <View style={[s.pill, { backgroundColor: colors.bg }]}>
+      <Text style={[s.pillText, { color: colors.text }]}>{STATUS_LABEL[status] ?? status}</Text>
     </View>
   )
 }
