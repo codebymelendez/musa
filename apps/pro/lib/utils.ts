@@ -43,6 +43,25 @@ export function formatMoney(amount: number, currency = 'USD'): string {
   return `$${amount.toFixed(2)}`
 }
 
+// ─── Moneda ──────────────────────────────────────────────────────────────────
+// La BD tiene valores históricos con casing mixto ('BS', 'Bs').
+// Nunca comparar currency con literales: usar siempre estos helpers.
+export function normalizeCurrency(currency?: string | null): 'USD' | 'BS' {
+  return (currency ?? 'USD').toUpperCase() === 'BS' ? 'BS' : 'USD'
+}
+
+export function isBs(currency?: string | null): boolean {
+  return normalizeCurrency(currency) === 'BS'
+}
+
+// Formato es-VE: miles con punto, decimales con coma → "Bs 9.082,92"
+// (sin Intl para evitar dependencia de datos de locale en Hermes/Android)
+export function formatBs(amount: number): string {
+  const [int, dec] = amount.toFixed(2).split('.')
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  return `Bs ${grouped},${dec}`
+}
+
 // HHMM integer (e.g. 830) → { h: '08', m: '30' }
 export function hhmmToParts(hhmm: number): { h: string; m: string } {
   return {

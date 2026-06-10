@@ -115,7 +115,21 @@ create policy "avatar_update_own_prefix"
 
 Para `business-photos`, replicar con prefijo por `businessId` (requiere el helper de §2 o mover la subida al backend).
 
-## 5 · Checklist al terminar
+## 5 · Normalización de moneda en Payment (2026-06-10, fix multi-moneda)
+
+El esquema del API aceptaba `currency: 'Bs'` además de `'BS'`. Los writers actuales (web `PaymentModal`, móvil `appointments/[id]`) escriben `'BS'` y el server ahora normaliza toda escritura a mayúsculas, pero pueden existir filas históricas con casing mixto. El código lee con normalización case-insensitive, así que esto es solo limpieza de datos:
+
+```sql
+-- Diagnóstico: ¿qué variantes existen?
+select currency, count(*) from "Payment" group by currency;
+
+-- Normalizar: cualquier variante de "bs" → 'BS'; todo lo demás → 'USD'
+update "Payment" set currency = 'BS'  where upper(currency) = 'BS'  and currency <> 'BS';
+update "Payment" set currency = 'USD' where upper(currency) <> 'BS' and currency <> 'USD';
+update "Payment" set currency = 'USD' where currency is null;
+```
+
+## 6 · Checklist al terminar
 
 - [ ] §1 ejecutado: todas las tablas listadas tienen `rls_activo = true`
 - [ ] Políticas de escritura por negocio en Business / BusinessHours / BusinessException / BusinessPhoto / ProfessionalSettings

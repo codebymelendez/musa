@@ -11,6 +11,7 @@ import { Pulse, Bone } from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
 import { validate, serviceFormSchema } from '../../lib/validation'
 import { useServices, useUpdateService, useDeleteService } from '../../hooks/queries'
+import { MaxWidthContainer } from '../../components/ui/MaxWidthContainer'
 
 const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120]
 
@@ -103,114 +104,116 @@ export default function ServiceEditScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="chevron-back-outline" size={24} color={DARK} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {service?.name ?? 'Servicio'}
-        </Text>
-        <View style={styles.backBtn} />
-      </View>
+      <MaxWidthContainer>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="chevron-back-outline" size={24} color={DARK} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {service?.name ?? 'Servicio'}
+          </Text>
+          <View style={styles.backBtn} />
+        </View>
 
-      {loadState === 'loading' && <ScrollView><ServiceSkeleton /></ScrollView>}
+        {loadState === 'loading' && <ScrollView><ServiceSkeleton /></ScrollView>}
 
-      {loadState === 'error' && (
-        <ErrorState message="No se pudo cargar el servicio" onRetry={load} />
-      )}
+        {loadState === 'error' && (
+          <ErrorState message="No se pudo cargar el servicio" onRetry={load} />
+        )}
 
-      {loadState === 'ready' && (
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
-        >
-          <ScrollView
-            contentContainerStyle={styles.content}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+        {loadState === 'ready' && (
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
           >
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Información del servicio</Text>
-
-              <Text style={styles.label}>Nombre *</Text>
-              <TextInput
-                style={styles.input}
-                value={name}
-                onChangeText={setName}
-                placeholderTextColor="#AAAAAA"
-              />
-
-              <Text style={[styles.label, { marginTop: 16 }]}>Duración</Text>
-              <View style={styles.pillsRow}>
-                {DURATION_OPTIONS.map(d => (
-                  <TouchableOpacity
-                    key={d}
-                    style={[styles.durationPill, durationMin === d && styles.durationPillActive]}
-                    onPress={() => setDurationMin(d)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.durationPillText, durationMin === d && { color: '#fff' }]}>
-                      {d} min
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <Text style={[styles.label, { marginTop: 16 }]}>Precio</Text>
-              <TextInput
-                style={styles.input}
-                value={price}
-                onChangeText={setPrice}
-                keyboardType="decimal-pad"
-                placeholderTextColor="#AAAAAA"
-              />
-
-              <Text style={[styles.label, { marginTop: 16 }]}>Descripción <Text style={{ color: GRAY }}>(opcional)</Text></Text>
-              <TextInput
-                style={[styles.input, { height: 80, textAlignVertical: 'top', paddingTop: 10 }]}
-                value={description}
-                onChangeText={setDescription}
-                multiline
-                placeholderTextColor="#AAAAAA"
-                placeholder="Describe el servicio…"
-              />
-            </View>
-
-            {/* Delete */}
-            <TouchableOpacity
-              style={styles.deleteBtn}
-              onPress={handleDelete}
-              disabled={deleting}
-              activeOpacity={0.85}
+            <ScrollView
+              contentContainerStyle={styles.content}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
             >
-              <Ionicons name="trash-outline" size={18} color="#C62828" />
-              <Text style={styles.deleteBtnText}>{deleting ? 'Eliminando…' : 'Eliminar servicio'}</Text>
-            </TouchableOpacity>
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Información del servicio</Text>
 
-            <View style={{ height: 20 }} />
-          </ScrollView>
+                <Text style={styles.label}>Nombre *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={name}
+                  onChangeText={setName}
+                  placeholderTextColor="#AAAAAA"
+                />
 
-          <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
-            {savedMsg ? (
-              <View style={styles.savedBadge}>
-                <Ionicons name="checkmark-circle-outline" size={18} color="#2E7D32" />
-                <Text style={styles.savedText}>Guardado ✓</Text>
+                <Text style={[styles.label, { marginTop: 16 }]}>Duración</Text>
+                <View style={styles.pillsRow}>
+                  {DURATION_OPTIONS.map(d => (
+                    <TouchableOpacity
+                      key={d}
+                      style={[styles.durationPill, durationMin === d && styles.durationPillActive]}
+                      onPress={() => setDurationMin(d)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.durationPillText, durationMin === d && { color: '#fff' }]}>
+                        {d} min
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={[styles.label, { marginTop: 16 }]}>Precio</Text>
+                <TextInput
+                  style={styles.input}
+                  value={price}
+                  onChangeText={setPrice}
+                  keyboardType="decimal-pad"
+                  placeholderTextColor="#AAAAAA"
+                />
+
+                <Text style={[styles.label, { marginTop: 16 }]}>Descripción <Text style={{ color: GRAY }}>(opcional)</Text></Text>
+                <TextInput
+                  style={[styles.input, { height: 80, textAlignVertical: 'top', paddingTop: 10 }]}
+                  value={description}
+                  onChangeText={setDescription}
+                  multiline
+                  placeholderTextColor="#AAAAAA"
+                  placeholder="Describe el servicio…"
+                />
               </View>
-            ) : (
+
+              {/* Delete */}
               <TouchableOpacity
-                style={[styles.btnPrimary, saving && { opacity: 0.6 }]}
-                onPress={handleSave}
-                disabled={saving}
+                style={styles.deleteBtn}
+                onPress={handleDelete}
+                disabled={deleting}
                 activeOpacity={0.85}
               >
-                <Text style={styles.btnPrimaryText}>{saving ? 'Guardando…' : 'Guardar cambios'}</Text>
+                <Ionicons name="trash-outline" size={18} color="#C62828" />
+                <Text style={styles.deleteBtnText}>{deleting ? 'Eliminando…' : 'Eliminar servicio'}</Text>
               </TouchableOpacity>
-            )}
-          </View>
-        </KeyboardAvoidingView>
-      )}
+
+              <View style={{ height: 20 }} />
+            </ScrollView>
+
+            <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
+              {savedMsg ? (
+                <View style={styles.savedBadge}>
+                  <Ionicons name="checkmark-circle-outline" size={18} color="#2E7D32" />
+                  <Text style={styles.savedText}>Guardado ✓</Text>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.btnPrimary, saving && { opacity: 0.6 }]}
+                  onPress={handleSave}
+                  disabled={saving}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.btnPrimaryText}>{saving ? 'Guardando…' : 'Guardar cambios'}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </KeyboardAvoidingView>
+        )}
+      </MaxWidthContainer>
     </SafeAreaView>
   )
 }

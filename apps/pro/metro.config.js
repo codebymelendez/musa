@@ -9,7 +9,7 @@ process.env.EXPO_ROUTER_APP_ROOT = path.resolve(projectRoot, 'app')
 
 const config = getDefaultConfig(projectRoot)
 
-config.watchFolders = [workspaceRoot]
+config.watchFolders = [...config.watchFolders, workspaceRoot]
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(workspaceRoot, 'node_modules'),

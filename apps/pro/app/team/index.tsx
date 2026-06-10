@@ -13,6 +13,7 @@ import { Pulse, Bone } from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
 import { validate, inviteFormSchema } from '../../lib/validation'
 import { useSettings, useInviteTeamMember } from '../../hooks/queries'
+import { MaxWidthContainer } from '../../components/ui/MaxWidthContainer'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -157,108 +158,110 @@ export default function TeamScreen() {
 
   return (
     <SafeAreaView style={teamStyles.safe} edges={['top']}>
-      <View style={teamStyles.header}>
-        <TouchableOpacity style={teamStyles.backBtn} onPress={() => router.back()}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="chevron-back-outline" size={24} color={DARK} />
-        </TouchableOpacity>
-        <Text style={teamStyles.headerTitle}>Mi Equipo</Text>
-        <View style={teamStyles.backBtn} />
-      </View>
-
-      {loadState === 'loading' && !refreshing && <TeamSkeleton />}
-
-      {loadState === 'error' && (
-        <ErrorState message="No se pudo cargar el equipo" onRetry={load} />
-      )}
-
-      {loadState === 'ready' && !isTeamPlan && (
-        <View style={teamStyles.planBanner}>
-          <Ionicons name="lock-closed-outline" size={20} color="#F57C00" />
-          <Text style={teamStyles.planBannerText}>
-            Esta función está disponible en el plan Team
-          </Text>
-          <TouchableOpacity
-            style={teamStyles.planBannerBtn}
-            onPress={() => Linking.openURL('https://getmusa.app')}
-            activeOpacity={0.85}
-          >
-            <Text style={teamStyles.planBannerBtnText}>Ver planes</Text>
+      <MaxWidthContainer>
+        <View style={teamStyles.header}>
+          <TouchableOpacity style={teamStyles.backBtn} onPress={() => router.back()}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="chevron-back-outline" size={24} color={DARK} />
           </TouchableOpacity>
+          <Text style={teamStyles.headerTitle}>Mi Equipo</Text>
+          <View style={teamStyles.backBtn} />
         </View>
-      )}
 
-      {loadState === 'ready' && (
-        <ScrollView
-          contentContainerStyle={teamStyles.content}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} colors={[PRIMARY]} />}
-        >
-          {/* Members */}
-          <View style={teamStyles.card}>
-            <Text style={teamStyles.cardTitle}>
-              Miembros activos ({members.length})
+        {loadState === 'loading' && !refreshing && <TeamSkeleton />}
+
+        {loadState === 'error' && (
+          <ErrorState message="No se pudo cargar el equipo" onRetry={load} />
+        )}
+
+        {loadState === 'ready' && !isTeamPlan && (
+          <View style={teamStyles.planBanner}>
+            <Ionicons name="lock-closed-outline" size={20} color="#F57C00" />
+            <Text style={teamStyles.planBannerText}>
+              Esta función está disponible en el plan Team
             </Text>
-            {members.length === 0 ? (
-              <Text style={teamStyles.grayText}>Solo tú en este momento</Text>
-            ) : (
-              members.map((m, i) => (
-                <View key={m.id}>
-                  <MemberRow member={m} />
-                  {i < members.length - 1 && <View style={teamStyles.divider} />}
-                </View>
-              ))
-            )}
+            <TouchableOpacity
+              style={teamStyles.planBannerBtn}
+              onPress={() => Linking.openURL('https://getmusa.app')}
+              activeOpacity={0.85}
+            >
+              <Text style={teamStyles.planBannerBtnText}>Ver planes</Text>
+            </TouchableOpacity>
           </View>
+        )}
 
-          {/* Pending invitations */}
-          {invitations.length > 0 && (
+        {loadState === 'ready' && (
+          <ScrollView
+            contentContainerStyle={teamStyles.content}
+            showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} colors={[PRIMARY]} />}
+          >
+            {/* Members */}
             <View style={teamStyles.card}>
-              <Text style={teamStyles.cardTitle}>Invitaciones pendientes ({invitations.length})</Text>
-              {invitations.map((inv, i) => (
-                <View key={inv.id}>
-                  <View style={teamStyles.invRow}>
-                    <View style={teamStyles.invIcon}>
-                      <Ionicons name="mail-outline" size={18} color={GRAY} />
-                    </View>
-                    <View style={teamStyles.invInfo}>
-                      <Text style={teamStyles.invEmail}>{inv.email}</Text>
-                      <Text style={teamStyles.invStatus}>Pendiente · enviada {formatJoinDate(inv.createdAt)}</Text>
-                    </View>
+              <Text style={teamStyles.cardTitle}>
+                Miembros activos ({members.length})
+              </Text>
+              {members.length === 0 ? (
+                <Text style={teamStyles.grayText}>Solo tú en este momento</Text>
+              ) : (
+                members.map((m, i) => (
+                  <View key={m.id}>
+                    <MemberRow member={m} />
+                    {i < members.length - 1 && <View style={teamStyles.divider} />}
                   </View>
-                  {i < invitations.length - 1 && <View style={teamStyles.divider} />}
-                </View>
-              ))}
+                ))
+              )}
             </View>
-          )}
 
-          {/* Info note */}
-          <View style={teamStyles.infoCard}>
-            <Ionicons name="information-circle-outline" size={18} color={GRAY} />
-            <Text style={teamStyles.infoText}>
-              Los miembros del equipo pueden ver y gestionar citas.
-              Solo el propietario puede modificar servicios y ajustes del negocio.
-            </Text>
-          </View>
+            {/* Pending invitations */}
+            {invitations.length > 0 && (
+              <View style={teamStyles.card}>
+                <Text style={teamStyles.cardTitle}>Invitaciones pendientes ({invitations.length})</Text>
+                {invitations.map((inv, i) => (
+                  <View key={inv.id}>
+                    <View style={teamStyles.invRow}>
+                      <View style={teamStyles.invIcon}>
+                        <Ionicons name="mail-outline" size={18} color={GRAY} />
+                      </View>
+                      <View style={teamStyles.invInfo}>
+                        <Text style={teamStyles.invEmail}>{inv.email}</Text>
+                        <Text style={teamStyles.invStatus}>Pendiente · enviada {formatJoinDate(inv.createdAt)}</Text>
+                      </View>
+                    </View>
+                    {i < invitations.length - 1 && <View style={teamStyles.divider} />}
+                  </View>
+                ))}
+              </View>
+            )}
 
-          {/* Invite button */}
-          <TouchableOpacity
-            style={[teamStyles.btnPrimary, !isTeamPlan && { opacity: 0.4 }]}
-            onPress={isTeamPlan ? () => setShowInviteModal(true) : undefined}
-            disabled={!isTeamPlan}
-            activeOpacity={0.85}>
-            <Ionicons name="person-add-outline" size={18} color="#fff" />
-            <Text style={teamStyles.btnPrimaryText}>Invitar miembro</Text>
-          </TouchableOpacity>
+            {/* Info note */}
+            <View style={teamStyles.infoCard}>
+              <Ionicons name="information-circle-outline" size={18} color={GRAY} />
+              <Text style={teamStyles.infoText}>
+                Los miembros del equipo pueden ver y gestionar citas.
+                Solo el propietario puede modificar servicios y ajustes del negocio.
+              </Text>
+            </View>
 
-          <View style={{ height: 24 }} />
-        </ScrollView>
-      )}
+            {/* Invite button */}
+            <TouchableOpacity
+              style={[teamStyles.btnPrimary, !isTeamPlan && { opacity: 0.4 }]}
+              onPress={isTeamPlan ? () => setShowInviteModal(true) : undefined}
+              disabled={!isTeamPlan}
+              activeOpacity={0.85}>
+              <Ionicons name="person-add-outline" size={18} color="#fff" />
+              <Text style={teamStyles.btnPrimaryText}>Invitar miembro</Text>
+            </TouchableOpacity>
 
-      <InviteModal
-        visible={showInviteModal}
-        onClose={email => email ? handleInvited(email) : setShowInviteModal(false)}
-      />
+            <View style={{ height: 24 }} />
+          </ScrollView>
+        )}
+
+        <InviteModal
+          visible={showInviteModal}
+          onClose={email => email ? handleInvited(email) : setShowInviteModal(false)}
+        />
+      </MaxWidthContainer>
     </SafeAreaView>
   )
 }

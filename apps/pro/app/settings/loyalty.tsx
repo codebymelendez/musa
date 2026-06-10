@@ -11,6 +11,7 @@ import { Pulse, Bone } from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
 import { validate, loyaltyFormSchema } from '../../lib/validation'
 import { useLoyaltyProgram, useLoyaltyAccounts, useSaveLoyaltyProgram } from '../../hooks/queries'
+import { MaxWidthContainer } from '../../components/ui/MaxWidthContainer'
 
 // ─── skeleton ─────────────────────────────────────────────────────────────────
 
@@ -110,141 +111,142 @@ export default function LoyaltyScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="chevron-back-outline" size={24} color={DARK} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Programa de Fidelidad</Text>
-        <View style={styles.backBtn} />
-      </View>
+      <MaxWidthContainer>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="chevron-back-outline" size={24} color={DARK} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Programa de Fidelidad</Text>
+          <View style={styles.backBtn} />
+        </View>
 
-      {loadState === 'loading' && <ScrollView><LoyaltySkeleton /></ScrollView>}
+        {loadState === 'loading' && <ScrollView><LoyaltySkeleton /></ScrollView>}
 
-      {loadState === 'error' && (
-        <ErrorState message="No se pudo cargar la configuración" onRetry={load} />
-      )}
+        {loadState === 'error' && (
+          <ErrorState message="No se pudo cargar la configuración" onRetry={load} />
+        )}
 
-      {loadState === 'ready' && (
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
-        >
-          <ScrollView
-            contentContainerStyle={styles.content}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+        {loadState === 'ready' && (
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
           >
-            {/* ─── Configuración del programa ─── */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Configuración del programa</Text>
+            <ScrollView
+              contentContainerStyle={styles.content}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* ─── Configuración del programa ─── */}
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Configuración del programa</Text>
 
-              {/* Toggle principal */}
-              <View style={styles.toggleRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.toggleTitle}>Activar programa de puntos</Text>
-                  <Text style={styles.toggleSub}>
-                    Las clientas acumularán puntos con cada cita completada
-                  </Text>
+                {/* Toggle principal */}
+                <View style={styles.toggleRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.toggleTitle}>Activar programa de puntos</Text>
+                    <Text style={styles.toggleSub}>
+                      Las clientas acumularán puntos con cada cita completada
+                    </Text>
+                  </View>
+                  <Switch
+                    value={isActive}
+                    onValueChange={setIsActive}
+                    trackColor={{ false: '#DDDDDD', true: PRIMARY }}
+                    thumbColor="#fff"
+                  />
                 </View>
-                <Switch
-                  value={isActive}
-                  onValueChange={setIsActive}
-                  trackColor={{ false: '#DDDDDD', true: PRIMARY }}
-                  thumbColor="#fff"
+
+                <View style={styles.divider} />
+
+                {/* Tipo de acumulación */}
+                <Text style={styles.label}>Tipo de programa</Text>
+                <View style={styles.typeRow}>
+                  {([
+                    { key: 'visits' as AccType, label: 'Por visitas', icon: 'calendar-outline' as const },
+                    { key: 'points' as AccType, label: 'Por monto gastado', icon: 'cash-outline' as const },
+                  ] as { key: AccType; label: string; icon: React.ComponentProps<typeof Ionicons>['name'] }[]).map(opt => {
+                    const active = accumulationType === opt.key
+                    return (
+                      <TouchableOpacity
+                        key={opt.key}
+                        style={[styles.typeOption, active && styles.typeOptionActive]}
+                        onPress={() => setAccumulationType(opt.key)}
+                        activeOpacity={0.78}
+                      >
+                        <Ionicons name={opt.icon} size={18}
+                          color={active ? PRIMARY : GRAY} />
+                        <Text style={[styles.typeOptionText, active && { color: PRIMARY }]}>
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    )
+                  })}
+                </View>
+
+                {/* Puntos por visita / por $ */}
+                <Text style={[styles.label, { marginTop: 16 }]}>
+                  {accumulationType === 'visits'
+                    ? 'Puntos por visita completada'
+                    : 'Puntos por cada $1 gastado'}
+                </Text>
+                <TextInput
+                  style={styles.input}
+                  value={pointsPerVisit}
+                  onChangeText={setPointsPerVisit}
+                  keyboardType="number-pad"
+                  placeholderTextColor="#AAAAAA"
+                  placeholder="1"
+                />
+
+                {/* Umbral de canje */}
+                <Text style={[styles.label, { marginTop: 16 }]}>
+                  Canjear premio cada X puntos
+                </Text>
+                <TextInput
+                  style={styles.input}
+                  value={rewardThreshold}
+                  onChangeText={setRewardThreshold}
+                  keyboardType="number-pad"
+                  placeholderTextColor="#AAAAAA"
+                  placeholder="10"
+                />
+
+                {/* Descripción del premio */}
+                <Text style={[styles.label, { marginTop: 16 }]}>
+                  Descripción del premio
+                </Text>
+                <TextInput
+                  style={[styles.input, { height: 70, textAlignVertical: 'top', paddingTop: 10 }]}
+                  value={rewardDescription}
+                  onChangeText={setRewardDescription}
+                  multiline
+                  placeholderTextColor="#AAAAAA"
+                  placeholder="ej: Servicio gratis, 20% de descuento"
                 />
               </View>
 
-              <View style={styles.divider} />
-
-              {/* Tipo de acumulación */}
-              <Text style={styles.label}>Tipo de programa</Text>
-              <View style={styles.typeRow}>
-                {([
-                  { key: 'visits' as AccType, label: 'Por visitas', icon: 'calendar-outline' as const },
-                  { key: 'points' as AccType, label: 'Por monto gastado', icon: 'cash-outline' as const },
-                ] as { key: AccType; label: string; icon: React.ComponentProps<typeof Ionicons>['name'] }[]).map(opt => {
-                  const active = accumulationType === opt.key
-                  return (
-                    <TouchableOpacity
-                      key={opt.key}
-                      style={[styles.typeOption, active && styles.typeOptionActive]}
-                      onPress={() => setAccumulationType(opt.key)}
-                      activeOpacity={0.78}
-                    >
-                      <Ionicons name={opt.icon} size={18}
-                        color={active ? PRIMARY : GRAY} />
-                      <Text style={[styles.typeOptionText, active && { color: PRIMARY }]}>
-                        {opt.label}
-                      </Text>
-                    </TouchableOpacity>
-                  )
-                })}
+              {/* ─── Estadísticas del programa ─── */}
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Estadísticas</Text>
+                <View style={styles.statsRow}>
+                  <StatBento label="clientas con puntos" value={statsClientsWithPoints} />
+                  <View style={styles.statsDivider} />
+                  <StatBento label="puntos activos totales" value={statsTotalPoints} />
+                </View>
               </View>
 
-              {/* Puntos por visita / por $ */}
-              <Text style={[styles.label, { marginTop: 16 }]}>
-                {accumulationType === 'visits'
-                  ? 'Puntos por visita completada'
-                  : 'Puntos por cada $1 gastado'}
-              </Text>
-              <TextInput
-                style={styles.input}
-                value={pointsPerVisit}
-                onChangeText={setPointsPerVisit}
-                keyboardType="number-pad"
-                placeholderTextColor="#AAAAAA"
-                placeholder="1"
-              />
-
-              {/* Umbral de canje */}
-              <Text style={[styles.label, { marginTop: 16 }]}>
-                Canjear premio cada X puntos
-              </Text>
-              <TextInput
-                style={styles.input}
-                value={rewardThreshold}
-                onChangeText={setRewardThreshold}
-                keyboardType="number-pad"
-                placeholderTextColor="#AAAAAA"
-                placeholder="10"
-              />
-
-              {/* Descripción del premio */}
-              <Text style={[styles.label, { marginTop: 16 }]}>
-                Descripción del premio
-              </Text>
-              <TextInput
-                style={[styles.input, { height: 70, textAlignVertical: 'top', paddingTop: 10 }]}
-                value={rewardDescription}
-                onChangeText={setRewardDescription}
-                multiline
-                placeholderTextColor="#AAAAAA"
-                placeholder="ej: Servicio gratis, 20% de descuento"
-              />
-            </View>
-
-            {/* ─── Estadísticas del programa ─── */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Estadísticas</Text>
-              <View style={styles.statsRow}>
-                <StatBento label="clientas con puntos" value={statsClientsWithPoints} />
-                <View style={styles.statsDivider} />
-                <StatBento label="puntos activos totales" value={statsTotalPoints} />
-              </View>
-            </View>
-
-            {/* ─── Cómo funciona ─── */}
-            <View style={styles.infoCard}>
-              <Ionicons name="information-circle-outline" size={18} color={GRAY} />
-              <View style={{ flex: 1, gap: 6 }}>
-                <Text style={styles.infoTitle}>¿Cómo funciona?</Text>
-                <Text style={styles.infoText}>
-                  {accumulationType === 'visits'
-                    ? `Cada vez que una clienta completa una cita, gana ${pointsPerVisit || '1'} punto${parseInt(pointsPerVisit, 10) !== 1 ? 's' : ''} automáticamente.`
-                    : `La clienta gana ${pointsPerVisit || '1'} punto${parseInt(pointsPerVisit, 10) !== 1 ? 's' : ''} por cada $1 que paga en su cita.`
+              {/* ─── Cómo funciona ─── */}
+              <View style={styles.infoCard}>
+                <Ionicons name="information-circle-outline" size={18} color={GRAY} />
+                <View style={{ flex: 1, gap: 6 }}>
+                  <Text style={styles.infoTitle}>¿Cómo funciona?</Text>
+                  <Text style={styles.infoText}>
+                    {accumulationType === 'visits'
+                      ? `Cada vez que una clienta completa una cita, gana ${pointsPerVisit || '1'} punto${parseInt(pointsPerVisit, 10) !== 1 ? 's' : ''} automáticamente.`
+                      : `La clienta gana ${pointsPerVisit || '1'} punto${parseInt(pointsPerVisit, 10) !== 1 ? 's' : ''} por cada $1 que paga en su cita.`
                   }
                   {` Al acumular ${rewardThreshold || '10'} puntos puede canjear: ${rewardDescription || '(configura el premio arriba)'}.`}
                 </Text>
@@ -280,7 +282,8 @@ export default function LoyaltyScreen() {
           </View>
         </KeyboardAvoidingView>
       )}
-    </SafeAreaView>
+    </MaxWidthContainer>
+  </SafeAreaView>
   )
 }
 

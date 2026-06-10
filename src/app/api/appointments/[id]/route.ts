@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase-server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { awardLoyaltyPoints } from "@/lib/loyalty";
+import { normalizeCurrency } from "@/lib/currency";
 
 const patchSchema = z.object({
   status: z
@@ -106,7 +107,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     // Registrar/actualizar pago si se envía
     // Usamos adminClient para Payment porque la tabla no tiene RLS de escritura para staff
     if (payment) {
-      const { amount, currency = "USD", method, isPaid = true, notes: payNotes } = payment;
+      const { amount, method, isPaid = true, notes: payNotes } = payment;
+      // El enum zod acepta "Bs" por retrocompatibilidad, pero en BD siempre se persiste "BS"
+      const currency = normalizeCurrency(payment.currency);
       const adminForPayment = createAdminClient();
 
       // Verificar si ya existe un pago para esta cita

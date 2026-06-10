@@ -256,11 +256,14 @@ export async function updateClient(id: string, data: {
 
 export interface StatsData {
   monthlyRevenue: number
+  monthlyRevenueBs?: number
   completedAppointments: number
   topServices: { serviceName: string; count: number }[]
   totalClients: number
   avgTicket: number
+  avgTicketBs?: number
   yearlyRevenue: number
+  yearlyRevenueBs?: number
   rescheduledThisMonth: number
   currency: string
 }
@@ -283,7 +286,9 @@ export interface DashboardData {
   loyaltyProgram: LoyaltyProgram | null
   loyaltyStats: { clientsWithPoints: number; totalPoints: number }
   monthlyRevenue: number | null
+  monthlyRevenueBs?: number | null
   weeklyRevenue: number | null
+  weeklyRevenueBs?: number | null
   newClientsCount: number | null
 }
 

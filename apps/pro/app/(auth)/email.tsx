@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { supabase } from '../../lib/supabase'
+import { MaxWidthContainer } from '../../components/ui/MaxWidthContainer'
 
 export default function EmailLoginScreen() {
   const [email, setEmail] = useState('')
@@ -45,83 +46,85 @@ export default function EmailLoginScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.kav}
-      >
-        <ScrollView
-          contentContainerStyle={styles.container}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+      <MaxWidthContainer>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.kav}
         >
-          {/* Back */}
-          <TouchableOpacity style={styles.back} onPress={() => router.back()}>
-            <Ionicons name="arrow-back-outline" size={22} color={DARK} />
-          </TouchableOpacity>
+          <ScrollView
+            contentContainerStyle={styles.container}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Back */}
+            <TouchableOpacity style={styles.back} onPress={() => router.back()}>
+              <Ionicons name="arrow-back-outline" size={22} color={DARK} />
+            </TouchableOpacity>
 
-          {/* Title */}
-          <View style={styles.titleArea}>
-            <Text style={styles.title}>Iniciar sesión</Text>
-            <Text style={styles.subtitle}>con tu correo electrónico</Text>
-          </View>
-
-          {/* Form */}
-          <View style={styles.form}>
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-            <Text style={styles.label}>Correo</Text>
-            <TextInput
-              style={styles.input}
-              value={email}
-              onChangeText={setEmail}
-              placeholder="tu@correo.com"
-              placeholderTextColor="#AAAAAA"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="email"
-            />
-
-            <Text style={styles.label}>Contraseña</Text>
-            <View style={styles.passwordRow}>
-              <TextInput
-                style={[styles.input, styles.passwordInput]}
-                value={password}
-                onChangeText={setPassword}
-                placeholder="••••••••"
-                placeholderTextColor="#AAAAAA"
-                secureTextEntry={!showPassword}
-                autoComplete="password"
-                returnKeyType="go"
-                onSubmitEditing={signIn}
-              />
-              <TouchableOpacity
-                style={styles.eyeBtn}
-                onPress={() => setShowPassword(v => !v)}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons
-                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                  size={20}
-                  color="#999999"
-                />
-              </TouchableOpacity>
+            {/* Title */}
+            <View style={styles.titleArea}>
+              <Text style={styles.title}>Iniciar sesión</Text>
+              <Text style={styles.subtitle}>con tu correo electrónico</Text>
             </View>
 
-            <TouchableOpacity
-              style={[styles.btnPrimary, loading && styles.btnDisabled]}
-              onPress={signIn}
-              disabled={loading}
-              activeOpacity={0.85}
-            >
-              {loading
-                ? <ActivityIndicator color="#FFFFFF" />
-                : <Text style={styles.btnText}>Entrar</Text>
-              }
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+            {/* Form */}
+            <View style={styles.form}>
+              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+              <Text style={styles.label}>Correo</Text>
+              <TextInput
+                style={styles.input}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="tu@correo.com"
+                placeholderTextColor="#AAAAAA"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+              />
+
+              <Text style={styles.label}>Contraseña</Text>
+              <View style={styles.passwordRow}>
+                <TextInput
+                  style={[styles.input, styles.passwordInput]}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="••••••••"
+                  placeholderTextColor="#AAAAAA"
+                  secureTextEntry={!showPassword}
+                  autoComplete="password"
+                  returnKeyType="go"
+                  onSubmitEditing={signIn}
+                />
+                <TouchableOpacity
+                  style={styles.eyeBtn}
+                  onPress={() => setShowPassword(v => !v)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color="#999999"
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.btnPrimary, loading && styles.btnDisabled]}
+                onPress={signIn}
+                disabled={loading}
+                activeOpacity={0.85}
+              >
+                {loading
+                  ? <ActivityIndicator color="#FFFFFF" />
+                  : <Text style={styles.btnText}>Entrar</Text>
+                }
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </MaxWidthContainer>
     </SafeAreaView>
   )
 }

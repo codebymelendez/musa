@@ -13,6 +13,7 @@ import * as WebBrowser from 'expo-web-browser'
 import { makeRedirectUri } from 'expo-auth-session'
 import { router } from 'expo-router'
 import { supabase } from '../../lib/supabase'
+import { MaxWidthContainer } from '../../components/ui/MaxWidthContainer'
 
 WebBrowser.maybeCompleteAuthSession()
 
@@ -72,48 +73,50 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
-      >
-        {/* Logo */}
-        <View style={styles.logoArea}>
-          <Text style={styles.logo}>MUSA Pro</Text>
-          <Text style={styles.subtitle}>Gestiona tu negocio de belleza</Text>
-        </View>
-
-        {/* Acciones */}
-        <View style={styles.actions}>
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-          <TouchableOpacity
-            style={[styles.btnPrimary, loading && styles.btnDisabled]}
-            onPress={signInWithGoogle}
-            disabled={loading}
-            activeOpacity={0.85}
-          >
-            {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.btnPrimaryText}>Continuar con Google</Text>
-            )}
-          </TouchableOpacity>
-
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerLabel}>o</Text>
-            <View style={styles.dividerLine} />
+      <MaxWidthContainer>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.container}
+        >
+          {/* Logo */}
+          <View style={styles.logoArea}>
+            <Text style={styles.logo}>MUSA Pro</Text>
+            <Text style={styles.subtitle}>Gestiona tu negocio de belleza</Text>
           </View>
 
-          <TouchableOpacity
-            style={styles.btnSecondary}
-            onPress={() => router.push('/(auth)/email')}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.btnSecondaryText}>Entrar con email</Text>
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
+          {/* Acciones */}
+          <View style={styles.actions}>
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+            <TouchableOpacity
+              style={[styles.btnPrimary, loading && styles.btnDisabled]}
+              onPress={signInWithGoogle}
+              disabled={loading}
+              activeOpacity={0.85}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.btnPrimaryText}>Continuar con Google</Text>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerLabel}>o</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <TouchableOpacity
+              style={styles.btnSecondary}
+              onPress={() => router.push('/(auth)/email')}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.btnSecondaryText}>Entrar con email</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </MaxWidthContainer>
     </SafeAreaView>
   )
 }

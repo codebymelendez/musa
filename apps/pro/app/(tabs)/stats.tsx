@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { type StatsData, type AppointmentItem } from '../../lib/api'
-import { PRIMARY, DARK, BORDER, GRAY, MONO, SERIF, formatTime, formatShortDate } from '../../lib/utils'
+import { PRIMARY, DARK, BORDER, GRAY, MONO, SERIF, formatTime, formatShortDate, formatBs } from '../../lib/utils'
 import { Pulse, Bone } from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
 import { useStats, useUpcomingAppointments, useBusinessTimezone } from '../../hooks/queries'
@@ -86,6 +86,9 @@ export default function StatsScreen() {
   const revenue = state.kind === 'ok'
     ? (period === 'year' ? state.stats.yearlyRevenue : state.stats.monthlyRevenue)
     : 0
+  const revenueBs = state.kind === 'ok'
+    ? (period === 'year' ? (state.stats.yearlyRevenueBs ?? 0) : (state.stats.monthlyRevenueBs ?? 0))
+    : 0
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -133,6 +136,7 @@ export default function StatsScreen() {
               <MetricCard
                 label={period === 'year' ? 'Ingresos del año' : 'Ingresos del mes'}
                 value={`$${revenue.toFixed(0)}`}
+                sub={revenueBs > 0 ? formatBs(revenueBs) : undefined}
               />
               <MetricCard
                 label="Total clientas"
@@ -141,6 +145,7 @@ export default function StatsScreen() {
               <MetricCard
                 label="Ticket promedio"
                 value={`$${stats.avgTicket.toFixed(0)}`}
+                sub={(stats.avgTicketBs ?? 0) > 0 ? formatBs(stats.avgTicketBs!) : undefined}
               />
             </View>
 

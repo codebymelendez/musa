@@ -21,6 +21,7 @@ import { ob } from '../../lib/observability'
 import { getSettings } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials } from '../../lib/utils'
 import { keys } from '../../hooks/queries'
+import { MaxWidthContainer } from '../ui/MaxWidthContainer'
 
 const GOOGLE_PLACES_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_KEY ?? ''
 
@@ -470,458 +471,460 @@ export default function BusinessInfoScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="chevron-back-outline" size={24} color={DARK} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Rediseño de Negocio</Text>
-        <View style={styles.backBtn} />
-      </View>
+      <MaxWidthContainer>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="chevron-back-outline" size={24} color={DARK} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Rediseño de Negocio</Text>
+          <View style={styles.backBtn} />
+        </View>
 
-      {loading ? (
-        <ScrollView><Skeleton /></ScrollView>
-      ) : (
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
-        >
-          <ScrollView
-            contentContainerStyle={styles.content}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
+        {loading ? (
+          <ScrollView><Skeleton /></ScrollView>
+        ) : (
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
           >
-            {/* SECTION 1: INFORMACIÓN GENERAL */}
-            <View style={styles.card}>
-              <Text style={styles.sectionHeader}>Información General</Text>
-              
-              <Text style={styles.label}>Nombre del negocio *</Text>
-              <TextInput
-                style={styles.input}
-                value={name}
-                onChangeText={setName}
-                placeholder="Ej. Studio de Belleza MUSA"
-                placeholderTextColor="#AAAAAA"
-              />
+            <ScrollView
+              contentContainerStyle={styles.content}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+            >
+              {/* SECTION 1: INFORMACIÓN GENERAL */}
+              <View style={styles.card}>
+                <Text style={styles.sectionHeader}>Información General</Text>
+                
+                <Text style={styles.label}>Nombre del negocio *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="Ej. Studio de Belleza MUSA"
+                  placeholderTextColor="#AAAAAA"
+                />
 
-              <Text style={styles.label}>Teléfono</Text>
-              <TextInput
-                style={styles.input}
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="Ej. +58 412 1234567"
-                placeholderTextColor="#AAAAAA"
-                keyboardType="phone-pad"
-              />
+                <Text style={styles.label}>Teléfono</Text>
+                <TextInput
+                  style={styles.input}
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder="Ej. +58 412 1234567"
+                  placeholderTextColor="#AAAAAA"
+                  keyboardType="phone-pad"
+                />
 
-              <Text style={styles.label}>Email del negocio</Text>
-              <TextInput
-                style={styles.input}
-                value={email}
-                onChangeText={setEmail}
-                placeholder="Ej. info@negocio.com"
-                placeholderTextColor="#AAAAAA"
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
+                <Text style={styles.label}>Email del negocio</Text>
+                <TextInput
+                  style={styles.input}
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="Ej. info@negocio.com"
+                  placeholderTextColor="#AAAAAA"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
 
-              <Text style={styles.label}>Sitio web</Text>
-              <TextInput
-                style={styles.input}
-                value={website}
-                onChangeText={setWebsite}
-                placeholder="Ej. https://misitio.com"
-                placeholderTextColor="#AAAAAA"
-                keyboardType="url"
-                autoCapitalize="none"
-              />
+                <Text style={styles.label}>Sitio web</Text>
+                <TextInput
+                  style={styles.input}
+                  value={website}
+                  onChangeText={setWebsite}
+                  placeholder="Ej. https://misitio.com"
+                  placeholderTextColor="#AAAAAA"
+                  keyboardType="url"
+                  autoCapitalize="none"
+                />
 
-              <View style={styles.descriptionHeader}>
-                <Text style={styles.label}>Descripción</Text>
-                <Text style={styles.counter}>{description.length} / 300</Text>
-              </View>
-              <TextInput
-                style={[styles.input, styles.textarea]}
-                value={description}
-                onChangeText={v => {
-                  if (v.length <= 300) setDescription(v)
-                }}
-                placeholder="Cuéntale a tus clientes sobre la experiencia y especialidades de tu salón..."
-                placeholderTextColor="#AAAAAA"
-                multiline
-                numberOfLines={4}
-              />
-            </View>
-
-            {/* SECTION 2: FOTOS */}
-            <View style={styles.card}>
-              <Text style={styles.sectionHeader}>Fotos</Text>
-
-              {/* Logo selection */}
-              <View style={styles.photoUploadRow}>
-                <View style={styles.logoCircleWrapper}>
-                  {logoUrl ? (
-                    <Image source={{ uri: logoUrl }} style={styles.logoCircle} cachePolicy="memory-disk" transition={100} />
-                  ) : (
-                    <View style={styles.logoCircle}>
-                      <Text style={styles.avatarInitials}>{initials(name || 'M')}</Text>
-                    </View>
-                  )}
-                  <TouchableOpacity style={styles.logoEditBadge} onPress={() => pickImage('logo')}>
-                    <Ionicons name="camera-outline" size={14} color="#FFF" />
-                  </TouchableOpacity>
+                <View style={styles.descriptionHeader}>
+                  <Text style={styles.label}>Descripción</Text>
+                  <Text style={styles.counter}>{description.length} / 300</Text>
                 </View>
-                <View style={styles.photoDescContainer}>
-                  <Text style={styles.photoTitle}>Logo del Negocio</Text>
-                  <Text style={styles.photoSub}>Imagen circular recomendada (80x80px). Se muestra en búsquedas y reservas.</Text>
-                </View>
-              </View>
-
-              {/* Cover Photo */}
-              <Text style={styles.photoTitleLabel}>Foto de Portada</Text>
-              <TouchableOpacity style={styles.coverWrapper} onPress={() => pickImage('cover')} activeOpacity={0.9}>
-                {coverUrl ? (
-                  <Image source={{ uri: coverUrl }} style={styles.coverImage} cachePolicy="memory-disk" transition={100} />
-                ) : (
-                  <View style={styles.coverPlaceholder}>
-                    <Ionicons name="image-outline" size={32} color={GRAY} />
-                    <Text style={styles.coverPlaceholderText}>Seleccionar banner horizontal (16:9)</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-
-              {/* Place Gallery */}
-              <View style={styles.galleryHeader}>
-                <Text style={styles.photoTitleLabel}>Galería del Lugar</Text>
-                <Text style={styles.counter}>{galleryPhotos.length} / 6</Text>
-              </View>
-              <View style={styles.galleryGrid}>
-                {galleryPhotos.map((photo) => (
-                  <View key={photo.id} style={styles.galleryPhotoWrapper}>
-                    <Image source={{ uri: photo.url }} style={styles.galleryPhoto} cachePolicy="memory-disk" transition={100} recyclingKey={photo.id} />
-                    <TouchableOpacity style={styles.photoDeleteBtn} onPress={() => removeGalleryPhoto(photo.id)}>
-                      <Ionicons name="close-circle" size={18} color="#D32F2F" />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-                {galleryPhotos.length < 6 && (
-                  <TouchableOpacity style={styles.galleryAddBtn} onPress={() => pickImage('gallery')}>
-                    <Ionicons name="add-outline" size={24} color={PRIMARY} />
-                    <Text style={styles.galleryAddText}>Añadir</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-
-            {/* SECTION 3: LOCALIZACIÓN Y MODALIDAD */}
-            <View style={styles.card}>
-              <Text style={styles.sectionHeader}>Localización y Modalidad</Text>
-
-              <Text style={styles.label}>Dirección física del negocio</Text>
-              <View style={styles.autocompleteWrapper}>
-                <GooglePlacesAutocomplete
-                  ref={placesRef}
-                  placeholder="Busca la dirección..."
-                  fetchDetails={true}
-                  onPress={async (data, details = null) => {
-                    if (details) {
-                      const detailsAny = details as any
-                      const lat = detailsAny.geometry.location.lat
-                      const lng = detailsAny.geometry.location.lng
-                      const formattedAddress = detailsAny.formatted_address
-
-                      const countryComp = detailsAny.address_components.find((c: any) => c.types.includes('country'))
-                      const detectedCountry = countryComp ? countryComp.short_name : 'VE'
-
-                      setAddress(formattedAddress)
-                      setLatitude(lat)
-                      setLongitude(lng)
-                      setCountry(detectedCountry)
-
-                      // Fetch Timezone dynamically using Places API coordinates
-                      if (GOOGLE_PLACES_API_KEY) {
-                        try {
-                          const tzRes = await fetch(
-                            `https://maps.googleapis.com/maps/api/timezone/json?location=${lat},${lng}&timestamp=${Math.floor(Date.now() / 1000)}&key=${GOOGLE_PLACES_API_KEY}`
-                          )
-                          const tzData = await tzRes.json()
-                          if (tzData.timeZoneId) {
-                            setTimezone(tzData.timeZoneId)
-                          }
-                        } catch (e) {
-                          ob.logError('business-info/timezone', e)
-                        }
-                      }
-                    }
+                <TextInput
+                  style={[styles.input, styles.textarea]}
+                  value={description}
+                  onChangeText={v => {
+                    if (v.length <= 300) setDescription(v)
                   }}
-                  query={{
-                    key: GOOGLE_PLACES_API_KEY,
-                    language: 'es',
-                    components: 'country:ve|country:es|country:mx|country:co',
-                  }}
-                  onFail={(error) => console.error('Places error:', error)}
-                  styles={{
-                    textInput: styles.autocompleteInput,
-                    container: { flex: 0 },
-                    listView: styles.autocompleteList,
-                  }}
-                  textInputProps={{
-                    placeholderTextColor: '#AAAAAA',
-                    onChangeText: setAddress,
-                  }}
+                  placeholder="Cuéntale a tus clientes sobre la experiencia y especialidades de tu salón..."
+                  placeholderTextColor="#AAAAAA"
+                  multiline
+                  numberOfLines={4}
                 />
               </View>
 
-              {/* Map Preview */}
-              <View style={styles.mapContainer}>
-                {latitude && longitude ? (
-                  <MapView
-                    ref={mapRef}
-                    style={styles.map}
-                    initialRegion={{
-                      latitude,
-                      longitude,
-                      latitudeDelta: 0.005,
-                      longitudeDelta: 0.005,
-                    }}
-                  >
-                    <Marker coordinate={{ latitude, longitude }} />
-                  </MapView>
-                ) : (
-                  <View style={styles.mapEmpty}>
-                    <Ionicons name="map-outline" size={28} color={GRAY} />
-                    <Text style={styles.mapEmptyText}>Añade tu dirección para ver el mapa</Text>
+              {/* SECTION 2: FOTOS */}
+              <View style={styles.card}>
+                <Text style={styles.sectionHeader}>Fotos</Text>
+
+                {/* Logo selection */}
+                <View style={styles.photoUploadRow}>
+                  <View style={styles.logoCircleWrapper}>
+                    {logoUrl ? (
+                      <Image source={{ uri: logoUrl }} style={styles.logoCircle} cachePolicy="memory-disk" transition={100} />
+                    ) : (
+                      <View style={styles.logoCircle}>
+                        <Text style={styles.avatarInitials}>{initials(name || 'M')}</Text>
+                      </View>
+                    )}
+                    <TouchableOpacity style={styles.logoEditBadge} onPress={() => pickImage('logo')}>
+                      <Ionicons name="camera-outline" size={14} color="#FFF" />
+                    </TouchableOpacity>
                   </View>
-                )}
-              </View>
+                  <View style={styles.photoDescContainer}>
+                    <Text style={styles.photoTitle}>Logo del Negocio</Text>
+                    <Text style={styles.photoSub}>Imagen circular recomendada (80x80px). Se muestra en búsquedas y reservas.</Text>
+                  </View>
+                </View>
 
-              {/* Service Mode */}
-              <Text style={styles.photoTitleLabel}>Modalidad de Servicio</Text>
-              <View style={styles.modeRow}>
-                {[
-                  { value: 'inStore', label: 'Solo en local', icon: 'storefront-outline' },
-                  { value: 'homeVisit', label: 'A domicilio', icon: 'home-outline' },
-                  { value: 'both', label: 'Ambas', icon: 'git-compare-outline' },
-                ].map((mode) => (
-                  <TouchableOpacity
-                    key={mode.value}
-                    style={[
-                      styles.modeCard,
-                      serviceMode === mode.value && styles.modeCardSelected,
-                    ]}
-                    onPress={() => setServiceMode(mode.value as any)}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons
-                      name={mode.icon as any}
-                      size={20}
-                      color={serviceMode === mode.value ? PRIMARY : DARK}
-                    />
-                    <Text
-                      style={[
-                        styles.modeLabel,
-                        serviceMode === mode.value && styles.modeLabelSelected,
-                      ]}
-                    >
-                      {mode.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            {/* SECTION 4: HORARIOS DE APERTURA */}
-            <View style={styles.card}>
-              <Text style={styles.sectionHeader}>Horarios de Apertura</Text>
-              {businessHours.map((day) => {
-                const dayLabel = DAYS_OF_WEEK.find(d => d.value === day.dayOfWeek)?.label ?? ''
-                return (
-                  <View key={day.dayOfWeek} style={styles.dayRow}>
-                    <Text style={styles.dayText}>{dayLabel}</Text>
-                    
-                    <View style={styles.switchWrapper}>
-                      <Switch
-                        value={day.isOpen}
-                        onValueChange={(checked) => handleHoursToggle(day.dayOfWeek, checked)}
-                        trackColor={{ true: PRIMARY, false: BORDER }}
-                        thumbColor="#FFF"
-                      />
+                {/* Cover Photo */}
+                <Text style={styles.photoTitleLabel}>Foto de Portada</Text>
+                <TouchableOpacity style={styles.coverWrapper} onPress={() => pickImage('cover')} activeOpacity={0.9}>
+                  {coverUrl ? (
+                    <Image source={{ uri: coverUrl }} style={styles.coverImage} cachePolicy="memory-disk" transition={100} />
+                  ) : (
+                    <View style={styles.coverPlaceholder}>
+                      <Ionicons name="image-outline" size={32} color={GRAY} />
+                      <Text style={styles.coverPlaceholderText}>Seleccionar banner horizontal (16:9)</Text>
                     </View>
+                  )}
+                </TouchableOpacity>
 
-                    <View style={styles.timePickersContainer}>
-                      {day.isOpen ? (
-                        <View style={styles.timePickersRow}>
-                          <TouchableOpacity
-                            style={styles.timePill}
-                            onPress={() => showTimePicker(day.dayOfWeek, 'open')}
-                          >
-                            <Text style={styles.timePillText}>{day.openTime}</Text>
-                          </TouchableOpacity>
-                          <Text style={styles.timeDash}>—</Text>
-                          <TouchableOpacity
-                            style={styles.timePill}
-                            onPress={() => showTimePicker(day.dayOfWeek, 'close')}
-                          >
-                            <Text style={styles.timePillText}>{day.closeTime}</Text>
-                          </TouchableOpacity>
-                        </View>
-                      ) : (
-                        <Text style={styles.closedLabel}>Cerrado</Text>
-                      )}
+                {/* Place Gallery */}
+                <View style={styles.galleryHeader}>
+                  <Text style={styles.photoTitleLabel}>Galería del Lugar</Text>
+                  <Text style={styles.counter}>{galleryPhotos.length} / 6</Text>
+                </View>
+                <View style={styles.galleryGrid}>
+                  {galleryPhotos.map((photo) => (
+                    <View key={photo.id} style={styles.galleryPhotoWrapper}>
+                      <Image source={{ uri: photo.url }} style={styles.galleryPhoto} cachePolicy="memory-disk" transition={100} recyclingKey={photo.id} />
+                      <TouchableOpacity style={styles.photoDeleteBtn} onPress={() => removeGalleryPhoto(photo.id)}>
+                        <Ionicons name="close-circle" size={18} color="#D32F2F" />
+                      </TouchableOpacity>
                     </View>
-                  </View>
-                )
-              })}
-            </View>
-
-            {/* SECTION 5: AJUSTES DE RESERVA */}
-            <View style={styles.card}>
-              <Text style={styles.sectionHeader}>Ajustes de Reserva</Text>
-              
-              <Text style={styles.label}>Duración de slots</Text>
-              <View style={[styles.pillsRow, { marginBottom: 16, marginTop: 4 }]}>
-                {SLOT_OPTIONS.map(min => {
-                  const active = slotDuration === min
-                  return (
-                    <TouchableOpacity
-                      key={min}
-                      style={[styles.slotPill, active && styles.dayPillActive]}
-                      onPress={() => setSlotDuration(min)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.dayPillText, active && styles.dayPillTextActive]}>
-                        {min} min
-                      </Text>
+                  ))}
+                  {galleryPhotos.length < 6 && (
+                    <TouchableOpacity style={styles.galleryAddBtn} onPress={() => pickImage('gallery')}>
+                      <Ionicons name="add-outline" size={24} color={PRIMARY} />
+                      <Text style={styles.galleryAddText}>Añadir</Text>
                     </TouchableOpacity>
-                  )
-                })}
-              </View>
-
-              <Text style={styles.label}>Zona horaria</Text>
-              <View style={[styles.pillsRow, { marginTop: 4 }]}>
-                {TIMEZONE_OPTIONS.map(({ label, value }) => {
-                  const active = timezone === value
-                  return (
-                    <TouchableOpacity
-                      key={value}
-                      style={[styles.tzPill, active && styles.dayPillActive]}
-                      onPress={() => setTimezone(value)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.dayPillText, active && styles.dayPillTextActive]}>
-                        {label}
-                      </Text>
-                    </TouchableOpacity>
-                  )
-                })}
-              </View>
-            </View>
-
-            <View style={{ height: 120 }} />
-          </ScrollView>
-
-          {/* DateTimePicker container (iOS and Android conditional) */}
-          {Platform.OS === 'ios' ? (
-            <Modal
-              visible={pickerShow !== null}
-              transparent
-              animationType="fade"
-              onRequestClose={() => {
-                setPickerShow(null)
-                setIosTempTime(null)
-              }}
-            >
-              <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                  <View style={styles.modalHeader}>
-                    <TouchableOpacity onPress={() => {
-                      setPickerShow(null)
-                      setIosTempTime(null)
-                    }}>
-                      <Text style={styles.modalCancelText}>Cancelar</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.modalTitle}>Seleccionar hora</Text>
-                    <TouchableOpacity onPress={() => {
-                      if (pickerShow) {
-                        const currentPicker = pickerShow
-                        const timeStr = iosTempTime || (currentPicker.type === 'open'
-                          ? businessHours.find(bh => bh.dayOfWeek === currentPicker.day)?.openTime
-                          : businessHours.find(bh => bh.dayOfWeek === currentPicker.day)?.closeTime) || '09:00'
-                        setBusinessHours(prev => prev.map(bh => {
-                          if (bh.dayOfWeek === currentPicker.day) {
-                            return {
-                              ...bh,
-                              openTime: currentPicker.type === 'open' ? timeStr : bh.openTime,
-                              closeTime: currentPicker.type === 'close' ? timeStr : bh.closeTime,
-                            }
-                          }
-                          return bh
-                        }))
-                      }
-                      setPickerShow(null)
-                      setIosTempTime(null)
-                    }}>
-                      <Text style={styles.modalConfirmText}>Confirmar</Text>
-                    </TouchableOpacity>
-                  </View>
-                  {pickerShow !== null && (
-                    <DateTimePicker
-                      value={(() => {
-                        const timeStr = iosTempTime || (pickerShow.type === 'open'
-                          ? businessHours.find(bh => bh.dayOfWeek === pickerShow.day)?.openTime
-                          : businessHours.find(bh => bh.dayOfWeek === pickerShow.day)?.closeTime) || '09:00'
-                        const [h, m] = timeStr.split(':').map(Number)
-                        const d = new Date()
-                        d.setHours(h, m, 0, 0)
-                        return d
-                      })()}
-                      mode="time"
-                      is24Hour={true}
-                      display="spinner"
-                      onChange={(event, selectedDate) => {
-                        if (selectedDate) {
-                          const hours = String(selectedDate.getHours()).padStart(2, '0')
-                          const mins = String(selectedDate.getMinutes()).padStart(2, '0')
-                          setIosTempTime(`${hours}:${mins}`)
-                        }
-                      }}
-                      style={{ backgroundColor: '#fff' }}
-                    />
                   )}
                 </View>
               </View>
-            </Modal>
-          ) : (
-            pickerShow !== null && (
-              <DateTimePicker
-                value={getDatePickerValue()}
-                mode="time"
-                is24Hour={true}
-                display="default"
-                onChange={handleTimeChange}
-              />
-            )
-          )}
 
-          {/* Bottom Save Bar */}
-          <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
-            <TouchableOpacity
-              style={[styles.btnPrimary, saving && { opacity: 0.7 }]}
-              onPress={handleSaveAll}
-              disabled={saving}
-              activeOpacity={0.85}
-            >
-              {saving ? (
-                <ActivityIndicator color="#FFF" size="small" />
-              ) : (
-                <Text style={styles.btnPrimaryText}>Guardar cambios</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
-      )}
+              {/* SECTION 3: LOCALIZACIÓN Y MODALIDAD */}
+              <View style={styles.card}>
+                <Text style={styles.sectionHeader}>Localización y Modalidad</Text>
+
+                <Text style={styles.label}>Dirección física del negocio</Text>
+                <View style={styles.autocompleteWrapper}>
+                  <GooglePlacesAutocomplete
+                    ref={placesRef}
+                    placeholder="Busca la dirección..."
+                    fetchDetails={true}
+                    onPress={async (data, details = null) => {
+                      if (details) {
+                        const detailsAny = details as any
+                        const lat = detailsAny.geometry.location.lat
+                        const lng = detailsAny.geometry.location.lng
+                        const formattedAddress = detailsAny.formatted_address
+
+                        const countryComp = detailsAny.address_components.find((c: any) => c.types.includes('country'))
+                        const detectedCountry = countryComp ? countryComp.short_name : 'VE'
+
+                        setAddress(formattedAddress)
+                        setLatitude(lat)
+                        setLongitude(lng)
+                        setCountry(detectedCountry)
+
+                        // Fetch Timezone dynamically using Places API coordinates
+                        if (GOOGLE_PLACES_API_KEY) {
+                          try {
+                            const tzRes = await fetch(
+                              `https://maps.googleapis.com/maps/api/timezone/json?location=${lat},${lng}&timestamp=${Math.floor(Date.now() / 1000)}&key=${GOOGLE_PLACES_API_KEY}`
+                            )
+                            const tzData = await tzRes.json()
+                            if (tzData.timeZoneId) {
+                              setTimezone(tzData.timeZoneId)
+                            }
+                          } catch (e) {
+                            ob.logError('business-info/timezone', e)
+                          }
+                        }
+                      }
+                    }}
+                    query={{
+                      key: GOOGLE_PLACES_API_KEY,
+                      language: 'es',
+                      components: 'country:ve|country:es|country:mx|country:co',
+                    }}
+                    onFail={(error) => console.error('Places error:', error)}
+                    styles={{
+                      textInput: styles.autocompleteInput,
+                      container: { flex: 0 },
+                      listView: styles.autocompleteList,
+                    }}
+                    textInputProps={{
+                      placeholderTextColor: '#AAAAAA',
+                      onChangeText: setAddress,
+                    }}
+                  />
+                </View>
+
+                {/* Map Preview */}
+                <View style={styles.mapContainer}>
+                  {latitude && longitude ? (
+                    <MapView
+                      ref={mapRef}
+                      style={styles.map}
+                      initialRegion={{
+                        latitude,
+                        longitude,
+                        latitudeDelta: 0.005,
+                        longitudeDelta: 0.005,
+                      }}
+                    >
+                      <Marker coordinate={{ latitude, longitude }} />
+                    </MapView>
+                  ) : (
+                    <View style={styles.mapEmpty}>
+                      <Ionicons name="map-outline" size={28} color={GRAY} />
+                      <Text style={styles.mapEmptyText}>Añade tu dirección para ver el mapa</Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Service Mode */}
+                <Text style={styles.photoTitleLabel}>Modalidad de Servicio</Text>
+                <View style={styles.modeRow}>
+                  {[
+                    { value: 'inStore', label: 'Solo en local', icon: 'storefront-outline' },
+                    { value: 'homeVisit', label: 'A domicilio', icon: 'home-outline' },
+                    { value: 'both', label: 'Ambas', icon: 'git-compare-outline' },
+                  ].map((mode) => (
+                    <TouchableOpacity
+                      key={mode.value}
+                      style={[
+                        styles.modeCard,
+                        serviceMode === mode.value && styles.modeCardSelected,
+                      ]}
+                      onPress={() => setServiceMode(mode.value as any)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name={mode.icon as any}
+                        size={20}
+                        color={serviceMode === mode.value ? PRIMARY : DARK}
+                      />
+                      <Text
+                        style={[
+                          styles.modeLabel,
+                          serviceMode === mode.value && styles.modeLabelSelected,
+                        ]}
+                      >
+                        {mode.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* SECTION 4: HORARIOS DE APERTURA */}
+              <View style={styles.card}>
+                <Text style={styles.sectionHeader}>Horarios de Apertura</Text>
+                {businessHours.map((day) => {
+                  const dayLabel = DAYS_OF_WEEK.find(d => d.value === day.dayOfWeek)?.label ?? ''
+                  return (
+                    <View key={day.dayOfWeek} style={styles.dayRow}>
+                      <Text style={styles.dayText}>{dayLabel}</Text>
+                      
+                      <View style={styles.switchWrapper}>
+                        <Switch
+                          value={day.isOpen}
+                          onValueChange={(checked) => handleHoursToggle(day.dayOfWeek, checked)}
+                          trackColor={{ true: PRIMARY, false: BORDER }}
+                          thumbColor="#FFF"
+                        />
+                      </View>
+
+                      <View style={styles.timePickersContainer}>
+                        {day.isOpen ? (
+                          <View style={styles.timePickersRow}>
+                            <TouchableOpacity
+                              style={styles.timePill}
+                              onPress={() => showTimePicker(day.dayOfWeek, 'open')}
+                            >
+                              <Text style={styles.timePillText}>{day.openTime}</Text>
+                            </TouchableOpacity>
+                            <Text style={styles.timeDash}>—</Text>
+                            <TouchableOpacity
+                              style={styles.timePill}
+                              onPress={() => showTimePicker(day.dayOfWeek, 'close')}
+                            >
+                              <Text style={styles.timePillText}>{day.closeTime}</Text>
+                            </TouchableOpacity>
+                          </View>
+                        ) : (
+                          <Text style={styles.closedLabel}>Cerrado</Text>
+                        )}
+                      </View>
+                    </View>
+                  )
+                })}
+              </View>
+
+              {/* SECTION 5: AJUSTES DE RESERVA */}
+              <View style={styles.card}>
+                <Text style={styles.sectionHeader}>Ajustes de Reserva</Text>
+                
+                <Text style={styles.label}>Duración de slots</Text>
+                <View style={[styles.pillsRow, { marginBottom: 16, marginTop: 4 }]}>
+                  {SLOT_OPTIONS.map(min => {
+                    const active = slotDuration === min
+                    return (
+                      <TouchableOpacity
+                        key={min}
+                        style={[styles.slotPill, active && styles.dayPillActive]}
+                        onPress={() => setSlotDuration(min)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[styles.dayPillText, active && styles.dayPillTextActive]}>
+                          {min} min
+                        </Text>
+                      </TouchableOpacity>
+                    )
+                  })}
+                </View>
+
+                <Text style={styles.label}>Zona horaria</Text>
+                <View style={[styles.pillsRow, { marginTop: 4 }]}>
+                  {TIMEZONE_OPTIONS.map(({ label, value }) => {
+                    const active = timezone === value
+                    return (
+                      <TouchableOpacity
+                        key={value}
+                        style={[styles.tzPill, active && styles.dayPillActive]}
+                        onPress={() => setTimezone(value)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[styles.dayPillText, active && styles.dayPillTextActive]}>
+                          {label}
+                        </Text>
+                      </TouchableOpacity>
+                    )
+                  })}
+                </View>
+              </View>
+
+              <View style={{ height: 120 }} />
+            </ScrollView>
+
+            {/* DateTimePicker container (iOS and Android conditional) */}
+            {Platform.OS === 'ios' ? (
+              <Modal
+                visible={pickerShow !== null}
+                transparent
+                animationType="fade"
+                onRequestClose={() => {
+                  setPickerShow(null)
+                  setIosTempTime(null)
+                }}
+              >
+                <View style={styles.modalOverlay}>
+                  <View style={styles.modalContent}>
+                    <View style={styles.modalHeader}>
+                      <TouchableOpacity onPress={() => {
+                        setPickerShow(null)
+                        setIosTempTime(null)
+                      }}>
+                        <Text style={styles.modalCancelText}>Cancelar</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.modalTitle}>Seleccionar hora</Text>
+                      <TouchableOpacity onPress={() => {
+                        if (pickerShow) {
+                          const currentPicker = pickerShow
+                          const timeStr = iosTempTime || (currentPicker.type === 'open'
+                            ? businessHours.find(bh => bh.dayOfWeek === currentPicker.day)?.openTime
+                            : businessHours.find(bh => bh.dayOfWeek === currentPicker.day)?.closeTime) || '09:00'
+                          setBusinessHours(prev => prev.map(bh => {
+                            if (bh.dayOfWeek === currentPicker.day) {
+                              return {
+                                ...bh,
+                                openTime: currentPicker.type === 'open' ? timeStr : bh.openTime,
+                                closeTime: currentPicker.type === 'close' ? timeStr : bh.closeTime,
+                              }
+                            }
+                            return bh
+                          }))
+                        }
+                        setPickerShow(null)
+                        setIosTempTime(null)
+                      }}>
+                        <Text style={styles.modalConfirmText}>Confirmar</Text>
+                      </TouchableOpacity>
+                    </View>
+                    {pickerShow !== null && (
+                      <DateTimePicker
+                        value={(() => {
+                          const timeStr = iosTempTime || (pickerShow.type === 'open'
+                            ? businessHours.find(bh => bh.dayOfWeek === pickerShow.day)?.openTime
+                            : businessHours.find(bh => bh.dayOfWeek === pickerShow.day)?.closeTime) || '09:00'
+                          const [h, m] = timeStr.split(':').map(Number)
+                          const d = new Date()
+                          d.setHours(h, m, 0, 0)
+                          return d
+                        })()}
+                        mode="time"
+                        is24Hour={true}
+                        display="spinner"
+                        onChange={(event, selectedDate) => {
+                          if (selectedDate) {
+                            const hours = String(selectedDate.getHours()).padStart(2, '0')
+                            const mins = String(selectedDate.getMinutes()).padStart(2, '0')
+                            setIosTempTime(`${hours}:${mins}`)
+                          }
+                        }}
+                        style={{ backgroundColor: '#fff' }}
+                      />
+                    )}
+                  </View>
+                </View>
+              </Modal>
+            ) : (
+              pickerShow !== null && (
+                <DateTimePicker
+                  value={getDatePickerValue()}
+                  mode="time"
+                  is24Hour={true}
+                  display="default"
+                  onChange={handleTimeChange}
+                />
+              )
+            )}
+
+            {/* Bottom Save Bar */}
+            <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
+              <TouchableOpacity
+                style={[styles.btnPrimary, saving && { opacity: 0.7 }]}
+                onPress={handleSaveAll}
+                disabled={saving}
+                activeOpacity={0.85}
+              >
+                {saving ? (
+                  <ActivityIndicator color="#FFF" size="small" />
+                ) : (
+                  <Text style={styles.btnPrimaryText}>Guardar cambios</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        )}
+      </MaxWidthContainer>
     </SafeAreaView>
   )
 }

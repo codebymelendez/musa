@@ -12,7 +12,7 @@ import HomeFooter, { type QuickAction } from '../../components/home/HomeFooter'
 import Skeleton from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
 import EmptyState from '../../components/ui/EmptyState'
-import { PRIMARY, DARK, SURFACE, GRAY, SERIF, formatTime } from '../../lib/utils'
+import { PRIMARY, DARK, SURFACE, GRAY, SERIF, formatTime, isBs } from '../../lib/utils'
 import { useDashboard } from '../../hooks/queries'
 
 function getGreeting(tz: string): string {
@@ -33,7 +33,9 @@ export default function HomeScreen() {
   const appointments = data?.appointments
   const promos = data?.promos ?? []
   const weeklyRevenue = data?.weeklyRevenue ?? null
+  const weeklyRevenueBs = data?.weeklyRevenueBs ?? null
   const monthlyRevenue = data?.monthlyRevenue ?? null
+  const monthlyRevenueBs = data?.monthlyRevenueBs ?? null
   const newClientsCount = data?.newClientsCount ?? null
 
   const sortedAppts = useMemo(
@@ -49,10 +51,10 @@ export default function HomeScreen() {
     const next = sortedAppts.find(a => new Date(a.startTime) >= now) ?? sortedAppts[0] ?? null
     return {
       cobradoUSD: appts
-        .filter(a => a.payment?.isPaid && a.payment.currency !== 'Bs')
+        .filter(a => a.payment?.isPaid && !isBs(a.payment.currency))
         .reduce((s, a) => s + a.payment!.amount, 0),
       cobradoBs: appts
-        .filter(a => a.payment?.isPaid && a.payment.currency === 'Bs')
+        .filter(a => a.payment?.isPaid && isBs(a.payment.currency))
         .reduce((s, a) => s + a.payment!.amount, 0),
       completedSinCobro: appts.filter(a => a.status === 'completed' && !a.payment).length,
       nextApptLabel: next ? `Siguiente a las ${formatTime(next.startTime, businessTz)}` : 'Día libre 🌿',
@@ -128,7 +130,9 @@ export default function HomeScreen() {
           completedSinCobro={completedSinCobro}
           newClientsCount={newClientsCount}
           weeklyRevenue={weeklyRevenue}
+          weeklyRevenueBs={weeklyRevenueBs}
           monthlyRevenue={monthlyRevenue}
+          monthlyRevenueBs={monthlyRevenueBs}
         />
       )}
 

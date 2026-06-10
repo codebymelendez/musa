@@ -2,11 +2,11 @@ import { memo } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import { PRIMARY, DARK, BORDER, GRAY, MONO, formatMoney } from '../../lib/utils'
+import { PRIMARY, DARK, BORDER, GRAY, MONO, formatMoney, formatBs } from '../../lib/utils'
 
 const BentoStats = memo(function BentoStats({
   appointmentsCount, nextApptLabel, cobradoUSD, cobradoBs, completedSinCobro,
-  newClientsCount, weeklyRevenue, monthlyRevenue,
+  newClientsCount, weeklyRevenue, weeklyRevenueBs, monthlyRevenue, monthlyRevenueBs,
 }: {
   appointmentsCount: number
   nextApptLabel: string
@@ -15,7 +15,9 @@ const BentoStats = memo(function BentoStats({
   completedSinCobro: number
   newClientsCount: number | null
   weeklyRevenue: number | null
+  weeklyRevenueBs?: number | null
   monthlyRevenue: number | null
+  monthlyRevenueBs?: number | null
 }) {
   return (
     <View style={styles.bentoContainer}>
@@ -48,7 +50,7 @@ const BentoStats = memo(function BentoStats({
               )}
               {cobradoBs > 0 && (
                 <Text style={[styles.bentoValSm, { fontFamily: MONO }]}>
-                  {`Bs. ${cobradoBs.toFixed(0)}`}
+                  {formatBs(cobradoBs)}
                 </Text>
               )}
             </>
@@ -84,6 +86,11 @@ const BentoStats = memo(function BentoStats({
           <Text style={[styles.bentoValSm, { fontFamily: MONO }]}>
             {weeklyRevenue !== null ? formatMoney(weeklyRevenue) : '—'}
           </Text>
+          {(weeklyRevenueBs ?? 0) > 0 && (
+            <Text style={[styles.bentoBsLine, { fontFamily: MONO }]}>
+              {formatBs(weeklyRevenueBs!)}
+            </Text>
+          )}
         </View>
 
         <View style={[styles.halfCard, styles.halfCardCompact, { backgroundColor: '#F5F0EB' }]}>
@@ -93,6 +100,11 @@ const BentoStats = memo(function BentoStats({
           <Text style={[styles.bentoValSm, { fontFamily: MONO }]}>
             {monthlyRevenue !== null ? formatMoney(monthlyRevenue) : '—'}
           </Text>
+          {(monthlyRevenueBs ?? 0) > 0 && (
+            <Text style={[styles.bentoBsLine, { fontFamily: MONO }]}>
+              {formatBs(monthlyRevenueBs!)}
+            </Text>
+          )}
         </View>
       </View>
     </View>
@@ -109,6 +121,7 @@ const styles = StyleSheet.create({
   bentoSubText: { fontSize: 11, color: GRAY, marginTop: 4 },
   bentoVal: { fontSize: 24, color: DARK, fontWeight: 'normal', marginTop: 8 },
   bentoValSm: { fontSize: 18, color: DARK, fontWeight: 'normal', marginTop: 6 },
+  bentoBsLine: { fontSize: 12, color: GRAY, marginTop: 2 },
   apptsTodayCard: {
     backgroundColor: DARK, borderRadius: 16,
     padding: 18, height: 120, justifyContent: 'space-between',
@@ -118,7 +131,7 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: BORDER,
     padding: 16, height: 110, justifyContent: 'space-between',
   },
-  halfCardCompact: { height: 86 },
+  halfCardCompact: { height: undefined, minHeight: 86 },
   cobrarBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4,
   },

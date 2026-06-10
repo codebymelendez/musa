@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { toLocalDate, dayRangeUTC, weekRangeUTC, DEFAULT_TZ } from "@/lib/utils";
+import { isBs } from "@/lib/currency";
 
 export async function GET(req: NextRequest) {
   const response = NextResponse.json({ user: null });
@@ -36,7 +37,9 @@ export async function GET(req: NextRequest) {
         loyaltyProgram: null,
         loyaltyStats: { clientsWithPoints: 0, totalPoints: 0 },
         monthlyRevenue: 0,
+        monthlyRevenueBs: 0,
         weeklyRevenue: 0,
+        weeklyRevenueBs: 0,
         newClientsCount: 0,
       }, {
         headers: response.headers,
@@ -100,7 +103,7 @@ export async function GET(req: NextRequest) {
       // 5. Monthly Revenue (Completed appointments payments)
       admin
         .from('Appointment')
-        .select('payment:Payment(isPaid, amount)')
+        .select('payment:Payment(isPaid, amount, currency)')
         .eq('userId', session.userId)
         .eq('status', 'completed')
         .gte('startTime', startOfMonth)
@@ -116,7 +119,7 @@ export async function GET(req: NextRequest) {
       // 7. Weekly Revenue (Completed appointments this week)
       admin
         .from('Appointment')
-        .select('service:Service(price), payment:Payment(isPaid, amount)')
+        .select('service:Service(price, currency), payment:Payment(isPaid, amount, currency)')
         .eq('userId', session.userId)
         .eq('status', 'completed')
         .gte('startTime', weekStart)
@@ -150,24 +153,31 @@ export async function GET(req: NextRequest) {
       totalPoints: accounts.reduce((sum: number, acc: any) => sum + (acc.totalPoints || 0), 0),
     };
 
-    // Calculate monthly revenue
-    const monthlyRevenue = (monthlyRevenueRes.data || []).reduce((sum: number, apt: any) => {
+    // Calculate monthly revenue — totales separados por moneda, nunca se mezclan
+    let monthlyRevenue = 0;
+    let monthlyRevenueBs = 0;
+    for (const apt of (monthlyRevenueRes.data || []) as any[]) {
       const payment = Array.isArray(apt.payment) ? apt.payment[0] : apt.payment;
-      if (payment?.isPaid) return sum + (payment.amount || 0);
-      return sum;
-    }, 0);
+      if (!payment?.isPaid) continue;
+      if (isBs(payment.currency)) monthlyRevenueBs += payment.amount || 0;
+      else monthlyRevenue += payment.amount || 0;
+    }
 
-    // Calculate weekly revenue (using payment if paid, or service price if not)
-    const weeklyRevenue = (weeklyRevenueRes.data || []).reduce((sum: number, apt: any) => {
+    // Calculate weekly revenue (using payment if paid, or service price if not).
+    // El fallback de service.price cuenta en la moneda del servicio (Service.currency).
+    let weeklyRevenue = 0;
+    let weeklyRevenueBs = 0;
+    for (const apt of (weeklyRevenueRes.data || []) as any[]) {
       const service = Array.isArray(apt.service) ? apt.service[0] : apt.service;
       const payment = Array.isArray(apt.payment) ? apt.payment[0] : apt.payment;
-      
-      const servicePrice = service?.price ?? 0;
-      const paymentAmount = payment?.amount ?? 0;
+
       const isPaid = payment?.isPaid ?? false;
-      
-      return sum + (isPaid ? paymentAmount : servicePrice);
-    }, 0);
+      const amount = isPaid ? (payment?.amount ?? 0) : (service?.price ?? 0);
+      const currency = isPaid ? payment?.currency : service?.currency;
+
+      if (isBs(currency)) weeklyRevenueBs += amount;
+      else weeklyRevenue += amount;
+    }
 
     return new NextResponse(
       JSON.stringify({
@@ -179,7 +189,9 @@ export async function GET(req: NextRequest) {
         loyaltyProgram: loyaltyProgramRes.data ?? null,
         loyaltyStats,
         monthlyRevenue,
+        monthlyRevenueBs,
         weeklyRevenue,
+        weeklyRevenueBs,
         newClientsCount: newClientsCountRes.count ?? 0,
       }),
       {

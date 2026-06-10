@@ -3,6 +3,7 @@
 # dependencies
 /node_modules
 .next/
+.expo/
 /apps/pro/node_modules/
 /apps/client/node_modules/
 /graphify-out/

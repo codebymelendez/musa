@@ -16,6 +16,7 @@ import { getAvailableSlots } from '@musa/availability'
 import { supabase } from '../../lib/supabase'
 import { toZonedTime, format } from 'date-fns-tz'
 import { useClients, useServices, useSettings, useCreateAppointment, keys } from '../../hooks/queries'
+import { MaxWidthContainer } from '../../components/ui/MaxWidthContainer'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -150,7 +151,8 @@ export default function NewAppointmentScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      {/* Header */}
+      <MaxWidthContainer>
+        {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.navBtn} onPress={() => router.back()}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -401,6 +403,7 @@ export default function NewAppointmentScreen() {
         title="Elegir fecha"
         minDate={todayISO}
       />
+      </MaxWidthContainer>
     </SafeAreaView>
   )
 }

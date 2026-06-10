@@ -11,7 +11,7 @@ import {
   getBcvRate,
   type AppointmentItem, type AppointmentStatus, type AppointmentPayment,
 } from '../../lib/api'
-import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, formatTime, formatDate, formatMoney } from '../../lib/utils'
+import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, formatTime, formatDate, formatMoney, formatBs, isBs as isBsCurrency, normalizeCurrency } from '../../lib/utils'
 import { Pulse, Bone } from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
 import { validate, paymentFormSchema } from '../../lib/validation'
@@ -19,6 +19,7 @@ import {
   useAppointment, useAppointmentAction, useCompleteAppointment, useRegisterPayment,
   useSettings, useBusinessTimezone,
 } from '../../hooks/queries'
+import { MaxWidthContainer } from '../../components/ui/MaxWidthContainer'
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -104,9 +105,9 @@ function PaymentSummary({
   businessTz: string
   onEdit?: () => void
 }) {
-  const isBs = ['Bs', 'BS'].includes(payment.currency)
+  const isBs = isBsCurrency(payment.currency)
   const formattedAmount = isBs
-    ? `Bs. ${payment.amount.toFixed(2)}`
+    ? formatBs(payment.amount)
     : `$${payment.amount.toFixed(2)} USD`
 
   return (
@@ -215,8 +216,8 @@ export default function AppointmentDetailScreen() {
     const amtStr = String(payment.amount)
     usdBaseRef.current = amtStr
     setAmount(amtStr)
-    const c = ['Bs', 'BS'].includes(payment.currency) ? 'BS' : 'USD'
-    setCurrency(c as 'USD' | 'BS')
+    const c = normalizeCurrency(payment.currency)
+    setCurrency(c)
     setMethod(payment.method)
     setIsPaid(payment.isPaid)
     setPayNotes(payment.notes ?? '')
@@ -318,8 +319,9 @@ export default function AppointmentDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
+      <MaxWidthContainer>
+        {/* Header */}
+        <View style={styles.header}>
         <TouchableOpacity
           style={styles.backBtn}
           onPress={() => router.back()}
@@ -634,6 +636,7 @@ export default function AppointmentDetailScreen() {
           </KeyboardAvoidingView>
         )
       })()}
+      </MaxWidthContainer>
     </SafeAreaView>
   )
 }

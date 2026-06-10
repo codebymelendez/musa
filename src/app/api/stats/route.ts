@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase-admin";
+import { isBs } from "@/lib/currency";
 
 export async function GET(req: NextRequest) {
   const session = await getSession(req);
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
     // ── Citas completadas del mes + Ingresos ──────────────────────────────────
     const { data: completedAppointments, error: appointmentsError } = await adminSupabase
       .from('Appointment')
-      .select('serviceId, service:Service(name), payment:Payment(isPaid, amount)')
+      .select('serviceId, service:Service(name), payment:Payment(isPaid, amount, currency)')
       .eq('userId', session.userId)
       .eq('status', 'completed')
       .gte('startTime', startOfMonth)
@@ -32,10 +33,17 @@ export async function GET(req: NextRequest) {
 
     const appointments = completedAppointments || [];
 
-    const monthlyRevenue = appointments.reduce((sum: number, apt: any) => {
-      if (apt.payment?.isPaid) return sum + (apt.payment.amount || 0);
-      return sum;
-    }, 0);
+    // Totales separados por moneda — nunca se mezclan en una sola cifra
+    const getPayment = (apt: any) => (Array.isArray(apt.payment) ? apt.payment[0] : apt.payment);
+
+    let monthlyRevenue = 0;
+    let monthlyRevenueBs = 0;
+    for (const apt of appointments as any[]) {
+      const payment = getPayment(apt);
+      if (!payment?.isPaid) continue;
+      if (isBs(payment.currency)) monthlyRevenueBs += payment.amount || 0;
+      else monthlyRevenue += payment.amount || 0;
+    }
 
     // ── Top 3 servicios ───────────────────────────────────────────────────────
     const serviceCounts: Record<string, { name: string; count: number }> = {};
@@ -59,11 +67,19 @@ export async function GET(req: NextRequest) {
       .eq('userId', session.userId);
 
     // ── Ticket promedio ───────────────────────────────────────────────────────
-    const paidPayments = appointments.filter((a: any) => a.payment?.isPaid);
+    // Ticket promedio por moneda: solo pagos USD para avgTicket, solo BS para avgTicketBs
+    const paidPayments = (appointments as any[])
+      .map(getPayment)
+      .filter((p: any) => p?.isPaid);
+    const paidUSD = paidPayments.filter((p: any) => !isBs(p.currency));
+    const paidBS = paidPayments.filter((p: any) => isBs(p.currency));
     const avgTicket =
-      paidPayments.length > 0
-        ? paidPayments.reduce((s: number, a: any) => s + (a.payment?.amount ?? 0), 0) /
-          paidPayments.length
+      paidUSD.length > 0
+        ? paidUSD.reduce((s: number, p: any) => s + (p.amount ?? 0), 0) / paidUSD.length
+        : 0;
+    const avgTicketBs =
+      paidBS.length > 0
+        ? paidBS.reduce((s: number, p: any) => s + (p.amount ?? 0), 0) / paidBS.length
         : 0;
 
     // ── Ingresos acumulados del año ───────────────────────────────────────────
@@ -72,15 +88,19 @@ export async function GET(req: NextRequest) {
 
     const { data: yearPayments } = await adminSupabase
       .from('Payment')
-      .select('amount, appointment:Appointment(startTime, status, userId)')
+      .select('amount, currency, appointment:Appointment(startTime, status, userId)')
       .eq('isPaid', true)
       .eq('Appointment.userId', session.userId)
       .eq('Appointment.status', 'completed')
       .gte('Appointment.startTime', startOfYear)
       .lte('Appointment.startTime', endOfYear);
 
-    const yearlyRevenue = (yearPayments || [])
-      .filter((p: any) => p.appointment) // Asegurar que el join fue exitoso
+    const validYearPayments = (yearPayments || []).filter((p: any) => p.appointment); // Asegurar que el join fue exitoso
+    const yearlyRevenue = validYearPayments
+      .filter((p: any) => !isBs(p.currency))
+      .reduce((s: number, p: any) => s + (p.amount || 0), 0);
+    const yearlyRevenueBs = validYearPayments
+      .filter((p: any) => isBs(p.currency))
       .reduce((s: number, p: any) => s + (p.amount || 0), 0);
 
     // ── Reprogramaciones del mes ──────────────────────────────────────────────
@@ -94,11 +114,14 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       monthlyRevenue,
+      monthlyRevenueBs,
       completedAppointments: appointments.length,
       topServices,
       totalClients: totalClients || 0,
       avgTicket,
+      avgTicketBs,
       yearlyRevenue,
+      yearlyRevenueBs,
       rescheduledThisMonth: rescheduledThisMonth || 0,
       currency: "USD",
     });

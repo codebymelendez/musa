@@ -10,6 +10,7 @@ import { PRIMARY, DARK, SURFACE, BORDER, GRAY, SERIF } from '../../lib/utils'
 import { Pulse, Bone } from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
 import { useSettings, useUpdateSettings } from '../../hooks/queries'
+import { MaxWidthContainer } from '../../components/ui/MaxWidthContainer'
 
 type Method = {
   key: string
@@ -69,84 +70,86 @@ export default function PaymentMethodsScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => router.back()}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="chevron-back-outline" size={24} color={DARK} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Métodos de Pago</Text>
-        <View style={styles.backBtn} />
-      </View>
+      <MaxWidthContainer>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => router.back()}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="chevron-back-outline" size={24} color={DARK} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Métodos de Pago</Text>
+          <View style={styles.backBtn} />
+        </View>
 
-      {loadState === 'loading' && <ScrollView><PaymentMethodsSkeleton /></ScrollView>}
+        {loadState === 'loading' && <ScrollView><PaymentMethodsSkeleton /></ScrollView>}
 
-      {loadState === 'error' && (
-        <ErrorState message="No se pudo cargar la configuración" onRetry={load} />
-      )}
+        {loadState === 'error' && (
+          <ErrorState message="No se pudo cargar la configuración" onRetry={load} />
+        )}
 
-      {loadState === 'ready' && (
-        <ScrollView
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.descCard}>
-            <Ionicons name="information-circle-outline" size={16} color={GRAY} />
-            <Text style={styles.descText}>
-              Activa los métodos que aceptas. Tus clientas los verán en tu perfil de reserva.
-            </Text>
-          </View>
+        {loadState === 'ready' && (
+          <ScrollView
+            contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.descCard}>
+              <Ionicons name="information-circle-outline" size={16} color={GRAY} />
+              <Text style={styles.descText}>
+                Activa los métodos que aceptas. Tus clientas los verán en tu perfil de reserva.
+              </Text>
+            </View>
 
-          <View style={styles.card}>
-            {METHODS.map((method, idx) => {
-              const isActive = active.includes(method.key)
-              const isSaving = saving === method.key
-              return (
-                <View key={method.key}>
-                  {idx > 0 && <View style={styles.divider} />}
-                  <View style={styles.row}>
-                    <View style={[styles.iconBox, isActive && styles.iconBoxActive]}>
-                      <Ionicons
-                        name={method.icon}
-                        size={20}
-                        color={isActive ? PRIMARY : DARK}
+            <View style={styles.card}>
+              {METHODS.map((method, idx) => {
+                const isActive = active.includes(method.key)
+                const isSaving = saving === method.key
+                return (
+                  <View key={method.key}>
+                    {idx > 0 && <View style={styles.divider} />}
+                    <View style={styles.row}>
+                      <View style={[styles.iconBox, isActive && styles.iconBoxActive]}>
+                        <Ionicons
+                          name={method.icon}
+                          size={20}
+                          color={isActive ? PRIMARY : DARK}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.rowLabel}>{method.label}</Text>
+                        {method.hint && (
+                          <Text style={styles.rowHint}>{method.hint}</Text>
+                        )}
+                      </View>
+                      <Switch
+                        value={isActive}
+                        onValueChange={val => { if (!isSaving) handleToggle(method.key, val) }}
+                        trackColor={{ false: '#DDDDDD', true: PRIMARY }}
+                        thumbColor="#fff"
+                        disabled={isSaving}
                       />
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.rowLabel}>{method.label}</Text>
-                      {method.hint && (
-                        <Text style={styles.rowHint}>{method.hint}</Text>
-                      )}
-                    </View>
-                    <Switch
-                      value={isActive}
-                      onValueChange={val => { if (!isSaving) handleToggle(method.key, val) }}
-                      trackColor={{ false: '#DDDDDD', true: PRIMARY }}
-                      thumbColor="#fff"
-                      disabled={isSaving}
-                    />
                   </View>
-                </View>
-              )
-            })}
-          </View>
-
-          {active.length > 0 && (
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryTitle}>Activos ahora</Text>
-              <View style={styles.pillsWrap}>
-                {active.map(key => (
-                  <View key={key} style={styles.pill}>
-                    <Text style={styles.pillText}>{key}</Text>
-                  </View>
-                ))}
-              </View>
+                )
+              })}
             </View>
-          )}
-        </ScrollView>
-      )}
+
+            {active.length > 0 && (
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryTitle}>Activos ahora</Text>
+                <View style={styles.pillsWrap}>
+                  {active.map(key => (
+                    <View key={key} style={styles.pill}>
+                      <Text style={styles.pillText}>{key}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+          </ScrollView>
+        )}
+      </MaxWidthContainer>
     </SafeAreaView>
   )
 }

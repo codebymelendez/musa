@@ -12,6 +12,7 @@ import { Pulse, Bone } from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
 import { validate, promotionFormSchema } from '../../lib/validation'
 import { usePromotions, useUpdatePromotion, useDeletePromotion } from '../../hooks/queries'
+import { MaxWidthContainer } from '../../components/ui/MaxWidthContainer'
 
 function formatDisplayDate(iso: string | null): string {
   if (!iso) return ''
@@ -134,118 +135,120 @@ export default function PromotionEditScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="chevron-back-outline" size={24} color={DARK} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{promo?.title ?? 'Promoción'}</Text>
-        <View style={styles.backBtn} />
-      </View>
+      <MaxWidthContainer>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="chevron-back-outline" size={24} color={DARK} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle} numberOfLines={1}>{promo?.title ?? 'Promoción'}</Text>
+          <View style={styles.backBtn} />
+        </View>
 
-      {loadState === 'loading' && <ScrollView><PromotionSkeleton /></ScrollView>}
+        {loadState === 'loading' && <ScrollView><PromotionSkeleton /></ScrollView>}
 
-      {loadState === 'error' && (
-        <ErrorState message="No se pudo cargar la promoción" onRetry={load} />
-      )}
+        {loadState === 'error' && (
+          <ErrorState message="No se pudo cargar la promoción" onRetry={load} />
+        )}
 
-      {loadState === 'ready' && (
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
-        >
-          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Detalles de la promoción</Text>
+        {loadState === 'ready' && (
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+          >
+            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Detalles de la promoción</Text>
 
-              <Text style={styles.label}>Título *</Text>
-              <TextInput style={styles.input} value={title} onChangeText={setTitle}
-                placeholderTextColor="#AAAAAA" />
+                <Text style={styles.label}>Título *</Text>
+                <TextInput style={styles.input} value={title} onChangeText={setTitle}
+                  placeholderTextColor="#AAAAAA" />
 
-              <Text style={[styles.label, { marginTop: 14 }]}>Descripción <Text style={{ color: GRAY }}>(opcional)</Text></Text>
-              <TextInput
-                style={[styles.input, { height: 80, textAlignVertical: 'top', paddingTop: 10 }]}
-                value={description} onChangeText={setDescription} multiline
-                placeholderTextColor="#AAAAAA" />
+                <Text style={[styles.label, { marginTop: 14 }]}>Descripción <Text style={{ color: GRAY }}>(opcional)</Text></Text>
+                <TextInput
+                  style={[styles.input, { height: 80, textAlignVertical: 'top', paddingTop: 10 }]}
+                  value={description} onChangeText={setDescription} multiline
+                  placeholderTextColor="#AAAAAA" />
 
-              <Text style={[styles.label, { marginTop: 14 }]}>Descuento %</Text>
-              <TextInput style={styles.input} value={discount} onChangeText={setDiscount}
-                keyboardType="decimal-pad" placeholderTextColor="#AAAAAA" />
+                <Text style={[styles.label, { marginTop: 14 }]}>Descuento %</Text>
+                <TextInput style={styles.input} value={discount} onChangeText={setDiscount}
+                  keyboardType="decimal-pad" placeholderTextColor="#AAAAAA" />
 
-              <View style={styles.datesRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Fecha inicio</Text>
-                  <TouchableOpacity
-                    style={styles.dateBtn}
-                    onPress={() => setShowFromPicker(true)}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="calendar-outline" size={16} color={PRIMARY} />
-                    <Text style={[styles.dateBtnText, !validFrom && { color: '#AAAAAA' }]} numberOfLines={1}>
-                      {validFrom ? formatDateSpanish(validFrom) : 'Sin fecha'}
-                    </Text>
-                  </TouchableOpacity>
+                <View style={styles.datesRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.label}>Fecha inicio</Text>
+                    <TouchableOpacity
+                      style={styles.dateBtn}
+                      onPress={() => setShowFromPicker(true)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="calendar-outline" size={16} color={PRIMARY} />
+                      <Text style={[styles.dateBtnText, !validFrom && { color: '#AAAAAA' }]} numberOfLines={1}>
+                        {validFrom ? formatDateSpanish(validFrom) : 'Sin fecha'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.label}>Fecha fin</Text>
+                    <TouchableOpacity
+                      style={styles.dateBtn}
+                      onPress={() => setShowUntilPicker(true)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="calendar-outline" size={16} color={PRIMARY} />
+                      <Text style={[styles.dateBtnText, !validUntil && { color: '#AAAAAA' }]} numberOfLines={1}>
+                        {validUntil ? formatDateSpanish(validUntil) : 'Sin fecha'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Fecha fin</Text>
-                  <TouchableOpacity
-                    style={styles.dateBtn}
-                    onPress={() => setShowUntilPicker(true)}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="calendar-outline" size={16} color={PRIMARY} />
-                    <Text style={[styles.dateBtnText, !validUntil && { color: '#AAAAAA' }]} numberOfLines={1}>
-                      {validUntil ? formatDateSpanish(validUntil) : 'Sin fecha'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+
               </View>
 
-            </View>
-
-            <TouchableOpacity
-              style={styles.deleteBtn} onPress={handleDelete} disabled={deleting} activeOpacity={0.85}>
-              <Ionicons name="trash-outline" size={18} color="#C62828" />
-              <Text style={styles.deleteBtnText}>{deleting ? 'Eliminando…' : 'Eliminar promoción'}</Text>
-            </TouchableOpacity>
-
-            <View style={{ height: 20 }} />
-          </ScrollView>
-
-          <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
-            {savedMsg ? (
-              <View style={styles.savedBadge}>
-                <Ionicons name="checkmark-circle-outline" size={18} color="#2E7D32" />
-                <Text style={styles.savedText}>Guardado ✓</Text>
-              </View>
-            ) : (
               <TouchableOpacity
-                style={[styles.btnPrimary, saving && { opacity: 0.6 }]}
-                onPress={handleSave} disabled={saving} activeOpacity={0.85}>
-                <Text style={styles.btnPrimaryText}>{saving ? 'Guardando…' : 'Guardar cambios'}</Text>
+                style={styles.deleteBtn} onPress={handleDelete} disabled={deleting} activeOpacity={0.85}>
+                <Ionicons name="trash-outline" size={18} color="#C62828" />
+                <Text style={styles.deleteBtnText}>{deleting ? 'Eliminando…' : 'Eliminar promoción'}</Text>
               </TouchableOpacity>
-            )}
-          </View>
-        </KeyboardAvoidingView>
-      )}
 
-      <DatePickerModal
-        visible={showFromPicker}
-        value={validFrom}
-        onConfirm={date => { setValidFrom(date); setShowFromPicker(false) }}
-        onCancel={() => setShowFromPicker(false)}
-        title="Fecha de inicio"
-        minDate={today}
-      />
-      <DatePickerModal
-        visible={showUntilPicker}
-        value={validUntil}
-        onConfirm={date => { setValidUntil(date); setShowUntilPicker(false) }}
-        onCancel={() => setShowUntilPicker(false)}
-        title="Fecha de fin"
-        minDate={validFrom ?? today}
-      />
+              <View style={{ height: 20 }} />
+            </ScrollView>
+
+            <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
+              {savedMsg ? (
+                <View style={styles.savedBadge}>
+                  <Ionicons name="checkmark-circle-outline" size={18} color="#2E7D32" />
+                  <Text style={styles.savedText}>Guardado ✓</Text>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.btnPrimary, saving && { opacity: 0.6 }]}
+                  onPress={handleSave} disabled={saving} activeOpacity={0.85}>
+                  <Text style={styles.btnPrimaryText}>{saving ? 'Guardando…' : 'Guardar cambios'}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </KeyboardAvoidingView>
+        )}
+
+        <DatePickerModal
+          visible={showFromPicker}
+          value={validFrom}
+          onConfirm={date => { setValidFrom(date); setShowFromPicker(false) }}
+          onCancel={() => setShowFromPicker(false)}
+          title="Fecha de inicio"
+          minDate={today}
+        />
+        <DatePickerModal
+          visible={showUntilPicker}
+          value={validUntil}
+          onConfirm={date => { setValidUntil(date); setShowUntilPicker(false) }}
+          onCancel={() => setShowUntilPicker(false)}
+          title="Fecha de fin"
+          minDate={validFrom ?? today}
+        />
+      </MaxWidthContainer>
     </SafeAreaView>
   )
 }

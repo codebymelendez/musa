@@ -11,13 +11,14 @@ import { useLocalSearchParams, router } from 'expo-router'
 import {
   type ClientItem, type AppointmentStatus, type AppointmentPayment, type LoyaltyProgram, type LoyaltyAccount,
 } from '../../lib/api'
-import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials, formatShortDate, formatMoney } from '../../lib/utils'
+import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials, formatShortDate, formatMoney, formatBs, isBs } from '../../lib/utils'
 import { Pulse, Bone } from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
 import { validate, clientFormSchema } from '../../lib/validation'
 import {
   useClient, useUpdateClient, useLoyaltyProgram, useLoyaltyAccounts, useRedeemLoyaltyReward,
 } from '../../hooks/queries'
+import { MaxWidthContainer } from '../../components/ui/MaxWidthContainer'
 
 // ─── status pill (mini) ───────────────────────────────────────────────────────
 
@@ -59,8 +60,8 @@ const METHOD_LABEL: Record<string, string> = {
 }
 
 function paymentAmountStr(p: AppointmentPayment): string {
-  return p.currency === 'Bs'
-    ? `Bs. ${p.amount.toFixed(2)}`
+  return isBs(p.currency)
+    ? formatBs(p.amount)
     : `$${p.amount.toFixed(2)}`
 }
 
@@ -224,7 +225,8 @@ function EditClientModal({
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={styles.mSafe} edges={['top', 'bottom']}>
-        <View style={styles.mHeader}>
+        <MaxWidthContainer>
+          <View style={styles.mHeader}>
           <Text style={styles.mTitle}>Editar clienta</Text>
           <TouchableOpacity
             style={styles.mCloseBtn}
@@ -343,6 +345,7 @@ function EditClientModal({
             <Text style={styles.mSaveBtnText}>{saving ? 'Guardando…' : 'Aceptar'}</Text>
           </TouchableOpacity>
         </View>
+        </MaxWidthContainer>
       </SafeAreaView>
 
       <DatePickerModal
@@ -429,7 +432,8 @@ export default function ClientDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
+      <MaxWidthContainer>
+        <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="chevron-back-outline" size={24} color={DARK} />
@@ -506,10 +510,10 @@ export default function ClientDetailScreen() {
                 const paid = c.appointments.filter(a => a.payment?.isPaid)
                 const pending = c.appointments.filter(a => a.payment && !a.payment.isPaid)
                 const totalUSD = paid
-                  .filter(a => a.payment!.currency !== 'Bs')
+                  .filter(a => !isBs(a.payment!.currency))
                   .reduce((s, a) => s + a.payment!.amount, 0)
                 const totalBs = paid
-                  .filter(a => a.payment!.currency === 'Bs')
+                  .filter(a => isBs(a.payment!.currency))
                   .reduce((s, a) => s + a.payment!.amount, 0)
                 const hasCobros = paid.length > 0 || pending.length > 0
                 if (!hasCobros) return null
@@ -524,7 +528,7 @@ export default function ClientDetailScreen() {
                       )}
                       {totalBs > 0 && (
                         <Text style={[styles.cobroAmount, { fontFamily: MONO }]}>
-                          Bs. {totalBs.toFixed(2)}
+                          {formatBs(totalBs)}
                         </Text>
                       )}
                       {paid.length === 0 && (
@@ -602,6 +606,7 @@ export default function ClientDetailScreen() {
           </>
         )
       })()}
+      </MaxWidthContainer>
     </SafeAreaView>
   )
 }

@@ -16,7 +16,7 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": false,
+      "supportsTablet": true,
       "bundleIdentifier": "app.getmusa.pro",
       "buildNumber": "1",
       "infoPlist": {
@@ -29,35 +29,30 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#34271E"
-      },
-      "plugins": [
-        "expo-router",
-        "expo-notifications",
-        [
-          "expo-secure-store",
-          {
-            "faceIDPermission": "Permite a MUSA Pro acceder a Face ID"
-          }
-        ],
-        "expo-web-browser"
-      ],
-      "experiments": {
-        "typedRoutes": true
-      },
-      "extra": {
-        "router": {
-          "origin": false
-        },
-        "eas": {
-          "projectId": "b4250c86-c967-4280-a93b-1f010293accc"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-notifications",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "Permite a MUSA Pro acceder a Face ID"
         }
-      },
-      "owner": "codebymelendezs-team"
+      ],
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "typedRoutes": true
     },
     "extra": {
+      "router": {
+        "origin": false
+      },
       "eas": {
-        "projectId": "5f40f09f-ead3-4bed-b7c1-2729c8476cab"
+        "projectId": "b4250c86-c967-4280-a93b-1f010293accc"
       }
-    }
+    },
+    "owner": "codebymelendezs-team"
   }
 }

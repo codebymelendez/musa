@@ -15,6 +15,7 @@ import { Pulse, Bone } from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
 import EmptyState from '../../components/ui/EmptyState'
 import { useServices } from '../../hooks/queries'
+import { MaxWidthContainer } from '../../components/ui/MaxWidthContainer'
 
 type LoadState = 'loading' | 'error' | 'ready'
 
@@ -34,64 +35,66 @@ export default function ServicesScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => router.back()}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="arrow-back-outline" size={22} color={DARK} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Servicios</Text>
-        <View style={styles.backBtn} />
-      </View>
+      <MaxWidthContainer>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => router.back()}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="arrow-back-outline" size={22} color={DARK} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Servicios</Text>
+          <View style={styles.backBtn} />
+        </View>
 
-      {state === 'loading' && !refreshing && (
-        <Pulse style={{ padding: 16, gap: 10 }}>
-          {[1, 2, 3, 4].map(i => (
-            <Bone key={i} height={72} radius={14} />
-          ))}
-        </Pulse>
-      )}
+        {state === 'loading' && !refreshing && (
+          <Pulse style={{ padding: 16, gap: 10 }}>
+            {[1, 2, 3, 4].map(i => (
+              <Bone key={i} height={72} radius={14} />
+            ))}
+          </Pulse>
+        )}
 
-      {state === 'error' && (
-        <ErrorState message="No se pudieron cargar los servicios" onRetry={load} />
-      )}
+        {state === 'error' && (
+          <ErrorState message="No se pudieron cargar los servicios" onRetry={load} />
+        )}
 
-      {state === 'ready' && (
-        <ScrollView
-          contentContainerStyle={[styles.content, services.length === 0 && { flexGrow: 1 }]}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} colors={[PRIMARY]} />
-          }
-        >
-          {services.length === 0 ? (
-            <EmptyState
-              icon="cut-outline"
-              title="Sin servicios configurados"
-              subtitle="Añade tus servicios para que las clientas puedan reservar."
-              ctaLabel="Añadir mi primer servicio"
-              onCtaPress={() => router.push('/services' as Parameters<typeof router.push>[0])}
-            />
-          ) : (
-            services.map(svc => (
-              <View key={svc.id} style={styles.card}>
-                <View style={styles.cardLeft}>
-                  <Text style={styles.svcName}>{svc.name}</Text>
-                  {svc.category ? (
-                    <Text style={styles.svcCategory}>{svc.category}</Text>
-                  ) : null}
-                  <Text style={styles.svcDuration}>{svc.durationMin} min</Text>
+        {state === 'ready' && (
+          <ScrollView
+            contentContainerStyle={[styles.content, services.length === 0 && { flexGrow: 1 }]}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} colors={[PRIMARY]} />
+            }
+          >
+            {services.length === 0 ? (
+              <EmptyState
+                icon="cut-outline"
+                title="Sin servicios configurados"
+                subtitle="Añade tus servicios para que las clientas puedan reservar."
+                ctaLabel="Añadir mi primer servicio"
+                onCtaPress={() => router.push('/services' as Parameters<typeof router.push>[0])}
+              />
+            ) : (
+              services.map(svc => (
+                <View key={svc.id} style={styles.card}>
+                  <View style={styles.cardLeft}>
+                    <Text style={styles.svcName}>{svc.name}</Text>
+                    {svc.category ? (
+                      <Text style={styles.svcCategory}>{svc.category}</Text>
+                    ) : null}
+                    <Text style={styles.svcDuration}>{svc.durationMin} min</Text>
+                  </View>
+                  <Text style={[styles.svcPrice, { fontFamily: MONO }]}>
+                    {formatMoney(svc.price, svc.currency)}
+                  </Text>
                 </View>
-                <Text style={[styles.svcPrice, { fontFamily: MONO }]}>
-                  {formatMoney(svc.price, svc.currency)}
-                </Text>
-              </View>
-            ))
-          )}
-        </ScrollView>
-      )}
+              ))
+            )}
+          </ScrollView>
+        )}
+      </MaxWidthContainer>
     </SafeAreaView>
   )
 }
