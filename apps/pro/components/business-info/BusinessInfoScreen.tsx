@@ -347,7 +347,7 @@ export default function BusinessInfoScreen() {
           description: description.trim() || null,
           logoUrl,
           coverUrl,
-          address: address.trim() || null,
+          address: (placesRef.current?.getAddressText() || address || '').trim() || null,
           latitude,
           longitude,
           country: country || null,
@@ -625,6 +625,7 @@ export default function BusinessInfoScreen() {
                 <View style={styles.autocompleteWrapper}>
                   <GooglePlacesAutocomplete
                     ref={placesRef}
+                    keyboardShouldPersistTaps="handled"
                     placeholder="Busca la dirección..."
                     fetchDetails={true}
                     onPress={async (data, details = null) => {
@@ -671,7 +672,6 @@ export default function BusinessInfoScreen() {
                     }}
                     textInputProps={{
                       placeholderTextColor: '#AAAAAA',
-                      onChangeText: setAddress,
                     }}
                   />
                 </View>
@@ -989,7 +989,7 @@ const styles = StyleSheet.create({
     backgroundColor: SURFACE,
   },
   galleryAddText: { fontFamily: 'System', fontSize: 10, color: PRIMARY, fontWeight: '500' },
-  autocompleteWrapper: { marginBottom: 14, zIndex: 10, position: 'relative' },
+  autocompleteWrapper: { marginBottom: 14, zIndex: 1000, elevation: 1000, position: 'relative' },
   autocompleteInput: {
     fontFamily: 'System', height: 48, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
     paddingHorizontal: 14, fontSize: 15, color: DARK, backgroundColor: SURFACE,
@@ -997,7 +997,7 @@ const styles = StyleSheet.create({
   },
   autocompleteList: {
     borderWidth: 1, borderColor: BORDER, borderRadius: 12, backgroundColor: '#fff',
-    marginTop: 4, position: 'absolute', top: 48, left: 0, right: 0, zIndex: 999,
+    marginTop: 4, position: 'absolute', top: 48, left: 0, right: 0, zIndex: 1001, elevation: 1001,
   },
   mapContainer: { height: 180, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: BORDER, marginBottom: 14 },
   map: { width: '100%', height: '100%' },
