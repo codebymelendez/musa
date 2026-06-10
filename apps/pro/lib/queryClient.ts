@@ -21,6 +21,13 @@ export const asyncStoragePersister = createAsyncStoragePersister({
   throttleTime: 1_000,
 })
 
+// Al cerrar sesión, ningún dato del negocio puede quedar en el dispositivo:
+// se vacía el caché en memoria y se purga el snapshot persistido en AsyncStorage.
+export async function clearPersistedCache(): Promise<void> {
+  queryClient.clear()
+  await asyncStoragePersister.removeClient()
+}
+
 // Queries whose first key segment is listed here never hit AsyncStorage:
 // slots must always be fresh (booking correctness) and the BCV rate is cheap.
 const NEVER_PERSIST = new Set(['availableSlots', 'bcv-rate'])

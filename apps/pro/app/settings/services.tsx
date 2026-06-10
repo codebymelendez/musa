@@ -5,13 +5,15 @@ import {
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
-  ActivityIndicator,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { type ServiceItem } from '../../lib/api'
 import { PRIMARY, DARK, BORDER, GRAY, MONO, formatMoney } from '../../lib/utils'
+import { Pulse, Bone } from '../../components/ui/Skeleton'
+import ErrorState from '../../components/ui/ErrorState'
+import EmptyState from '../../components/ui/EmptyState'
 import { useServices } from '../../hooks/queries'
 
 type LoadState = 'loading' | 'error' | 'ready'
@@ -45,34 +47,33 @@ export default function ServicesScreen() {
       </View>
 
       {state === 'loading' && !refreshing && (
-        <View style={styles.center}>
-          <ActivityIndicator color={PRIMARY} />
-        </View>
+        <Pulse style={{ padding: 16, gap: 10 }}>
+          {[1, 2, 3, 4].map(i => (
+            <Bone key={i} height={72} radius={14} />
+          ))}
+        </Pulse>
       )}
 
       {state === 'error' && (
-        <View style={styles.center}>
-          <Text style={styles.grayText}>No se pudieron cargar los servicios</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={load} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Reintentar</Text>
-          </TouchableOpacity>
-        </View>
+        <ErrorState message="No se pudieron cargar los servicios" onRetry={load} />
       )}
 
       {state === 'ready' && (
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, services.length === 0 && { flexGrow: 1 }]}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} colors={[PRIMARY]} />
           }
         >
           {services.length === 0 ? (
-            <View style={styles.empty}>
-              <Ionicons name="cut-outline" size={48} color="#CCCCCC" />
-              <Text style={styles.emptyText}>Sin servicios configurados</Text>
-              <Text style={styles.emptyHint}>Agrega servicios desde el panel web en getmusa.app</Text>
-            </View>
+            <EmptyState
+              icon="cut-outline"
+              title="Sin servicios configurados"
+              subtitle="Añade tus servicios para que las clientas puedan reservar."
+              ctaLabel="Añadir mi primer servicio"
+              onCtaPress={() => router.push('/services' as Parameters<typeof router.push>[0])}
+            />
           ) : (
             services.map(svc => (
               <View key={svc.id} style={styles.card}>
@@ -127,11 +128,4 @@ const styles = StyleSheet.create({
   svcCategory: { fontSize: 12, color: GRAY },
   svcDuration: { fontSize: 12, color: GRAY },
   svcPrice: { fontSize: 15, color: DARK, fontWeight: '500' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
-  grayText: { fontSize: 14, color: '#AAAAAA' },
-  retryBtn: { height: 48, paddingHorizontal: 32, backgroundColor: PRIMARY, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  retryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '500' },
-  empty: { alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 12 },
-  emptyText: { fontSize: 15, color: '#AAAAAA' },
-  emptyHint: { fontSize: 13, color: '#CCCCCC', textAlign: 'center', paddingHorizontal: 24 },
 })

@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react'
+import { useState, useCallback, useMemo, memo } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
-  StyleSheet, RefreshControl, Animated,
+  StyleSheet, RefreshControl,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -10,47 +10,26 @@ import { router } from 'expo-router'
 import { type ClientItem } from '../../lib/api'
 import { PRIMARY, DARK, BORDER, GRAY, MONO, SERIF, SURFACE, initials } from '../../lib/utils'
 import AddClientModal from '../../components/AddClientModal'
+import { Pulse, Bone } from '../../components/ui/Skeleton'
+import ErrorState from '../../components/ui/ErrorState'
+import EmptyState from '../../components/ui/EmptyState'
 import { useClients } from '../../hooks/queries'
 
 // ─── skeleton ─────────────────────────────────────────────────────────────────
 
 function SkeletonRows() {
-  const opacity = useRef(new Animated.Value(0.45)).current
-  useEffect(() => {
-    const anim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 1, duration: 750, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.45, duration: 750, useNativeDriver: true }),
-      ])
-    )
-    anim.start()
-    return () => anim.stop()
-  }, [opacity])
   return (
     <>
       {[70, 60, 75, 55, 65, 58].map((w, i) => (
-        <Animated.View key={i} style={[styles.skeletonRow, { opacity }]}>
-          <View style={styles.skeletonAvatar} />
+        <Pulse key={i} style={styles.skeletonRow}>
+          <Bone width={44} height={44} radius={22} />
           <View style={{ flex: 1 }}>
-            <View style={[styles.skeletonLine, { width: `${w}%` }]} />
-            <View style={[styles.skeletonLine, { width: '40%', marginTop: 6 }]} />
+            <Bone height={13} width={`${w}%`} />
+            <Bone height={13} width="40%" style={{ marginTop: 6 }} />
           </View>
-        </Animated.View>
+        </Pulse>
       ))}
     </>
-  )
-}
-
-// ─── empty ────────────────────────────────────────────────────────────────────
-
-function EmptyState({ searching }: { searching: boolean }) {
-  return (
-    <View style={styles.centerState}>
-      <Ionicons name="people-outline" size={52} color="#CCCCCC" />
-      <Text style={styles.emptyText}>
-        {searching ? 'Sin resultados para esa búsqueda' : 'No tienes clientas aún'}
-      </Text>
-    </View>
   )
 }
 
@@ -179,12 +158,7 @@ export default function ClientsScreen() {
       {state.kind === 'loading' && <View style={styles.listPad}><SkeletonRows /></View>}
 
       {state.kind === 'error' && (
-        <View style={styles.centerState}>
-          <Text style={styles.emptyText}>No se pudieron cargar las clientas</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Reintentar</Text>
-          </TouchableOpacity>
-        </View>
+        <ErrorState message="No se pudieron cargar las clientas" onRetry={() => refetch()} />
       )}
 
       {state.kind === 'ok' && (
@@ -193,7 +167,19 @@ export default function ClientsScreen() {
           keyExtractor={item => item.id}
           contentContainerStyle={filtered.length === 0 ? { flex: 1 } : styles.listPad}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
-          ListEmptyComponent={<EmptyState searching={query.length > 0} />}
+          ListEmptyComponent={
+            query.length > 0 ? (
+              <EmptyState icon="search-outline" title="Sin resultados" subtitle="Prueba con otro nombre o teléfono." />
+            ) : (
+              <EmptyState
+                icon="people-outline"
+                title="Aún no tienes clientas"
+                subtitle="Tu directorio crece con cada reserva. Empieza agregando tu primera clienta."
+                ctaLabel="Agregar mi primera clienta"
+                onCtaPress={() => setShowAddModal(true)}
+              />
+            )
+          }
           renderItem={renderItem}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} colors={[PRIMARY]} />}
           showsVerticalScrollIndicator={false}
@@ -273,13 +259,7 @@ const styles = StyleSheet.create({
   rowCountText: { fontSize: 11, color: GRAY },
 
   separator: { height: StyleSheet.hairlineWidth, backgroundColor: BORDER, marginLeft: 78 },
-  centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingTop: 60 },
-  emptyText: { fontSize: 15, color: '#AAAAAA', textAlign: 'center', paddingHorizontal: 32 },
-  retryBtn: { height: 48, paddingHorizontal: 32, backgroundColor: PRIMARY, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  retryText: { color: '#fff', fontSize: 15, fontWeight: '500' },
   skeletonRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, gap: 14 },
-  skeletonAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F0EDE9' },
-  skeletonLine: { height: 13, backgroundColor: '#F0EDE9', borderRadius: 6 },
   fab: {
     position: 'absolute', bottom: 32, right: 24,
     width: 56, height: 56, borderRadius: 28,

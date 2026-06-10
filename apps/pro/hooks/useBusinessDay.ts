@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import { toZonedTime, fromZonedTime } from 'date-fns-tz'
+import { keys } from './queries/keys'
 
 export interface BusinessDayState {
   isOpen: boolean
@@ -9,93 +9,60 @@ export interface BusinessDayState {
   isLoading: boolean
 }
 
-export function useBusinessDay(businessId: string | null, date: string, timezone: string): BusinessDayState {
-  const [state, setState] = useState<BusinessDayState>({
-    isOpen: true,
-    openTime: '09:00',
-    closeTime: '18:00',
-    isLoading: true,
+const DEFAULT_DAY = { isOpen: true, openTime: '09:00', closeTime: '18:00' }
+
+async function fetchBusinessDay(businessId: string, date: string): Promise<Omit<BusinessDayState, 'isLoading'>> {
+  // 1. Check Exceptions
+  const { data: exception } = await supabase
+    .from('BusinessException')
+    .select('isClosed, openTime, closeTime')
+    .eq('businessId', businessId)
+    .eq('date', date)
+    .maybeSingle()
+
+  if (exception) {
+    return {
+      isOpen: !exception.isClosed,
+      openTime: exception.openTime || '09:00',
+      closeTime: exception.closeTime || '18:00',
+    }
+  }
+
+  // 2. Check Regular Business Hours
+  // Respect business timezone to interpret the day of week
+  const [y, m, d] = date.split('-').map(Number)
+  const dayOfWeek = new Date(Date.UTC(y, m - 1, d)).getUTCDay()
+
+  const { data: hours } = await supabase
+    .from('BusinessHours')
+    .select('isOpen, openTime, closeTime')
+    .eq('businessId', businessId)
+    .eq('dayOfWeek', dayOfWeek)
+    .is('userId', null)
+    .maybeSingle()
+
+  if (hours) {
+    return {
+      isOpen: hours.isOpen,
+      openTime: hours.openTime || '09:00',
+      closeTime: hours.closeTime || '18:00',
+    }
+  }
+
+  // If no config found, assume closed
+  return { isOpen: false, openTime: '09:00', closeTime: '18:00' }
+}
+
+export function useBusinessDay(businessId: string | null, date: string, _timezone: string): BusinessDayState {
+  const query = useQuery({
+    queryKey: keys.businessDay(businessId, date),
+    queryFn: () => fetchBusinessDay(businessId!, date),
+    enabled: !!businessId,
   })
 
-  useEffect(() => {
-    if (!businessId) {
-      setState({ isOpen: true, openTime: '09:00', closeTime: '18:00', isLoading: false })
-      return
-    }
-
-    let active = true
-
-    async function fetchDayInfo() {
-      try {
-        // 1. Check Exceptions
-        const { data: exception } = await supabase
-          .from('BusinessException')
-          .select('isClosed, openTime, closeTime')
-          .eq('businessId', businessId)
-          .eq('date', date)
-          .maybeSingle()
-
-        if (!active) return
-
-        if (exception) {
-          setState({
-            isOpen: !exception.isClosed,
-            openTime: exception.openTime || '09:00',
-            closeTime: exception.closeTime || '18:00',
-            isLoading: false,
-          })
-          return
-        }
-
-        // 2. Check Regular Business Hours
-        // Respect business timezone to interpret the day of week
-        const [y, m, d] = date.split('-').map(Number)
-        const dayOfWeek = new Date(Date.UTC(y, m - 1, d)).getUTCDay()
-
-        const { data: hours } = await supabase
-          .from('BusinessHours')
-          .select('isOpen, openTime, closeTime')
-          .eq('businessId', businessId)
-          .eq('dayOfWeek', dayOfWeek)
-          .is('userId', null)
-          .maybeSingle()
-
-        if (!active) return
-
-        if (hours) {
-          setState({
-            isOpen: hours.isOpen,
-            openTime: hours.openTime || '09:00',
-            closeTime: hours.closeTime || '18:00',
-            isLoading: false,
-          })
-        } else {
-          // If no config found, assume closed
-          setState({
-            isOpen: false,
-            openTime: '09:00',
-            closeTime: '18:00',
-            isLoading: false,
-          })
-        }
-      } catch (err) {
-        if (!active) return
-        setState({
-          isOpen: false,
-          openTime: '09:00',
-          closeTime: '18:00',
-          isLoading: false,
-        })
-      }
-    }
-
-    setState(s => ({ ...s, isLoading: true }))
-    fetchDayInfo()
-
-    return () => {
-      active = false
-    }
-  }, [businessId, date, timezone])
-
-  return state
+  if (!businessId) return { ...DEFAULT_DAY, isLoading: false }
+  if (query.data) return { ...query.data, isLoading: false }
+  // On error the old hook assumed closed; while loading it reported isLoading.
+  if (query.isError) return { isOpen: false, openTime: '09:00', closeTime: '18:00', isLoading: false }
+  return { ...DEFAULT_DAY, isLoading: true }
 }

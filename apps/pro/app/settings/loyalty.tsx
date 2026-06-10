@@ -1,31 +1,26 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Switch, Animated, Alert, KeyboardAvoidingView, Platform,
+  StyleSheet, Switch, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF } from '../../lib/utils'
+import { Pulse, Bone } from '../../components/ui/Skeleton'
+import ErrorState from '../../components/ui/ErrorState'
+import { validate, loyaltyFormSchema } from '../../lib/validation'
 import { useLoyaltyProgram, useLoyaltyAccounts, useSaveLoyaltyProgram } from '../../hooks/queries'
 
 // ─── skeleton ─────────────────────────────────────────────────────────────────
 
-function Skeleton() {
-  const op = useRef(new Animated.Value(0.45)).current
-  useEffect(() => {
-    const a = Animated.loop(Animated.sequence([
-      Animated.timing(op, { toValue: 1, duration: 750, useNativeDriver: true }),
-      Animated.timing(op, { toValue: 0.45, duration: 750, useNativeDriver: true }),
-    ]))
-    a.start(); return () => a.stop()
-  }, [op])
+function LoyaltySkeleton() {
   return (
-    <Animated.View style={{ opacity: op, paddingHorizontal: 20, paddingTop: 20, gap: 14 }}>
+    <Pulse style={{ paddingHorizontal: 20, paddingTop: 20, gap: 14 }}>
       {[220, 180, 100].map((h, i) => (
-        <View key={i} style={{ height: h, backgroundColor: '#F0EDE9', borderRadius: 16 }} />
+        <Bone key={i} height={h} radius={16} />
       ))}
-    </Animated.View>
+    </Pulse>
   )
 }
 
@@ -94,24 +89,17 @@ export default function LoyaltyScreen() {
   async function handleSave() {
     const threshold = parseInt(rewardThreshold, 10)
     const perVisit = parseInt(pointsPerVisit, 10)
-    if (!rewardDescription.trim()) {
-      Alert.alert('', 'Describe el premio para las clientas'); return
-    }
-    if (isNaN(threshold) || threshold < 1) {
-      Alert.alert('', 'El umbral de canje debe ser al menos 1 punto'); return
-    }
-    if (isNaN(perVisit) || perVisit < 1) {
-      Alert.alert('', 'Los puntos por visita deben ser al menos 1'); return
-    }
+    const parsed = validate(loyaltyFormSchema, {
+      isActive,
+      accumulationType,
+      pointsPerVisit: Number.isNaN(perVisit) ? 0 : perVisit,
+      rewardThreshold: Number.isNaN(threshold) ? 0 : threshold,
+      rewardDescription: rewardDescription.trim(),
+    })
+    if (!parsed.ok) { Alert.alert('', parsed.error); return }
 
     try {
-      await saveProgramMutation.mutateAsync({
-        isActive,
-        accumulationType,
-        pointsPerVisit: perVisit,
-        rewardThreshold: threshold,
-        rewardDescription: rewardDescription.trim(),
-      })
+      await saveProgramMutation.mutateAsync(parsed.data)
       setSavedMsg(true)
       setTimeout(() => setSavedMsg(false), 2000)
     } catch (e) {
@@ -132,15 +120,10 @@ export default function LoyaltyScreen() {
         <View style={styles.backBtn} />
       </View>
 
-      {loadState === 'loading' && <ScrollView><Skeleton /></ScrollView>}
+      {loadState === 'loading' && <ScrollView><LoyaltySkeleton /></ScrollView>}
 
       {loadState === 'error' && (
-        <View style={styles.center}>
-          <Text style={styles.grayText}>No se pudo cargar la configuración</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={load} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Reintentar</Text>
-          </TouchableOpacity>
-        </View>
+        <ErrorState message="No se pudo cargar la configuración" onRetry={load} />
       )}
 
       {loadState === 'ready' && (
@@ -357,8 +340,4 @@ const styles = StyleSheet.create({
   btnPrimaryText: { color: '#fff', fontSize: 16, fontWeight: '500' },
   savedBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 52, gap: 8 },
   savedText: { fontSize: 16, fontWeight: '500', color: '#2E7D32' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
-  grayText: { fontSize: 14, color: '#AAAAAA' },
-  retryBtn: { height: 48, paddingHorizontal: 32, backgroundColor: PRIMARY, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  retryText: { color: '#fff', fontSize: 15, fontWeight: '500' },
 })

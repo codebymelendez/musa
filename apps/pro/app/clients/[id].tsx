@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Linking, Modal, RefreshControl,
-  KeyboardAvoidingView, Platform, Animated, Alert,
+  KeyboardAvoidingView, Platform, Alert,
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import DatePickerModal, { formatDateSpanish } from '../../components/DatePickerModal'
@@ -12,6 +12,9 @@ import {
   type ClientItem, type AppointmentStatus, type AppointmentPayment, type LoyaltyProgram, type LoyaltyAccount,
 } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials, formatShortDate, formatMoney } from '../../lib/utils'
+import { Pulse, Bone } from '../../components/ui/Skeleton'
+import ErrorState from '../../components/ui/ErrorState'
+import { validate, clientFormSchema } from '../../lib/validation'
 import {
   useClient, useUpdateClient, useLoyaltyProgram, useLoyaltyAccounts, useRedeemLoyaltyReward,
 } from '../../hooks/queries'
@@ -128,25 +131,14 @@ function LoyaltySection({
 
 // ─── skeleton ─────────────────────────────────────────────────────────────────
 
-function Skeleton() {
-  const opacity = useRef(new Animated.Value(0.45)).current
-  useEffect(() => {
-    const anim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 1, duration: 750, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.45, duration: 750, useNativeDriver: true }),
-      ])
-    )
-    anim.start()
-    return () => anim.stop()
-  }, [opacity])
+function ClientSkeleton() {
   return (
-    <Animated.View style={[styles.skeletonWrap, { opacity }]}>
-      <View style={styles.skeletonAvatar} />
+    <Pulse style={styles.skeletonWrap}>
+      <Bone width={72} height={72} radius={36} />
       {[80, 55, 40].map((w, i) => (
-        <View key={i} style={[styles.skeletonLine, { width: `${w}%`, marginTop: i === 0 ? 20 : 10 }]} />
+        <Bone key={i} height={14} width={`${w}%`} style={{ marginTop: i === 0 ? 20 : 10 }} />
       ))}
-    </Animated.View>
+    </Pulse>
   )
 }
 
@@ -206,15 +198,22 @@ function EditClientModal({
   }
 
   async function handleSave() {
-    if (!name.trim()) { Alert.alert('', 'El nombre es requerido'); return }
-    if (!phone.trim()) { Alert.alert('', 'El teléfono es requerido'); return }
+    const parsed = validate(clientFormSchema, {
+      name: name.trim(),
+      phone: phone.trim(),
+      email: email.trim() || undefined,
+      birthday: birthday ?? undefined,
+      tags: selectedTags,
+      notes: notes.trim() || undefined,
+    })
+    if (!parsed.ok) { Alert.alert('', parsed.error); return }
 
     setSaving(true)
     try {
       await onSave({
-        name: name.trim(),
-        phone: phone.trim(),
-        email: email.trim() || null,
+        name: parsed.data.name,
+        phone: parsed.data.phone,
+        email: parsed.data.email ?? null,
         birthday,
         tags: selectedTags,
         notes: notes.trim(),
@@ -447,16 +446,11 @@ export default function ClientDetailScreen() {
       </View>
 
       {state.kind === 'loading' && (
-        <ScrollView contentContainerStyle={styles.content}><Skeleton /></ScrollView>
+        <ScrollView contentContainerStyle={styles.content}><ClientSkeleton /></ScrollView>
       )}
 
       {state.kind === 'error' && (
-        <View style={styles.centerState}>
-          <Text style={styles.grayText}>No se pudo cargar la ficha</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={load} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Reintentar</Text>
-          </TouchableOpacity>
-        </View>
+        <ErrorState message="No se pudo cargar la ficha" onRetry={load} />
       )}
 
       {state.kind === 'ok' && (() => {
@@ -676,13 +670,8 @@ const styles = StyleSheet.create({
   grayText: { fontSize: 14, color: '#AAAAAA' },
   pill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
   pillText: { fontSize: 11, fontWeight: '500' },
-  centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
-  retryBtn: { height: 48, paddingHorizontal: 32, backgroundColor: PRIMARY, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  retryText: { color: '#fff', fontSize: 15, fontWeight: '500' },
   // skeleton
   skeletonWrap: { alignItems: 'center', paddingTop: 16 },
-  skeletonAvatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#F0EDE9' },
-  skeletonLine: { height: 14, backgroundColor: '#F0EDE9', borderRadius: 6, alignSelf: 'stretch' },
   // loyalty
   loyaltyHero: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   loyaltyPointsBox: { alignItems: 'flex-start' },

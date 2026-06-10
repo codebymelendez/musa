@@ -1,15 +1,17 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Animated, Platform, Alert, KeyboardAvoidingView,
+  StyleSheet, Platform, Alert, KeyboardAvoidingView,
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import * as Haptics from 'expo-haptics'
 import { router } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { getBusinessTZ, type ClientItem, type ServiceItem } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO } from '../../lib/utils'
 import DatePickerModal from '../../components/DatePickerModal'
+import { Pulse, Bone } from '../../components/ui/Skeleton'
 import { getAvailableSlots } from '@musa/availability'
 import { supabase } from '../../lib/supabase'
 import { toZonedTime, format } from 'date-fns-tz'
@@ -25,21 +27,13 @@ function addDays(date: Date, n: number): Date {
 
 // ─── skeleton ─────────────────────────────────────────────────────────────────
 
-function Skeleton() {
-  const op = useRef(new Animated.Value(0.45)).current
-  useEffect(() => {
-    const a = Animated.loop(Animated.sequence([
-      Animated.timing(op, { toValue: 1, duration: 750, useNativeDriver: true }),
-      Animated.timing(op, { toValue: 0.45, duration: 750, useNativeDriver: true }),
-    ]))
-    a.start(); return () => a.stop()
-  }, [op])
+function NewAppointmentSkeleton() {
   return (
-    <Animated.View style={{ opacity: op, paddingHorizontal: 20, paddingTop: 20, gap: 14 }}>
+    <Pulse style={{ paddingHorizontal: 20, paddingTop: 20, gap: 14 }}>
       {[120, 160, 100, 200].map((h, i) => (
-        <View key={i} style={{ height: h, backgroundColor: '#F0EDE9', borderRadius: 16 }} />
+        <Bone key={i} height={h} radius={16} />
       ))}
-    </Animated.View>
+    </Pulse>
   )
 }
 
@@ -147,6 +141,7 @@ export default function NewAppointmentScreen() {
         businessId: settingsData?.businessId || settingsData?.business?.id || undefined,
         businessTimezone: businessTz,
       })
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       router.back()
     } catch (e) {
       Alert.alert('Error', 'No se pudo crear la cita. Intenta de nuevo.')
@@ -166,7 +161,7 @@ export default function NewAppointmentScreen() {
       </View>
 
       {loading ? (
-        <ScrollView><Skeleton /></ScrollView>
+        <ScrollView><NewAppointmentSkeleton /></ScrollView>
       ) : (
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

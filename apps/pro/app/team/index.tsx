@@ -9,6 +9,9 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { type TeamMember, type TeamInvitation } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, SERIF, initials } from '../../lib/utils'
+import { Pulse, Bone } from '../../components/ui/Skeleton'
+import ErrorState from '../../components/ui/ErrorState'
+import { validate, inviteFormSchema } from '../../lib/validation'
 import { useSettings, useInviteTeamMember } from '../../hooks/queries'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -56,14 +59,12 @@ function InviteModal({
   const sending = inviteMutation.isPending
 
   async function handleInvite() {
-    const trimmed = email.trim().toLowerCase()
-    if (!trimmed || !trimmed.includes('@')) {
-      Alert.alert('', 'Ingresa un email válido'); return
-    }
+    const parsed = validate(inviteFormSchema, { email: email.trim().toLowerCase() })
+    if (!parsed.ok) { Alert.alert('', parsed.error); return }
     try {
-      await inviteMutation.mutateAsync(trimmed)
+      await inviteMutation.mutateAsync(parsed.data.email)
       setEmail('')
-      onClose(trimmed)
+      onClose(parsed.data.email)
     } catch {
       Alert.alert('Error', 'No se pudo enviar la invitación. Verifica el email e intenta de nuevo.')
     }
@@ -114,21 +115,13 @@ function InviteModal({
 
 // ─── skeleton ──────────────────────────────────────────────────────────────────
 
-function Skeleton() {
-  const op = useRef(new Animated.Value(0.45)).current
-  useEffect(() => {
-    const a = Animated.loop(Animated.sequence([
-      Animated.timing(op, { toValue: 1, duration: 750, useNativeDriver: true }),
-      Animated.timing(op, { toValue: 0.45, duration: 750, useNativeDriver: true }),
-    ]))
-    a.start(); return () => a.stop()
-  }, [op])
+function TeamSkeleton() {
   return (
-    <Animated.View style={{ opacity: op, paddingHorizontal: 20, paddingTop: 20, gap: 12 }}>
-      {[80, 80, 80].map((h, i) => (
-        <View key={i} style={{ height: h, backgroundColor: '#F0EDE9', borderRadius: 16 }} />
+    <Pulse style={{ paddingHorizontal: 20, paddingTop: 20, gap: 12 }}>
+      {[0, 1, 2].map(i => (
+        <Bone key={i} height={80} radius={16} />
       ))}
-    </Animated.View>
+    </Pulse>
   )
 }
 
@@ -173,15 +166,10 @@ export default function TeamScreen() {
         <View style={teamStyles.backBtn} />
       </View>
 
-      {loadState === 'loading' && !refreshing && <Skeleton />}
+      {loadState === 'loading' && !refreshing && <TeamSkeleton />}
 
       {loadState === 'error' && (
-        <View style={teamStyles.center}>
-          <Text style={teamStyles.grayText}>No se pudo cargar el equipo</Text>
-          <TouchableOpacity style={teamStyles.retryBtn} onPress={load} activeOpacity={0.85}>
-            <Text style={teamStyles.retryText}>Reintentar</Text>
-          </TouchableOpacity>
-        </View>
+        <ErrorState message="No se pudo cargar el equipo" onRetry={load} />
       )}
 
       {loadState === 'ready' && !isTeamPlan && (
@@ -335,10 +323,7 @@ const teamStyles = StyleSheet.create({
     backgroundColor: '#F57C00', alignItems: 'center', justifyContent: 'center',
   },
   planBannerBtnText: { fontSize: 12, fontWeight: '500', color: '#fff' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
   grayText: { fontSize: 14, color: '#AAAAAA' },
-  retryBtn: { height: 48, paddingHorizontal: 32, backgroundColor: PRIMARY, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  retryText: { color: '#fff', fontSize: 15, fontWeight: '500' },
   btnPrimary: {
     height: 52, backgroundColor: PRIMARY, borderRadius: 26,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,

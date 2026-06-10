@@ -13,7 +13,10 @@ import { router } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { type SettingsData } from '../../lib/api'
 import { useSettings, useUpdateSettings } from '../../hooks/queries'
+import { clearPersistedCache } from '../../lib/queryClient'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials, hhmmToDisplay } from '../../lib/utils'
+import { Pulse, Bone } from '../../components/ui/Skeleton'
+import ErrorState from '../../components/ui/ErrorState'
 
 const APP_URL = (process.env.EXPO_PUBLIC_APP_URL ?? 'https://getmusa.app').replace(/\/$/, '')
 
@@ -32,21 +35,13 @@ function availSummary(settings: SettingsData['settings'] | null): string {
 
 // ─── skeleton ─────────────────────────────────────────────────────────────────
 
-function Skeleton() {
-  const op = useRef(new Animated.Value(0.45)).current
-  useEffect(() => {
-    const a = Animated.loop(Animated.sequence([
-      Animated.timing(op, { toValue: 1, duration: 750, useNativeDriver: true }),
-      Animated.timing(op, { toValue: 0.45, duration: 750, useNativeDriver: true }),
-    ]))
-    a.start(); return () => a.stop()
-  }, [op])
+function SettingsSkeleton() {
   return (
-    <Animated.View style={{ opacity: op, paddingHorizontal: 20, paddingTop: 20, gap: 14 }}>
+    <Pulse style={{ paddingHorizontal: 20, paddingTop: 20, gap: 14 }}>
       {[110, 60, 130, 100, 100].map((h, i) => (
-        <View key={i} style={{ height: h, backgroundColor: '#F0EDE9', borderRadius: 16 }} />
+        <Bone key={i} height={h} radius={16} />
       ))}
-    </Animated.View>
+    </Pulse>
   )
 }
 
@@ -254,6 +249,9 @@ export default function SettingsTabScreen() {
         text: 'Cerrar sesión', style: 'destructive',
         onPress: async () => {
           await supabase.auth.signOut()
+          // Datos del negocio no pueden quedar en el dispositivo para la
+          // siguiente sesión: vaciar caché en memoria + persistido.
+          await clearPersistedCache()
           router.replace('/(auth)/login')
         },
       },
@@ -284,15 +282,10 @@ export default function SettingsTabScreen() {
         </TouchableOpacity>
       </View>
 
-      {loadState === 'loading' && <ScrollView><Skeleton /></ScrollView>}
+      {loadState === 'loading' && <ScrollView><SettingsSkeleton /></ScrollView>}
 
       {loadState === 'error' && (
-        <View style={styles.center}>
-          <Text style={styles.grayText}>No se pudo cargar la configuración</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={load} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Reintentar</Text>
-          </TouchableOpacity>
-        </View>
+        <ErrorState message="No se pudo cargar la configuración" onRetry={load} />
       )}
 
       {loadState === 'ready' && profile && (
@@ -782,10 +775,6 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
 
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
-  grayText: { fontSize: 14, color: '#AAAAAA' },
-  retryBtn: { height: 48, paddingHorizontal: 32, backgroundColor: PRIMARY, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  retryText: { color: '#fff', fontSize: 15, fontWeight: '500' },
 })
 
 const ms = StyleSheet.create({

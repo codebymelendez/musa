@@ -3,9 +3,19 @@ import { View, ActivityIndicator } from 'react-native'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
+import { onlineManager } from '@tanstack/react-query'
+import NetInfo from '@react-native-community/netinfo'
 import { supabase } from '../lib/supabase'
 import { queryClient, asyncStoragePersister, shouldDehydrateQuery } from '../lib/queryClient'
+import ErrorBoundary from '../components/ui/ErrorBoundary'
+import OfflineBanner from '../components/ui/OfflineBanner'
 import type { Session } from '@supabase/supabase-js'
+
+// React Query pausa los fetch cuando no hay red y los reanuda al reconectar;
+// el caché persistido mantiene la app consultable sin conexión.
+onlineManager.setEventListener(setOnline =>
+  NetInfo.addEventListener(state => setOnline(!!state.isConnected))
+)
 
 const persistOptions = {
   persister: asyncStoragePersister,
@@ -52,10 +62,13 @@ export default function RootLayout() {
   }
 
   return (
-    <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
-      <SafeAreaProvider>
-        <Stack screenOptions={{ headerShown: false }} />
-      </SafeAreaProvider>
-    </PersistQueryClientProvider>
+    <ErrorBoundary>
+      <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
+        <SafeAreaProvider>
+          <OfflineBanner />
+          <Stack screenOptions={{ headerShown: false }} />
+        </SafeAreaProvider>
+      </PersistQueryClientProvider>
+    </ErrorBoundary>
   )
 }

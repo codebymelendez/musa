@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as SecureStore from 'expo-secure-store'
 import { AppState } from 'react-native'
+import { ob } from './observability'
 
 // Adaptador seguro e híbrido con migración transparente y compatible hacia atrás
 const secureStorage = {
@@ -18,7 +19,7 @@ const secureStorage = {
         await SecureStore.setItemAsync(key, asyncValue)
         // Limpiar la clave no segura
         await AsyncStorage.removeItem(key)
-        console.log(`[secureStorage] Migración exitosa de la clave "${key}" a SecureStore.`)
+        ob.debug(`[secureStorage] Migración exitosa de la clave "${key}" a SecureStore.`)
         return asyncValue
       }
     } catch (error) {

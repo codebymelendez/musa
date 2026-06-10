@@ -8,6 +8,7 @@ import { getAppointments, getBusinessTZ, type AppointmentItem } from '../../lib/
 import { useBusinessDay } from '../../hooks/useBusinessDay'
 import { useAppointments, useSettings, keys } from '../../hooks/queries'
 import SkeletonCards from '../../components/calendar/SkeletonCards'
+import ErrorState from '../../components/ui/ErrorState'
 import WeekView from '../../components/calendar/WeekView'
 import MonthView from '../../components/calendar/MonthView'
 import DayTimeline from '../../components/calendar/DayTimeline'
@@ -21,17 +22,6 @@ const DARK    = '#34271E'
 
 type ViewMode    = 'day' | 'week' | 'month'
 type ScreenState = { kind: 'loading' } | { kind: 'error' } | { kind: 'ok'; data: AppointmentItem[] }
-
-function ErrorState({ onRetry }: { onRetry: () => void }) {
-  return (
-    <View style={s.centerState}>
-      <Text style={s.errorText}>No se pudieron cargar las citas</Text>
-      <TouchableOpacity style={s.retryBtn} onPress={onRetry} activeOpacity={0.85}>
-        <Text style={s.retryText}>Reintentar</Text>
-      </TouchableOpacity>
-    </View>
-  )
-}
 
 export default function CalendarScreen() {
   const [view,        setView]        = useState<ViewMode>('day')
@@ -168,7 +158,7 @@ export default function CalendarScreen() {
         </ScrollView>
       )}
       {view === 'day' && state.kind === 'error' && (
-        <ErrorState onRetry={() => dayQuery.refetch()} />
+        <ErrorState message="No se pudieron cargar las citas" onRetry={() => dayQuery.refetch()} />
       )}
       {view === 'day' && state.kind === 'ok' && (
         <DayTimeline
@@ -231,12 +221,6 @@ const s = StyleSheet.create({
   // shared scroll + list
   scroll:      { flex: 1 },
   listContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 88, flexGrow: 1 },
-
-  // center states
-  centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 72, gap: 16 },
-  errorText:   { fontSize: 15, color: '#888888', textAlign: 'center' },
-  retryBtn:    { height: 48, paddingHorizontal: 36, backgroundColor: PRIMARY, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  retryText:   { fontSize: 15, fontWeight: '500', color: '#FFFFFF', letterSpacing: 0.2 },
 
   // FAB
   fab: {

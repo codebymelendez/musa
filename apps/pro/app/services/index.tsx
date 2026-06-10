@@ -10,6 +10,10 @@ import * as Haptics from 'expo-haptics'
 import { router } from 'expo-router'
 import { type ServiceItem } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, formatMoney } from '../../lib/utils'
+import { Pulse, Bone } from '../../components/ui/Skeleton'
+import ErrorState from '../../components/ui/ErrorState'
+import EmptyState from '../../components/ui/EmptyState'
+import { validate, serviceFormSchema } from '../../lib/validation'
 import { useServices, useCreateService, useDeleteService } from '../../hooks/queries'
 
 // ─── duration pills ───────────────────────────────────────────────────────────
@@ -97,14 +101,15 @@ function CreateModal({
 
   async function handleCreate() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-    if (!name.trim()) { Alert.alert('', 'El nombre es requerido'); return }
+    const parsed = validate(serviceFormSchema, {
+      name: name.trim(),
+      durationMin,
+      price: parseFloat(price) || 0,
+      description: description.trim() || undefined,
+    })
+    if (!parsed.ok) { Alert.alert('', parsed.error); return }
     try {
-      const svc = await createServiceMutation.mutateAsync({
-        name: name.trim(),
-        durationMin,
-        price: parseFloat(price) || 0,
-        description: description.trim() || undefined,
-      })
+      const svc = await createServiceMutation.mutateAsync(parsed.data)
       reset()
       onCreated(svc)
     } catch {
@@ -190,38 +195,15 @@ function CreateModal({
   )
 }
 
-// ─── empty state ──────────────────────────────────────────────────────────────
-
-function EmptyState({ onAdd }: { onAdd: () => void }) {
-  return (
-    <View style={svcStyles.emptyState}>
-      <Ionicons name="cut-outline" size={56} color="#DDDDDD" />
-      <Text style={svcStyles.emptyTitle}>Aún no tienes servicios</Text>
-      <Text style={svcStyles.emptyHint}>Añade tus servicios para que las clientas puedan reservar</Text>
-      <TouchableOpacity style={[svcStyles.btnPrimary, { paddingHorizontal: 28 }]} onPress={onAdd} activeOpacity={0.85}>
-        <Text style={svcStyles.btnPrimaryText}>Añadir primer servicio</Text>
-      </TouchableOpacity>
-    </View>
-  )
-}
-
 // ─── skeleton ────────────────────────────────────────────────────────────────
 
-function Skeleton() {
-  const op = useRef(new Animated.Value(0.45)).current
-  useEffect(() => {
-    const a = Animated.loop(Animated.sequence([
-      Animated.timing(op, { toValue: 1, duration: 750, useNativeDriver: true }),
-      Animated.timing(op, { toValue: 0.45, duration: 750, useNativeDriver: true }),
-    ]))
-    a.start(); return () => a.stop()
-  }, [op])
+function ServicesSkeleton() {
   return (
-    <Animated.View style={{ opacity: op, paddingHorizontal: 20, paddingTop: 20, gap: 10 }}>
+    <Pulse style={{ paddingHorizontal: 20, paddingTop: 20, gap: 10 }}>
       {[1, 2, 3, 4].map(i => (
-        <View key={i} style={{ height: 72, backgroundColor: '#F0EDE9', borderRadius: 14 }} />
+        <Bone key={i} height={72} radius={14} />
       ))}
-    </Animated.View>
+    </Pulse>
   )
 }
 
@@ -285,19 +267,20 @@ export default function ServicesScreen() {
         <View style={svcStyles.backBtn} />
       </View>
 
-      {loadState === 'loading' && !refreshing && <Skeleton />}
+      {loadState === 'loading' && !refreshing && <ServicesSkeleton />}
 
       {loadState === 'error' && (
-        <View style={svcStyles.center}>
-          <Text style={svcStyles.grayText}>No se pudieron cargar los servicios</Text>
-          <TouchableOpacity style={svcStyles.retryBtn} onPress={load} activeOpacity={0.85}>
-            <Text style={svcStyles.retryText}>Reintentar</Text>
-          </TouchableOpacity>
-        </View>
+        <ErrorState message="No se pudieron cargar los servicios" onRetry={load} />
       )}
 
       {loadState === 'ready' && services.length === 0 && (
-        <EmptyState onAdd={() => setShowModal(true)} />
+        <EmptyState
+          icon="cut-outline"
+          title="Aún no tienes servicios"
+          subtitle="Añade tus servicios para que las clientas puedan reservar."
+          ctaLabel="Añadir mi primer servicio"
+          onCtaPress={() => setShowModal(true)}
+        />
       )}
 
       {loadState === 'ready' && services.length > 0 && (
@@ -357,13 +340,6 @@ const svcStyles = StyleSheet.create({
   svcCategory: { fontSize: 12, color: GRAY },
   svcDuration: { fontSize: 12, color: GRAY },
   svcPrice: { fontSize: 15, fontWeight: '500', color: DARK },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
-  grayText: { fontSize: 14, color: '#AAAAAA' },
-  retryBtn: { height: 48, paddingHorizontal: 32, backgroundColor: PRIMARY, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  retryText: { color: '#fff', fontSize: 15, fontWeight: '500' },
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: 14 },
-  emptyTitle: { fontSize: 17, fontWeight: '500', color: DARK, textAlign: 'center' },
-  emptyHint: { fontSize: 14, color: GRAY, textAlign: 'center' },
   fab: {
     position: 'absolute', bottom: 32, right: 24,
     width: 56, height: 56, borderRadius: 28,

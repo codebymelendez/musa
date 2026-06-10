@@ -17,6 +17,7 @@ import { randomUUID } from 'expo-crypto'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '../../lib/supabase'
+import { ob } from '../../lib/observability'
 import { getSettings } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials } from '../../lib/utils'
 import { keys } from '../../hooks/queries'
@@ -650,7 +651,7 @@ export default function BusinessInfoScreen() {
                             setTimezone(tzData.timeZoneId)
                           }
                         } catch (e) {
-                          console.log('Error fetching timezone', e)
+                          ob.logError('business-info/timezone', e)
                         }
                       }
                     }

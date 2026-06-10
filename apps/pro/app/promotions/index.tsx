@@ -10,6 +10,10 @@ import { router } from 'expo-router'
 import { type PromotionItem } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF } from '../../lib/utils'
 import DatePickerModal, { formatDateSpanish } from '../../components/DatePickerModal'
+import { Pulse, Bone } from '../../components/ui/Skeleton'
+import ErrorState from '../../components/ui/ErrorState'
+import EmptyState from '../../components/ui/EmptyState'
+import { validate, promotionFormSchema } from '../../lib/validation'
 import { usePromotions, useCreatePromotion, useBroadcastPromotion } from '../../hooks/queries'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -124,15 +128,19 @@ function CreateModal({
   }
 
   async function handleCreate() {
-    if (!title.trim()) { Alert.alert('', 'El título es requerido'); return }
-    if (!discount.trim()) { Alert.alert('', 'El descuento es requerido'); return }
+    const parsed = validate(promotionFormSchema, {
+      title: title.trim(),
+      description: description.trim() || undefined,
+      discount: parseFloat(discount) || 0,
+      validFrom: validFrom ?? undefined,
+      validUntil: validUntil ?? undefined,
+    })
+    if (!parsed.ok) { Alert.alert('', parsed.error); return }
     try {
       const p = await createPromotionMutation.mutateAsync({
-        title: title.trim(),
-        description: description.trim() || undefined,
-        discount: parseFloat(discount) || 0,
-        validFrom: validFrom ? `${validFrom}T00:00:00` : undefined,
-        validUntil: validUntil ? `${validUntil}T23:59:59` : undefined,
+        ...parsed.data,
+        validFrom: parsed.data.validFrom ? `${parsed.data.validFrom}T00:00:00` : undefined,
+        validUntil: parsed.data.validUntil ? `${parsed.data.validUntil}T23:59:59` : undefined,
       })
       reset()
       onCreated(p)
@@ -234,21 +242,13 @@ function CreateModal({
 
 // ─── skeleton ─────────────────────────────────────────────────────────────────
 
-function Skeleton() {
-  const op = useRef(new Animated.Value(0.45)).current
-  useEffect(() => {
-    const a = Animated.loop(Animated.sequence([
-      Animated.timing(op, { toValue: 1, duration: 750, useNativeDriver: true }),
-      Animated.timing(op, { toValue: 0.45, duration: 750, useNativeDriver: true }),
-    ]))
-    a.start(); return () => a.stop()
-  }, [op])
+function PromotionsSkeleton() {
   return (
-    <Animated.View style={{ opacity: op, paddingHorizontal: 20, paddingTop: 20, gap: 12 }}>
+    <Pulse style={{ paddingHorizontal: 20, paddingTop: 20, gap: 12 }}>
       {[1, 2, 3].map(i => (
-        <View key={i} style={{ height: 130, backgroundColor: '#F0EDE9', borderRadius: 16 }} />
+        <Bone key={i} height={130} radius={16} />
       ))}
-    </Animated.View>
+    </Pulse>
   )
 }
 
@@ -308,27 +308,20 @@ export default function PromotionsScreen() {
         <View style={promoStyles.backBtn} />
       </View>
 
-      {loadState === 'loading' && !refreshing && <Skeleton />}
+      {loadState === 'loading' && !refreshing && <PromotionsSkeleton />}
 
       {loadState === 'error' && (
-        <View style={promoStyles.center}>
-          <Text style={promoStyles.grayText}>No se pudieron cargar las promociones</Text>
-          <TouchableOpacity style={promoStyles.retryBtn} onPress={load} activeOpacity={0.85}>
-            <Text style={promoStyles.retryText}>Reintentar</Text>
-          </TouchableOpacity>
-        </View>
+        <ErrorState message="No se pudieron cargar las promociones" onRetry={load} />
       )}
 
       {loadState === 'ready' && promos.length === 0 && (
-        <View style={promoStyles.emptyState}>
-          <Ionicons name="pricetag-outline" size={56} color="#DDDDDD" />
-          <Text style={promoStyles.emptyTitle}>Sin promociones activas</Text>
-          <Text style={promoStyles.emptyHint}>Crea promociones y notifica a tus clientas con un tap</Text>
-          <TouchableOpacity style={[promoStyles.btnPrimary, { paddingHorizontal: 28 }]}
-            onPress={() => setShowModal(true)} activeOpacity={0.85}>
-            <Text style={promoStyles.btnPrimaryText}>Crear primera promoción</Text>
-          </TouchableOpacity>
-        </View>
+        <EmptyState
+          icon="pricetag-outline"
+          title="Sin promociones activas"
+          subtitle="Crea promociones y notifica a tus clientas con un tap."
+          ctaLabel="Crear mi primera promoción"
+          onCtaPress={() => setShowModal(true)}
+        />
       )}
 
       {loadState === 'ready' && promos.length > 0 && (
@@ -389,13 +382,6 @@ const promoStyles = StyleSheet.create({
     paddingHorizontal: 14, alignSelf: 'flex-start',
   },
   broadcastBtnText: { fontSize: 13, fontWeight: '500', color: PRIMARY },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
-  grayText: { fontSize: 14, color: '#AAAAAA' },
-  retryBtn: { height: 48, paddingHorizontal: 32, backgroundColor: PRIMARY, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  retryText: { color: '#fff', fontSize: 15, fontWeight: '500' },
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: 14 },
-  emptyTitle: { fontSize: 17, fontWeight: '500', color: DARK, textAlign: 'center' },
-  emptyHint: { fontSize: 14, color: GRAY, textAlign: 'center' },
   fab: {
     position: 'absolute', bottom: 32, right: 24,
     width: 56, height: 56, borderRadius: 28,

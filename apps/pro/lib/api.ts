@@ -1,5 +1,6 @@
 import { router } from 'expo-router'
 import { supabase } from './supabase'
+import { clearPersistedCache } from './queryClient'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
@@ -41,6 +42,7 @@ async function authHeaders(): Promise<Record<string, string> | null> {
 
 async function handle401(): Promise<void> {
   await supabase.auth.signOut()
+  await clearPersistedCache()
   router.replace('/(auth)/login')
 }
 

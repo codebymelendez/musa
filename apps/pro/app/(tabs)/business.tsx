@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, RefreshControl,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl,
 } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -8,40 +8,34 @@ import { Ionicons } from '@expo/vector-icons'
 import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, SERIF, initials } from '../../lib/utils'
+import { Pulse, Bone } from '../../components/ui/Skeleton'
+import ErrorState from '../../components/ui/ErrorState'
 import { useSettings, useServices, usePromotions, useLoyaltyProgram } from '../../hooks/queries'
 
 const APP_URL = (process.env.EXPO_PUBLIC_APP_URL ?? 'https://getmusa.app').replace(/\/$/, '')
 
 // ─── skeleton ─────────────────────────────────────────────────────────────────
 
-function Skeleton() {
-  const op = useRef(new Animated.Value(0.45)).current
-  useEffect(() => {
-    const a = Animated.loop(Animated.sequence([
-      Animated.timing(op, { toValue: 1, duration: 750, useNativeDriver: true }),
-      Animated.timing(op, { toValue: 0.45, duration: 750, useNativeDriver: true }),
-    ]))
-    a.start(); return () => a.stop()
-  }, [op])
+function BusinessSkeleton() {
   return (
-    <Animated.View style={{ opacity: op }}>
+    <Pulse>
       <View style={skStyles.heroSkeleton}>
-        <View style={skStyles.avatarSkeleton} />
-        <View style={[skStyles.lineSkeleton, { width: 160, height: 20, marginTop: 14 }]} />
-        <View style={[skStyles.lineSkeleton, { width: 200, height: 14, marginTop: 8 }]} />
+        <Bone width={80} height={80} radius={40} />
+        <Bone width={160} height={20} style={{ marginTop: 14 }} />
+        <Bone width={200} height={14} style={{ marginTop: 8 }} />
       </View>
       <View style={skStyles.cardSkeleton}>
         {[0, 1, 2, 3, 4].map(i => (
           <View key={i} style={[skStyles.rowSkeleton, i < 4 && skStyles.rowDivider]}>
-            <View style={skStyles.iconSkeleton} />
+            <Bone width={38} height={38} radius={10} />
             <View style={{ flex: 1, gap: 6 }}>
-              <View style={[skStyles.lineSkeleton, { width: '45%', height: 13 }]} />
-              <View style={[skStyles.lineSkeleton, { width: '28%', height: 10 }]} />
+              <Bone width="45%" height={13} />
+              <Bone width="28%" height={10} />
             </View>
           </View>
         ))}
       </View>
-    </Animated.View>
+    </Pulse>
   )
 }
 
@@ -104,6 +98,7 @@ export default function BusinessScreen() {
   const isTeamPlan = planName?.toLowerCase() === 'team'
 
   const loading = settingsQuery.isLoading && !sData
+  const loadError = settingsQuery.isError && !sData
   const refreshing = settingsQuery.isRefetching
   const onRefresh = () => {
     settingsQuery.refetch()
@@ -143,7 +138,9 @@ export default function BusinessScreen() {
         }
       >
         {loading ? (
-          <Skeleton />
+          <BusinessSkeleton />
+        ) : loadError ? (
+          <ErrorState message="No se pudo cargar tu negocio" onRetry={() => settingsQuery.refetch()} />
         ) : (
           <>
             {/* ─── Hero / Profile Details ─── */}
@@ -308,13 +305,10 @@ const styles = StyleSheet.create({
 
 const skStyles = StyleSheet.create({
   heroSkeleton: { alignItems: 'center', paddingTop: 4, marginBottom: 24 },
-  avatarSkeleton: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#F0EDE9' },
   cardSkeleton: {
     marginHorizontal: 20, backgroundColor: '#fff',
     borderRadius: 16, borderWidth: 1, borderColor: BORDER, overflow: 'hidden',
   },
   rowSkeleton: { flexDirection: 'row', alignItems: 'center', gap: 14, height: 64, paddingHorizontal: 18 },
   rowDivider: { height: StyleSheet.hairlineWidth, backgroundColor: BORDER, marginLeft: 70 },
-  iconSkeleton: { width: 38, height: 38, borderRadius: 10, backgroundColor: '#F0EDE9' },
-  lineSkeleton: { backgroundColor: '#F0EDE9', borderRadius: 6 },
 })

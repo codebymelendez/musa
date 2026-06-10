@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics'
 import { Ionicons } from '@expo/vector-icons'
 import { type ClientItem } from '../lib/api'
 import { useCreateClient } from '../hooks/queries'
+import { validate, clientFormSchema } from '../lib/validation'
 import { PRIMARY, DARK, BORDER, GRAY, SERIF, SURFACE } from '../lib/utils'
 import DatePickerModal, { formatDateSpanish } from './DatePickerModal'
 
@@ -44,17 +45,18 @@ export default function AddClientModal({
 
   async function handleCreate() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-    if (!name.trim())  { Alert.alert('', 'El nombre es requerido');   return }
-    if (!phone.trim()) { Alert.alert('', 'El teléfono es requerido'); return }
+    const parsed = validate(clientFormSchema, {
+      name:     name.trim(),
+      phone:    phone.trim(),
+      email:    email.trim() || undefined,
+      notes:    notes.trim() || undefined,
+      tags:     selectedTags,
+      birthday: birthday ?? undefined,
+    })
+    if (!parsed.ok) { Alert.alert('', parsed.error); return }
     try {
-      const client = await createClientMutation.mutateAsync({
-        name:     name.trim(),
-        phone:    phone.trim(),
-        email:    email.trim() || undefined,
-        notes:    notes.trim() || undefined,
-        tags:     selectedTags,
-        birthday: birthday ?? undefined,
-      })
+      const client = await createClientMutation.mutateAsync(parsed.data)
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       reset()
       onCreated(client)
     } catch (e) {

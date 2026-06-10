@@ -5,12 +5,16 @@ import {
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import * as Haptics from 'expo-haptics'
 import { useLocalSearchParams, router } from 'expo-router'
 import {
   getBcvRate,
   type AppointmentItem, type AppointmentStatus, type AppointmentPayment,
 } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, formatTime, formatDate, formatMoney } from '../../lib/utils'
+import { Pulse, Bone } from '../../components/ui/Skeleton'
+import ErrorState from '../../components/ui/ErrorState'
+import { validate, paymentFormSchema } from '../../lib/validation'
 import {
   useAppointment, useAppointmentAction, useCompleteAppointment, useRegisterPayment,
   useSettings, useBusinessTimezone,
@@ -81,11 +85,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function DetailSkeleton() {
   return (
-    <View style={styles.skeletonWrap}>
+    <Pulse style={styles.skeletonWrap}>
       {[120, 80, 60, 100, 70].map((w, i) => (
-        <View key={i} style={[styles.skeletonLine, { width: `${w * 0.6}%`, marginTop: i === 0 ? 0 : 14 }]} />
+        <Bone key={i} height={16} width={`${w * 0.6}%`} style={{ marginTop: i === 0 ? 0 : 14 }} />
       ))}
-    </View>
+    </Pulse>
   )
 }
 
@@ -265,25 +269,22 @@ export default function AppointmentDetailScreen() {
 
   async function handleRegisterPayment(apt: AppointmentItem) {
     if (!id) return
-    const parsedAmount = parseFloat(amount.replace(',', '.'))
-    if (!parsedAmount || parsedAmount <= 0) {
-      Alert.alert('', 'El monto debe ser mayor a 0')
-      return
-    }
-    if (!method) {
-      Alert.alert('', 'Selecciona un método de pago')
-      return
-    }
+    const rawAmount = parseFloat(amount.replace(',', '.'))
+    const parsed = validate(paymentFormSchema, {
+      amount: Number.isNaN(rawAmount) ? 0 : rawAmount,
+      method: method ?? '',
+      currency,
+      isPaid,
+      notes: payNotes.trim() || undefined,
+    })
+    if (!parsed.ok) { Alert.alert('', parsed.error); return }
     try {
       const updated = await paymentMutation.mutateAsync({
-        amount: parsedAmount,
-        method,
-        currency,
-        isPaid,
-        notes: payNotes.trim() || undefined,
+        ...parsed.data,
         completeAppointment: apt.status === 'confirmed' && !editingPayment,
       })
       if (updated) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
         setEditingPayment(false)
       }
     } catch {
@@ -303,6 +304,7 @@ export default function AppointmentDetailScreen() {
             if (!id) return
             try {
               await completeMutation.mutateAsync()
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
             } catch {
               Alert.alert('Error', 'No se pudo completar la cita')
             }
@@ -334,26 +336,14 @@ export default function AppointmentDetailScreen() {
       )}
 
       {state.kind === 'error' && (
-        <View style={styles.centerState}>
-          <Text style={styles.errorText}>No se pudo cargar la cita</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={load} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Reintentar</Text>
-          </TouchableOpacity>
-        </View>
+        <ErrorState message="No se pudo cargar la cita" onRetry={load} />
       )}
 
       {state.kind === 'ok' && (() => {
         const apt = state.data
 
         if (!apt.client || !apt.service) {
-          return (
-            <View style={styles.centerState}>
-              <Text style={styles.errorText}>No se pudo cargar el detalle completo de la cita.</Text>
-              <TouchableOpacity style={styles.retryBtn} onPress={load} activeOpacity={0.85}>
-                <Text style={styles.retryText}>Reintentar</Text>
-              </TouchableOpacity>
-            </View>
-          )
+          return <ErrorState message="No se pudo cargar el detalle completo de la cita." onRetry={load} />
         }
 
         const showPaymentForm = apt.status === 'confirmed' && (!apt.payment || editingPayment)
@@ -699,12 +689,7 @@ const styles = StyleSheet.create({
   btnDisabled: { opacity: 0.55 },
   pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
   pillText: { fontSize: 12, fontWeight: '500' },
-  centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingTop: 60 },
-  errorText: { fontSize: 15, color: GRAY, textAlign: 'center' },
-  retryBtn: { height: 48, paddingHorizontal: 32, backgroundColor: PRIMARY, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  retryText: { color: '#fff', fontSize: 15, fontWeight: '500' },
   skeletonWrap: { gap: 12 },
-  skeletonLine: { height: 16, backgroundColor: '#F0EDE9', borderRadius: 6 },
 })
 
 // ─── payment form styles ──────────────────────────────────────────────────────

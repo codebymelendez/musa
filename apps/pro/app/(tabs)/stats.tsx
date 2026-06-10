@@ -1,39 +1,30 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, FlatList,
-  StyleSheet, RefreshControl, Animated,
+  StyleSheet, RefreshControl,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { type StatsData, type AppointmentItem } from '../../lib/api'
 import { PRIMARY, DARK, BORDER, GRAY, MONO, SERIF, formatTime, formatShortDate } from '../../lib/utils'
+import { Pulse, Bone } from '../../components/ui/Skeleton'
+import ErrorState from '../../components/ui/ErrorState'
 import { useStats, useUpcomingAppointments, useBusinessTimezone } from '../../hooks/queries'
 
 // ─── skeleton ─────────────────────────────────────────────────────────────────
 
-function Skeleton() {
-  const opacity = useRef(new Animated.Value(0.45)).current
-  useEffect(() => {
-    const anim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 1, duration: 750, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.45, duration: 750, useNativeDriver: true }),
-      ])
-    )
-    anim.start()
-    return () => anim.stop()
-  }, [opacity])
+function StatsSkeleton() {
   return (
-    <Animated.View style={{ opacity, paddingHorizontal: 20, paddingTop: 20 }}>
+    <Pulse style={{ paddingHorizontal: 20, paddingTop: 20 }}>
       <View style={styles.skeletonGrid}>
         {[0, 1, 2, 3].map(i => (
-          <View key={i} style={styles.skeletonMetric} />
+          <Bone key={i} height={90} radius={16} style={{ flex: 1, minWidth: '45%' }} />
         ))}
       </View>
-      {[1, 2].map(i => (
-        <View key={i} style={[styles.skeletonBlock, { height: i === 1 ? 160 : 120 }]} />
+      {[160, 120].map((h, i) => (
+        <Bone key={i} height={h} radius={16} style={{ marginBottom: 14 }} />
       ))}
-    </Animated.View>
+    </Pulse>
   )
 }
 
@@ -117,15 +108,10 @@ export default function StatsScreen() {
         ))}
       </View>
 
-      {state.kind === 'loading' && <ScrollView><Skeleton /></ScrollView>}
+      {state.kind === 'loading' && <ScrollView><StatsSkeleton /></ScrollView>}
 
       {state.kind === 'error' && (
-        <View style={styles.centerState}>
-          <Text style={styles.grayText}>No se pudieron cargar las estadísticas</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={() => statsQuery.refetch()} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Reintentar</Text>
-          </TouchableOpacity>
-        </View>
+        <ErrorState message="No se pudieron cargar las estadísticas" onRetry={() => statsQuery.refetch()} />
       )}
 
       {state.kind === 'ok' && (() => {
@@ -269,11 +255,5 @@ const styles = StyleSheet.create({
   upcomingService: { fontSize: 13, color: GRAY },
   calendarLink: { marginTop: 12, alignItems: 'flex-end' },
   calendarLinkText: { fontSize: 13, color: PRIMARY },
-  centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
-  grayText: { fontSize: 15, color: '#AAAAAA' },
-  retryBtn: { height: 48, paddingHorizontal: 32, backgroundColor: PRIMARY, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  retryText: { color: '#fff', fontSize: 15, fontWeight: '500' },
   skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 14 },
-  skeletonMetric: { flex: 1, minWidth: '45%', height: 90, backgroundColor: '#F0EDE9', borderRadius: 16 },
-  skeletonBlock: { backgroundColor: '#F0EDE9', borderRadius: 16, marginBottom: 14 },
 })

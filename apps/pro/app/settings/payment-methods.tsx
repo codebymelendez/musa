@@ -1,12 +1,14 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, Switch,
-  StyleSheet, Animated, Alert,
+  StyleSheet, Alert,
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, SERIF } from '../../lib/utils'
+import { Pulse, Bone } from '../../components/ui/Skeleton'
+import ErrorState from '../../components/ui/ErrorState'
 import { useSettings, useUpdateSettings } from '../../hooks/queries'
 
 type Method = {
@@ -25,20 +27,12 @@ const METHODS: Method[] = [
   { key: 'otro',          label: 'Otro',                   icon: 'ellipsis-horizontal-outline'                             },
 ]
 
-function Skeleton() {
-  const op = useRef(new Animated.Value(0.45)).current
-  useEffect(() => {
-    const a = Animated.loop(Animated.sequence([
-      Animated.timing(op, { toValue: 1, duration: 750, useNativeDriver: true }),
-      Animated.timing(op, { toValue: 0.45, duration: 750, useNativeDriver: true }),
-    ]))
-    a.start(); return () => a.stop()
-  }, [op])
+function PaymentMethodsSkeleton() {
   return (
-    <Animated.View style={{ opacity: op, paddingHorizontal: 20, paddingTop: 20, gap: 12 }}>
-      <View style={{ height: 60, backgroundColor: '#F0EDE9', borderRadius: 14 }} />
-      <View style={{ height: 280, backgroundColor: '#F0EDE9', borderRadius: 16 }} />
-    </Animated.View>
+    <Pulse style={{ paddingHorizontal: 20, paddingTop: 20, gap: 12 }}>
+      <Bone height={60} radius={14} />
+      <Bone height={280} radius={16} />
+    </Pulse>
   )
 }
 
@@ -87,15 +81,10 @@ export default function PaymentMethodsScreen() {
         <View style={styles.backBtn} />
       </View>
 
-      {loadState === 'loading' && <ScrollView><Skeleton /></ScrollView>}
+      {loadState === 'loading' && <ScrollView><PaymentMethodsSkeleton /></ScrollView>}
 
       {loadState === 'error' && (
-        <View style={styles.center}>
-          <Text style={styles.grayText}>No se pudo cargar la configuración</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={load} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Reintentar</Text>
-          </TouchableOpacity>
-        </View>
+        <ErrorState message="No se pudo cargar la configuración" onRetry={load} />
       )}
 
       {loadState === 'ready' && (
@@ -211,8 +200,4 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#F5D8CE',
   },
   pillText: { fontSize: 12, color: PRIMARY, fontWeight: '500' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
-  grayText: { fontSize: 14, color: '#AAAAAA' },
-  retryBtn: { height: 48, paddingHorizontal: 32, backgroundColor: PRIMARY, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  retryText: { color: '#fff', fontSize: 15, fontWeight: '500' },
 })

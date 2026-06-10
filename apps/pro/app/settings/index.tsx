@@ -1,32 +1,27 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Animated, Share, Linking, Alert,
+  StyleSheet, Share, Linking, Alert,
 } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF } from '../../lib/utils'
+import { Pulse, Bone } from '../../components/ui/Skeleton'
+import ErrorState from '../../components/ui/ErrorState'
+import { validate, businessSettingsFormSchema } from '../../lib/validation'
 import { useSettings, useUpdateSettings } from '../../hooks/queries'
 
 const APP_URL = (process.env.EXPO_PUBLIC_APP_URL ?? 'https://getmusa.app').replace(/\/$/, '')
 
-function Skeleton() {
-  const op = useRef(new Animated.Value(0.45)).current
-  useEffect(() => {
-    const a = Animated.loop(Animated.sequence([
-      Animated.timing(op, { toValue: 1, duration: 750, useNativeDriver: true }),
-      Animated.timing(op, { toValue: 0.45, duration: 750, useNativeDriver: true }),
-    ]))
-    a.start(); return () => a.stop()
-  }, [op])
+function SettingsSkeleton() {
   return (
-    <Animated.View style={{ opacity: op, paddingHorizontal: 20, paddingTop: 20, gap: 14 }}>
+    <Pulse style={{ paddingHorizontal: 20, paddingTop: 20, gap: 14 }}>
       {[180, 120, 100].map((h, i) => (
-        <View key={i} style={{ height: h, backgroundColor: '#F0EDE9', borderRadius: 16 }} />
+        <Bone key={i} height={h} radius={16} />
       ))}
-    </Animated.View>
+    </Pulse>
   )
 }
 
@@ -82,13 +77,21 @@ export default function BusinessSettingsScreen() {
   function markDirty() { setDirty(true) }
 
   async function handleSave() {
+    const parsed = validate(businessSettingsFormSchema, {
+      businessName: businessName.trim(),
+      businessAddress: address.trim(),
+      bio: description.trim(),
+      whatsapp: whatsapp.trim(),
+      instagram: instagram.trim(),
+    })
+    if (!parsed.ok) { Alert.alert('', parsed.error); return }
     try {
       await updateSettingsMutation.mutateAsync({
-        businessName: businessName.trim(),
-        businessAddress: address.trim(),
-        bio: description.trim(),
-        whatsapp: whatsapp.trim(),
-        instagram: instagram.trim(),
+        businessName: parsed.data.businessName,
+        businessAddress: parsed.data.businessAddress ?? '',
+        bio: parsed.data.bio ?? '',
+        whatsapp: parsed.data.whatsapp ?? '',
+        instagram: (parsed.data.instagram ?? '').replace(/^@/, ''),
       })
       setSavedMsg(true)
       setDirty(false)
@@ -126,15 +129,10 @@ export default function BusinessSettingsScreen() {
         <View style={styles.backBtn} />
       </View>
 
-      {loadState === 'loading' && <ScrollView><Skeleton /></ScrollView>}
+      {loadState === 'loading' && <ScrollView><SettingsSkeleton /></ScrollView>}
 
       {loadState === 'error' && (
-        <View style={styles.center}>
-          <Text style={styles.grayText}>No se pudo cargar la configuración</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={load} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Reintentar</Text>
-          </TouchableOpacity>
-        </View>
+        <ErrorState message="No se pudo cargar la configuración" onRetry={load} />
       )}
 
       {loadState === 'ready' && (
@@ -407,10 +405,6 @@ const styles = StyleSheet.create({
   btnPrimaryText: { color: '#fff', fontSize: 16, fontWeight: '500' },
   savedBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 52, gap: 8 },
   savedText: { fontSize: 16, fontWeight: '500', color: '#2E7D32' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
-  grayText: { fontSize: 14, color: '#AAAAAA' },
-  retryBtn: { height: 48, paddingHorizontal: 32, backgroundColor: PRIMARY, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  retryText: { color: '#fff', fontSize: 15, fontWeight: '500' },
   mobileAlertYellow: {
     backgroundColor: '#FFF9EB',
     borderColor: '#FFE7B3',

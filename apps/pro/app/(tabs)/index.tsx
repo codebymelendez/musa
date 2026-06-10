@@ -9,7 +9,9 @@ import HomeTopBar from '../../components/home/HomeTopBar'
 import BentoStats from '../../components/home/BentoStats'
 import AgendaRow from '../../components/home/AgendaRow'
 import HomeFooter, { type QuickAction } from '../../components/home/HomeFooter'
-import PulseSkeleton from '../../components/home/PulseSkeleton'
+import Skeleton from '../../components/ui/Skeleton'
+import ErrorState from '../../components/ui/ErrorState'
+import EmptyState from '../../components/ui/EmptyState'
 import { PRIMARY, DARK, SURFACE, GRAY, SERIF, formatTime } from '../../lib/utils'
 import { useDashboard } from '../../hooks/queries'
 
@@ -21,7 +23,7 @@ function getGreeting(tz: string): string {
 }
 
 export default function HomeScreen() {
-  const { data, isLoading, refetch, isRefetching } = useDashboard()
+  const { data, isLoading, isError, refetch, isRefetching } = useDashboard()
   const [showAddClient, setShowAddClient] = useState(false)
 
   const loading = isLoading && !data
@@ -107,14 +109,14 @@ export default function HomeScreen() {
       {/* ─── Bento Stats Grid ─── */}
       {loading ? (
         <View style={{ paddingHorizontal: 20, gap: 10, marginBottom: 24 }}>
-          <PulseSkeleton height={120} mx={0} mb={0} />
+          <Skeleton height={120} />
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <View style={{ flex: 1 }}><PulseSkeleton height={110} mx={0} mb={0} /></View>
-            <View style={{ flex: 1 }}><PulseSkeleton height={110} mx={0} mb={0} /></View>
+            <Skeleton height={110} style={{ flex: 1 }} />
+            <Skeleton height={110} style={{ flex: 1 }} />
           </View>
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <View style={{ flex: 1 }}><PulseSkeleton height={86} mx={0} mb={0} /></View>
-            <View style={{ flex: 1 }}><PulseSkeleton height={86} mx={0} mb={0} /></View>
+            <Skeleton height={86} style={{ flex: 1 }} />
+            <Skeleton height={86} style={{ flex: 1 }} />
           </View>
         </View>
       ) : (
@@ -138,14 +140,20 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {loading && <View style={{ paddingHorizontal: 20 }}><PulseSkeleton height={60} mx={0} mb={10} /></View>}
+      {loading && <View style={{ paddingHorizontal: 20 }}><Skeleton height={60} style={{ marginBottom: 10 }} /></View>}
     </View>
   )
 
-  const listEmpty = loading ? null : (
-    <View style={styles.emptyAgenda}>
-      <Text style={styles.emptyAgendaText}>La agenda está libre hoy. 🌿</Text>
-    </View>
+  const listEmpty = loading ? null : isError && !data ? (
+    <ErrorState message="No se pudo cargar tu agenda" onRetry={() => refetch()} />
+  ) : (
+    <EmptyState
+      icon="calendar-outline"
+      title="La agenda está libre hoy"
+      subtitle="Aprovecha para llenar tu día: agenda una cita en segundos."
+      ctaLabel="Agendar una cita"
+      onCtaPress={() => router.push('/appointments/new' as Parameters<typeof router.push>[0])}
+    />
   )
 
   return (
@@ -202,9 +210,6 @@ const styles = StyleSheet.create({
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 12 },
   sectionTitle: { fontSize: 11, fontWeight: '600', color: GRAY, letterSpacing: 0.8 },
   viewAllBtn: { fontSize: 11, fontWeight: '600', color: PRIMARY, letterSpacing: 0.5 },
-
-  emptyAgenda: { marginHorizontal: 20, paddingVertical: 20, alignItems: 'center', justifyContent: 'center' },
-  emptyAgendaText: { fontSize: 14, color: GRAY, fontStyle: 'italic' },
 
   fab: {
     position: 'absolute', bottom: 24, right: 20, zIndex: 10,
