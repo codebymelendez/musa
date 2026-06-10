@@ -5,7 +5,8 @@ import {
 } from 'react-native'
 import * as Haptics from 'expo-haptics'
 import { Ionicons } from '@expo/vector-icons'
-import { createClient, type ClientItem } from '../lib/api'
+import { type ClientItem } from '../lib/api'
+import { useCreateClient } from '../hooks/queries'
 import { PRIMARY, DARK, BORDER, GRAY, SERIF, SURFACE } from '../lib/utils'
 import DatePickerModal, { formatDateSpanish } from './DatePickerModal'
 
@@ -25,7 +26,8 @@ export default function AddClientModal({
   const [showBirthdayPicker, setShowBirthdayPicker] = useState(false)
   const [notes,            setNotes]            = useState('')
   const [selectedTags,     setSelectedTags]     = useState<string[]>([])
-  const [saving,           setSaving]           = useState(false)
+  const createClientMutation = useCreateClient()
+  const saving = createClientMutation.isPending
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -44,9 +46,8 @@ export default function AddClientModal({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     if (!name.trim())  { Alert.alert('', 'El nombre es requerido');   return }
     if (!phone.trim()) { Alert.alert('', 'El teléfono es requerido'); return }
-    setSaving(true)
     try {
-      const client = await createClient({
+      const client = await createClientMutation.mutateAsync({
         name:     name.trim(),
         phone:    phone.trim(),
         email:    email.trim() || undefined,
@@ -58,7 +59,7 @@ export default function AddClientModal({
       onCreated(client)
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : 'No se pudo crear la clienta')
-    } finally { setSaving(false) }
+    }
   }
 
   const slideAnim = useRef(new Animated.Value(500)).current

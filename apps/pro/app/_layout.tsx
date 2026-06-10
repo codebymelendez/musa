@@ -2,8 +2,16 @@ import { useEffect, useState } from 'react'
 import { View, ActivityIndicator } from 'react-native'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { supabase } from '../lib/supabase'
+import { queryClient, asyncStoragePersister, shouldDehydrateQuery } from '../lib/queryClient'
 import type { Session } from '@supabase/supabase-js'
+
+const persistOptions = {
+  persister: asyncStoragePersister,
+  maxAge: 24 * 60 * 60 * 1000,
+  dehydrateOptions: { shouldDehydrateQuery },
+}
 
 export default function RootLayout() {
   // undefined = cargando, null = sin sesión, Session = autenticado
@@ -44,8 +52,10 @@ export default function RootLayout() {
   }
 
   return (
-    <SafeAreaProvider>
-      <Stack screenOptions={{ headerShown: false }} />
-    </SafeAreaProvider>
+    <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
+      <SafeAreaProvider>
+        <Stack screenOptions={{ headerShown: false }} />
+      </SafeAreaProvider>
+    </PersistQueryClientProvider>
   )
 }

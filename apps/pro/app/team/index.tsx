@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Modal, Animated, Alert, RefreshControl,
@@ -7,8 +7,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import { getSettings, inviteTeamMember, type SettingsData, type TeamMember, type TeamInvitation } from '../../lib/api'
+import { type TeamMember, type TeamInvitation } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, SERIF, initials } from '../../lib/utils'
+import { useSettings, useInviteTeamMember } from '../../hooks/queries'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -51,21 +52,21 @@ function InviteModal({
   visible: boolean; onClose: (invited?: string) => void
 }) {
   const [email, setEmail] = useState('')
-  const [sending, setSending] = useState(false)
+  const inviteMutation = useInviteTeamMember()
+  const sending = inviteMutation.isPending
 
   async function handleInvite() {
     const trimmed = email.trim().toLowerCase()
     if (!trimmed || !trimmed.includes('@')) {
       Alert.alert('', 'Ingresa un email válido'); return
     }
-    setSending(true)
     try {
-      await inviteTeamMember(trimmed)
+      await inviteMutation.mutateAsync(trimmed)
       setEmail('')
       onClose(trimmed)
     } catch {
       Alert.alert('Error', 'No se pudo enviar la invitación. Verifica el email e intenta de nuevo.')
-    } finally { setSending(false) }
+    }
   }
 
   const slideAnim = useRef(new Animated.Value(300)).current
@@ -136,39 +137,27 @@ function Skeleton() {
 type LoadState = 'loading' | 'error' | 'ready'
 
 export default function TeamScreen() {
-  const [loadState, setLoadState] = useState<LoadState>('loading')
-  const [members, setMembers] = useState<TeamMember[]>([])
-  const [invitations, setInvitations] = useState<TeamInvitation[]>([])
-  const [planName, setPlanName] = useState<string | null>(null)
-  const [refreshing, setRefreshing] = useState(false)
+  const settingsQuery = useSettings()
   const [showInviteModal, setShowInviteModal] = useState(false)
 
+  const data = settingsQuery.data ?? null
+  const loadState: LoadState = data
+    ? 'ready'
+    : settingsQuery.isLoading
+      ? 'loading'
+      : 'error'
+
+  const members: TeamMember[] = data?.business?.users ?? []
+  const invitations: TeamInvitation[] = data?.business?.invitations ?? []
+  const planName = data?.business?.plan?.name ?? null
   const isTeamPlan = planName?.toLowerCase() === 'team'
 
-  const load = useCallback(async () => {
-    setLoadState('loading')
-    try {
-      const data = await getSettings()
-      if (!data) { setLoadState('error'); return }
-      setMembers(data.business?.users ?? [])
-      setInvitations(data.business?.invitations ?? [])
-      setPlanName(data.business?.plan?.name ?? null)
-      setLoadState('ready')
-    } catch { setLoadState('error') }
-  }, [])
-
-  useEffect(() => { load() }, [load])
-
-  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false) }
+  const refreshing = settingsQuery.isRefetching
+  const load = () => { settingsQuery.refetch() }
+  const onRefresh = () => { settingsQuery.refetch() }
 
   function handleInvited(email: string) {
-    const fake: TeamInvitation = {
-      id: Date.now().toString(),
-      email,
-      createdAt: new Date().toISOString(),
-      status: 'pending',
-    }
-    setInvitations(prev => [...prev, fake])
+    // useInviteTeamMember invalidates settings, which refreshes the invitations list
     setShowInviteModal(false)
     Alert.alert('', `Invitación enviada a ${email}`)
   }

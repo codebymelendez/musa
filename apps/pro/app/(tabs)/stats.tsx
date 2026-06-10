@@ -1,14 +1,13 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, FlatList,
   StyleSheet, RefreshControl, Animated,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
-import { getStats, getUpcomingAppointments, getSettings, getBusinessTZ, type StatsData, type AppointmentItem } from '../../lib/api'
+import { type StatsData, type AppointmentItem } from '../../lib/api'
 import { PRIMARY, DARK, BORDER, GRAY, MONO, SERIF, formatTime, formatShortDate } from '../../lib/utils'
-import { cacheManager } from '../../lib/cache'
-import { ob } from '../../lib/observability'
+import { useStats, useUpcomingAppointments, useBusinessTimezone } from '../../hooks/queries'
 
 // ─── skeleton ─────────────────────────────────────────────────────────────────
 
@@ -73,96 +72,25 @@ function periodToYearMonth(p: Period): { year: number; month: number } {
 
 type State = { kind: 'loading' } | { kind: 'error' } | { kind: 'ok'; stats: StatsData; upcoming: AppointmentItem[] }
 
-const getCachedPeriodData = (p: Period) => {
-  const all = cacheManager.get('stats') as Record<Period, { stats: StatsData; upcoming: AppointmentItem[]; timestamp: number }> | null
-  return all?.[p] ?? null
-}
-
-const setCachedPeriodData = (p: Period, data: { stats: StatsData; upcoming: AppointmentItem[]; timestamp: number }) => {
-  const all = cacheManager.get('stats') as Record<Period, { stats: StatsData; upcoming: AppointmentItem[]; timestamp: number }> | null
-  const next = { ...all, [p]: data } as Record<Period, { stats: StatsData; upcoming: AppointmentItem[]; timestamp: number }>
-  cacheManager.set('stats', next)
-}
-
 export default function StatsScreen() {
   const [period, setPeriod] = useState<Period>('month')
+  const businessTz = useBusinessTimezone()
 
+  const { year, month } = periodToYearMonth(period)
+  const statsQuery = useStats(year, month)
+  const upcomingQuery = useUpcomingAppointments(period === 'month')
 
-  const [state, setState] = useState<State>(() => {
-    const cached = getCachedPeriodData('month')
-    if (cached) {
-      return { kind: 'ok', stats: cached.stats, upcoming: cached.upcoming }
-    }
-    return { kind: 'loading' }
-  })
-  const [refreshing, setRefreshing] = useState(false)
-  const [businessTz, setBusinessTz] = useState(() => {
-    const c = cacheManager.get('dashboard') as any | null
-    return c?.businessTz ?? 'America/Caracas'
-  })
+  const state: State = statsQuery.data
+    ? { kind: 'ok', stats: statsQuery.data, upcoming: upcomingQuery.data ?? [] }
+    : statsQuery.isError
+      ? { kind: 'error' }
+      : { kind: 'loading' }
 
-  useEffect(() => {
-    const cached = cacheManager.get('dashboard') as any | null
-    if (cached?.businessTz) {
-      setBusinessTz(cached.businessTz)
-    } else {
-      getSettings().then((s) => {
-        if (s) setBusinessTz(getBusinessTZ(s))
-      }).catch(() => {})
-    }
-  }, [])
-
-  const load = useCallback(async (p: Period, force = false) => {
-    const cached = getCachedPeriodData(p)
-    if (cached) {
-      setState({ kind: 'ok', stats: cached.stats, upcoming: cached.upcoming })
-      
-      // If cache is fresh and we aren't forcing, skip background reload
-      if (!force && (Date.now() - cached.timestamp < 30000)) {
-        return
-      }
-    } else {
-      setState({ kind: 'loading' })
-    }
-
-    try {
-      const { year, month } = periodToYearMonth(p)
-      const results = await Promise.allSettled([
-        getStats(year, month),
-        p === 'month' ? getUpcomingAppointments() : Promise.resolve([]),
-      ])
-
-      const stats = results[0].status === 'fulfilled' ? results[0].value as any : { completedAppointments: 0, monthlyRevenue: 0, yearlyRevenue: 0, totalClients: 0, avgTicket: 0, topServices: [], rescheduledThisMonth: 0, currency: 'USD' }
-      const upcoming = results[1].status === 'fulfilled' ? results[1].value as any : []
-
-      setCachedPeriodData(p, { stats, upcoming, timestamp: Date.now() })
-      setState({ kind: 'ok', stats, upcoming })
-    } catch (e) {
-      ob.logError('StatsScreen load', e)
-      if (!cached) {
-        setState({ kind: 'error' })
-      }
-    }
-  }, [])
-
-  // Telemetry of render time
-  useEffect(() => {
-    const endTrack = ob.trackTime()
-    load(period, false).then(() => {
-      ob.logPerformance('StatsScreen', endTrack())
-    })
-  }, [period, load])
-
-  // Reactive subscription
-  useEffect(() => {
-    return cacheManager.subscribe('stats', () => {
-      if (!cacheManager.has('stats')) {
-        load(period, true)
-      }
-    })
-  }, [period, load])
-
-  const onRefresh = async () => { setRefreshing(true); await load(period, true); setRefreshing(false) }
+  const refreshing = statsQuery.isRefetching
+  const onRefresh = () => {
+    statsQuery.refetch()
+    if (period === 'month') upcomingQuery.refetch()
+  }
 
   const revenue = state.kind === 'ok'
     ? (period === 'year' ? state.stats.yearlyRevenue : state.stats.monthlyRevenue)
@@ -194,7 +122,7 @@ export default function StatsScreen() {
       {state.kind === 'error' && (
         <View style={styles.centerState}>
           <Text style={styles.grayText}>No se pudieron cargar las estadísticas</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={() => load(period)} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => statsQuery.refetch()} activeOpacity={0.85}>
             <Text style={styles.retryText}>Reintentar</Text>
           </TouchableOpacity>
         </View>

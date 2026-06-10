@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Modal, Animated, PanResponder, Alert,
@@ -8,12 +8,9 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { router } from 'expo-router'
-import {
-  getServices, createService, deleteService,
-  type ServiceItem,
-} from '../../lib/api'
+import { type ServiceItem } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, formatMoney } from '../../lib/utils'
-import { cacheManager } from '../../lib/cache'
+import { useServices, useCreateService, useDeleteService } from '../../hooks/queries'
 
 // ─── duration pills ───────────────────────────────────────────────────────────
 
@@ -21,12 +18,12 @@ const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120]
 
 // ─── swipeable row ────────────────────────────────────────────────────────────
 
-function SwipeableRow({
+const SwipeableRow = memo(function SwipeableRow({
   item, onEdit, onDelete,
 }: {
   item: ServiceItem
-  onEdit: () => void
-  onDelete: () => void
+  onEdit: (item: ServiceItem) => void
+  onDelete: (item: ServiceItem) => void
 }) {
   const translateX = useRef(new Animated.Value(0)).current
   const [revealed, setRevealed] = useState(false)
@@ -58,14 +55,14 @@ function SwipeableRow({
     <View style={svcStyles.rowWrap}>
       {/* delete button revealed on swipe */}
       <View style={svcStyles.deleteAction}>
-        <TouchableOpacity style={svcStyles.deleteBtn} onPress={() => { close(); onDelete() }} activeOpacity={0.8}>
+        <TouchableOpacity style={svcStyles.deleteBtn} onPress={() => { close(); onDelete(item) }} activeOpacity={0.8}>
           <Ionicons name="trash-outline" size={20} color="#fff" />
           <Text style={svcStyles.deleteBtnText}>Eliminar</Text>
         </TouchableOpacity>
       </View>
 
       <Animated.View style={{ transform: [{ translateX }] }} {...panResponder.panHandlers}>
-        <TouchableOpacity style={svcStyles.card} onPress={() => { close(); onEdit() }} activeOpacity={0.75}>
+        <TouchableOpacity style={svcStyles.card} onPress={() => { close(); onEdit(item) }} activeOpacity={0.75}>
           <View style={svcStyles.cardLeft}>
             <Text style={svcStyles.svcName}>{item.name}</Text>
             {item.category ? <Text style={svcStyles.svcCategory}>{item.category}</Text> : null}
@@ -78,7 +75,7 @@ function SwipeableRow({
       </Animated.View>
     </View>
   )
-}
+})
 
 // ─── create modal ────────────────────────────────────────────────────────────
 
@@ -91,7 +88,8 @@ function CreateModal({
   const [durationMin, setDurationMin] = useState(30)
   const [price, setPrice] = useState('')
   const [description, setDescription] = useState('')
-  const [saving, setSaving] = useState(false)
+  const createServiceMutation = useCreateService()
+  const saving = createServiceMutation.isPending
 
   function reset() {
     setName(''); setDurationMin(30); setPrice(''); setDescription('')
@@ -100,9 +98,8 @@ function CreateModal({
   async function handleCreate() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     if (!name.trim()) { Alert.alert('', 'El nombre es requerido'); return }
-    setSaving(true)
     try {
-      const svc = await createService({
+      const svc = await createServiceMutation.mutateAsync({
         name: name.trim(),
         durationMin,
         price: parseFloat(price) || 0,
@@ -112,7 +109,7 @@ function CreateModal({
       onCreated(svc)
     } catch {
       Alert.alert('Error', 'No se pudo crear el servicio')
-    } finally { setSaving(false) }
+    }
   }
 
   const slideAnim = useRef(new Animated.Value(400)).current
@@ -233,25 +230,22 @@ function Skeleton() {
 type LoadState = 'loading' | 'error' | 'ready'
 
 export default function ServicesScreen() {
-  const [loadState, setLoadState] = useState<LoadState>('loading')
-  const [services, setServices] = useState<ServiceItem[]>([])
-  const [refreshing, setRefreshing] = useState(false)
+  const servicesQuery = useServices()
+  const deleteServiceMutation = useDeleteService()
   const [showModal, setShowModal] = useState(false)
 
-  const load = useCallback(async () => {
-    setLoadState('loading')
-    try {
-      const data = await getServices()
-      setServices(data)
-      setLoadState('ready')
-    } catch { setLoadState('error') }
-  }, [])
+  const services: ServiceItem[] = servicesQuery.data ?? []
+  const loadState: LoadState = servicesQuery.data
+    ? 'ready'
+    : servicesQuery.isLoading
+      ? 'loading'
+      : 'error'
 
-  useEffect(() => { load() }, [load])
+  const refreshing = servicesQuery.isRefetching
+  const load = () => { servicesQuery.refetch() }
+  const onRefresh = () => { servicesQuery.refetch() }
 
-  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false) }
-
-  function handleDelete(svc: ServiceItem) {
+  const handleDelete = useCallback((svc: ServiceItem) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)
     Alert.alert(
       'Eliminar servicio',
@@ -262,9 +256,7 @@ export default function ServicesScreen() {
           text: 'Eliminar', style: 'destructive',
           onPress: async () => {
             try {
-              await deleteService(svc.id)
-              cacheManager.invalidate('business')
-              setServices(prev => prev.filter(s => s.id !== svc.id))
+              await deleteServiceMutation.mutateAsync(svc.id)
             } catch {
               Alert.alert('Error', 'No se pudo eliminar el servicio')
             }
@@ -272,7 +264,15 @@ export default function ServicesScreen() {
         },
       ]
     )
-  }
+  }, [deleteServiceMutation.mutateAsync])
+
+  const handleEdit = useCallback((svc: ServiceItem) => {
+    router.push(`/services/${svc.id}` as Parameters<typeof router.push>[0])
+  }, [])
+
+  const renderItem = useCallback(({ item }: { item: ServiceItem }) => (
+    <SwipeableRow item={item} onEdit={handleEdit} onDelete={handleDelete} />
+  ), [handleEdit, handleDelete])
 
   return (
     <SafeAreaView style={svcStyles.safe} edges={['top']}>
@@ -307,13 +307,7 @@ export default function ServicesScreen() {
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} colors={[PRIMARY]} />}
-          renderItem={({ item }) => (
-            <SwipeableRow
-              item={item}
-              onEdit={() => router.push(`/services/${item.id}` as Parameters<typeof router.push>[0])}
-              onDelete={() => handleDelete(item)}
-            />
-          )}
+          renderItem={renderItem}
         />
       )}
 
@@ -327,9 +321,8 @@ export default function ServicesScreen() {
       <CreateModal
         visible={showModal}
         onClose={() => setShowModal(false)}
-        onCreated={svc => {
-          cacheManager.invalidate('business')
-          setServices(prev => [...prev, svc])
+        onCreated={() => {
+          // useCreateService already invalidates the services query
           setShowModal(false)
         }}
       />

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Switch, Animated, Alert, KeyboardAvoidingView, Platform,
@@ -6,12 +6,8 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import {
-  getLoyaltyProgram, saveLoyaltyProgram, getLoyaltyAccounts,
-  type LoyaltyProgram,
-} from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF } from '../../lib/utils'
-import { cacheManager } from '../../lib/cache'
+import { useLoyaltyProgram, useLoyaltyAccounts, useSaveLoyaltyProgram } from '../../hooks/queries'
 
 // ─── skeleton ─────────────────────────────────────────────────────────────────
 
@@ -50,7 +46,9 @@ type LoadState = 'loading' | 'error' | 'ready'
 type AccType = 'visits' | 'points'
 
 export default function LoyaltyScreen() {
-  const [loadState, setLoadState] = useState<LoadState>('loading')
+  const programQuery = useLoyaltyProgram()
+  const accountsQuery = useLoyaltyAccounts()
+  const saveProgramMutation = useSaveLoyaltyProgram()
 
   // program config form state
   const [isActive, setIsActive] = useState(false)
@@ -58,44 +56,40 @@ export default function LoyaltyScreen() {
   const [pointsPerVisit, setPointsPerVisit] = useState('1')
   const [rewardThreshold, setRewardThreshold] = useState('10')
   const [rewardDescription, setRewardDescription] = useState('')
-
-  // stats (from accounts list)
-  const [statsClientsWithPoints, setStatsClientsWithPoints] = useState(0)
-  const [statsTotalPoints, setStatsTotalPoints] = useState(0)
-
-  // save state
-  const [saving, setSaving] = useState(false)
   const [savedMsg, setSavedMsg] = useState(false)
 
   const insets = useSafeAreaInsets()
 
-  const load = useCallback(async () => {
-    setLoadState('loading')
-    try {
-      const [program, accounts] = await Promise.all([
-        getLoyaltyProgram(),
-        getLoyaltyAccounts(),
-      ])
+  const loadState: LoadState = programQuery.isError || accountsQuery.isError
+    ? 'error'
+    : (programQuery.isLoading || accountsQuery.isLoading)
+      ? 'loading'
+      : 'ready'
 
-      // hydrate form
-      if (program) {
-        setIsActive(program.isActive)
-        setAccumulationType(program.accumulationType)
-        setPointsPerVisit(String(program.pointsPerVisit))
-        setRewardThreshold(String(program.rewardThreshold))
-        setRewardDescription(program.rewardDescription ?? '')
-      }
+  // Hydrate the form once from the loaded program — background refetches
+  // must not overwrite what the user is editing.
+  const initializedRef = useRef(false)
+  useEffect(() => {
+    const program = programQuery.data
+    if (!program || initializedRef.current) return
+    initializedRef.current = true
+    setIsActive(program.isActive)
+    setAccumulationType(program.accumulationType)
+    setPointsPerVisit(String(program.pointsPerVisit))
+    setRewardThreshold(String(program.rewardThreshold))
+    setRewardDescription(program.rewardDescription ?? '')
+  }, [programQuery.data])
 
-      // compute stats client-side
-      const withPoints = accounts.filter(a => a.totalPoints > 0)
-      setStatsClientsWithPoints(withPoints.length)
-      setStatsTotalPoints(withPoints.reduce((sum, a) => sum + a.totalPoints, 0))
+  // stats computed client-side from accounts
+  const withPoints = (accountsQuery.data ?? []).filter(a => a.totalPoints > 0)
+  const statsClientsWithPoints = withPoints.length
+  const statsTotalPoints = withPoints.reduce((sum, a) => sum + a.totalPoints, 0)
 
-      setLoadState('ready')
-    } catch { setLoadState('error') }
-  }, [])
-
-  useEffect(() => { load() }, [load])
+  const saving = saveProgramMutation.isPending
+  const load = () => {
+    programQuery.refetch()
+    accountsQuery.refetch()
+  }
 
   async function handleSave() {
     const threshold = parseInt(rewardThreshold, 10)
@@ -110,23 +104,20 @@ export default function LoyaltyScreen() {
       Alert.alert('', 'Los puntos por visita deben ser al menos 1'); return
     }
 
-    setSaving(true)
     try {
-      await saveLoyaltyProgram({
+      await saveProgramMutation.mutateAsync({
         isActive,
         accumulationType,
         pointsPerVisit: perVisit,
         rewardThreshold: threshold,
         rewardDescription: rewardDescription.trim(),
       })
-      cacheManager.invalidate('business')
-      cacheManager.invalidate('dashboard')
       setSavedMsg(true)
       setTimeout(() => setSavedMsg(false), 2000)
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error desconocido'
       Alert.alert('Error al guardar', msg)
-    } finally { setSaving(false) }
+    }
   }
 
   return (

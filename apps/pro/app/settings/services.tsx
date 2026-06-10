@@ -1,4 +1,3 @@
-import { useState, useEffect, useCallback } from 'react'
 import {
   View,
   Text,
@@ -11,30 +10,25 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import { getServices, type ServiceItem } from '../../lib/api'
+import { type ServiceItem } from '../../lib/api'
 import { PRIMARY, DARK, BORDER, GRAY, MONO, formatMoney } from '../../lib/utils'
+import { useServices } from '../../hooks/queries'
 
 type LoadState = 'loading' | 'error' | 'ready'
 
 export default function ServicesScreen() {
-  const [state, setState] = useState<LoadState>('loading')
-  const [services, setServices] = useState<ServiceItem[]>([])
-  const [refreshing, setRefreshing] = useState(false)
+  const servicesQuery = useServices()
 
-  const load = useCallback(async () => {
-    setState('loading')
-    try {
-      const data = await getServices()
-      setServices(data)
-      setState('ready')
-    } catch {
-      setState('error')
-    }
-  }, [])
+  const services: ServiceItem[] = servicesQuery.data ?? []
+  const state: LoadState = servicesQuery.data
+    ? 'ready'
+    : servicesQuery.isLoading
+      ? 'loading'
+      : 'error'
 
-  useEffect(() => { load() }, [load])
-
-  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false) }
+  const refreshing = servicesQuery.isRefetching
+  const load = () => { servicesQuery.refetch() }
+  const onRefresh = () => { servicesQuery.refetch() }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>

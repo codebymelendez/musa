@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, memo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   StyleSheet, RefreshControl, Animated,
@@ -7,11 +7,10 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { router } from 'expo-router'
-import { getClients, type ClientItem } from '../../lib/api'
+import { type ClientItem } from '../../lib/api'
 import { PRIMARY, DARK, BORDER, GRAY, MONO, SERIF, SURFACE, initials } from '../../lib/utils'
 import AddClientModal from '../../components/AddClientModal'
-import { cacheManager } from '../../lib/cache'
-import { ob } from '../../lib/observability'
+import { useClients } from '../../hooks/queries'
 
 // ─── skeleton ─────────────────────────────────────────────────────────────────
 
@@ -98,77 +97,27 @@ const ClientRow = memo(function ClientRow({
 type State = { kind: 'loading' } | { kind: 'error' } | { kind: 'ok'; data: ClientItem[] }
 
 export default function ClientsScreen() {
-  const [state, setState] = useState<State>(() => {
-    const cache = cacheManager.get('clients') as ClientItem[] | null
-    if (cache) {
-      return { kind: 'ok', data: cache }
-    }
-    return { kind: 'loading' }
-  })
+  const { data, isLoading, refetch, isRefetching } = useClients()
   const [query, setQuery] = useState('')
-  const [refreshing, setRefreshing] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
 
-  const load = useCallback(async (force = false) => {
-    const cache = cacheManager.get('clients') as ClientItem[] | null
-    const timestamp = cacheManager.getTimestamp('clients')
+  const state: State = data
+    ? { kind: 'ok', data }
+    : isLoading
+      ? { kind: 'loading' }
+      : { kind: 'error' }
 
-    if (cache) {
-      setState({ kind: 'ok', data: cache })
-      if (!force && (Date.now() - timestamp < 30000)) {
-        return
-      }
-    } else {
-      setState({ kind: 'loading' })
-    }
+  const refreshing = isRefetching
+  const onRefresh = () => { refetch() }
 
-    try {
-      const data = await getClients()
-      cacheManager.set('clients', data)
-      setState({ kind: 'ok', data })
-    } catch (e) {
-      ob.logError('ClientsScreen load', e)
-      if (!cache) {
-        setState({ kind: 'error' })
-      }
-    }
-  }, [])
+  const filtered = useMemo(() => {
+    if (state.kind !== 'ok') return []
+    const q = query.toLowerCase()
+    return state.data.filter(c => c.name.toLowerCase().includes(q) || c.phone.includes(q))
+  }, [state.kind === 'ok' ? state.data : null, query])
 
-  // Telemetry of render time
-  useEffect(() => {
-    const endTrack = ob.trackTime()
-    load(false).then(() => {
-      ob.logPerformance('ClientsScreen', endTrack())
-    })
-  }, [load])
-
-  // Reactive subscription
-  useEffect(() => {
-    return cacheManager.subscribe('clients', () => {
-      if (!cacheManager.has('clients')) {
-        load(true)
-      }
-    })
-  }, [load])
-
-  const onRefresh = async () => { setRefreshing(true); await load(true); setRefreshing(false) }
-
-  const filtered = state.kind === 'ok'
-    ? state.data.filter(c => {
-        const q = query.toLowerCase()
-        return c.name.toLowerCase().includes(q) || c.phone.includes(q)
-      })
-    : []
-
-  function handleCreated(client: ClientItem) {
-    setState(prev => {
-      const nextData = prev.kind === 'ok'
-        ? [client, ...prev.data]
-        : [client]
-      cacheManager.set('clients', nextData)
-      return { kind: 'ok', data: nextData }
-    })
-    cacheManager.invalidate('dashboard')
+  function handleCreated(_client: ClientItem) {
+    // useCreateClient already updates the clients cache and invalidates the dashboard
     setShowAddModal(false)
   }
 
@@ -232,7 +181,7 @@ export default function ClientsScreen() {
       {state.kind === 'error' && (
         <View style={styles.centerState}>
           <Text style={styles.emptyText}>No se pudieron cargar las clientas</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={() => load(true)} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()} activeOpacity={0.85}>
             <Text style={styles.retryText}>Reintentar</Text>
           </TouchableOpacity>
         </View>

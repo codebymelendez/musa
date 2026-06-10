@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Alert, Animated, KeyboardAvoidingView, Platform,
@@ -6,9 +6,9 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, router } from 'expo-router'
-import { getPromotions, updatePromotion, deletePromotion, type PromotionItem } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, SERIF } from '../../lib/utils'
 import DatePickerModal, { formatDateSpanish } from '../../components/DatePickerModal'
+import { usePromotions, useUpdatePromotion, useDeletePromotion } from '../../hooks/queries'
 
 function formatDisplayDate(iso: string | null): string {
   if (!iso) return ''
@@ -53,8 +53,9 @@ type LoadState = 'loading' | 'error' | 'ready'
 
 export default function PromotionEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
-  const [loadState, setLoadState] = useState<LoadState>('loading')
-  const [promo, setPromo] = useState<PromotionItem | null>(null)
+  const promotionsQuery = usePromotions()
+  const updatePromotionMutation = useUpdatePromotion(id ?? '')
+  const deletePromotionMutation = useDeletePromotion()
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -63,38 +64,40 @@ export default function PromotionEditScreen() {
   const [validUntil, setValidUntil] = useState<string | null>(null)
   const [showFromPicker, setShowFromPicker] = useState(false)
   const [showUntilPicker, setShowUntilPicker] = useState(false)
-
-  const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState(false)
   const [savedMsg, setSavedMsg] = useState(false)
 
   const today = new Date().toISOString().split('T')[0]
 
   const insets = useSafeAreaInsets()
 
-  const load = useCallback(async () => {
-    setLoadState('loading')
-    try {
-      const all = await getPromotions()
-      const found = all.find(p => p.id === id)
-      if (!found) { setLoadState('error'); return }
-      setPromo(found)
-      setTitle(found.title)
-      setDescription(found.description ?? '')
-      setDiscount(String(found.discount))
-      setValidFrom(found.validFrom ? found.validFrom.split('T')[0] : null)
-      setValidUntil(found.validUntil ? found.validUntil.split('T')[0] : null)
-      setLoadState('ready')
-    } catch { setLoadState('error') }
-  }, [id])
+  const promo = promotionsQuery.data?.find(p => p.id === id) ?? null
+  const loadState: LoadState = promo
+    ? 'ready'
+    : promotionsQuery.isLoading
+      ? 'loading'
+      : 'error'
 
-  useEffect(() => { load() }, [load])
+  // Populate the form once per promotion — background refetches must not
+  // overwrite what the user is editing.
+  const initializedForRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!promo || initializedForRef.current === promo.id) return
+    initializedForRef.current = promo.id
+    setTitle(promo.title)
+    setDescription(promo.description ?? '')
+    setDiscount(String(promo.discount))
+    setValidFrom(promo.validFrom ? promo.validFrom.split('T')[0] : null)
+    setValidUntil(promo.validUntil ? promo.validUntil.split('T')[0] : null)
+  }, [promo])
+
+  const saving = updatePromotionMutation.isPending
+  const deleting = deletePromotionMutation.isPending
+  const load = () => { promotionsQuery.refetch() }
 
   async function handleSave() {
     if (!title.trim()) { Alert.alert('', 'El título es requerido'); return }
-    setSaving(true)
     try {
-      await updatePromotion(id!, {
+      await updatePromotionMutation.mutateAsync({
         title: title.trim(),
         description: description.trim() || undefined,
         discount: parseFloat(discount) || 0,
@@ -105,7 +108,7 @@ export default function PromotionEditScreen() {
       setTimeout(() => setSavedMsg(false), 2000)
     } catch {
       Alert.alert('Error', 'No se pudo guardar la promoción')
-    } finally { setSaving(false) }
+    }
   }
 
   function handleDelete() {
@@ -117,13 +120,11 @@ export default function PromotionEditScreen() {
         {
           text: 'Eliminar', style: 'destructive',
           onPress: async () => {
-            setDeleting(true)
             try {
-              await deletePromotion(id!)
+              await deletePromotionMutation.mutateAsync(id!)
               router.back()
             } catch {
               Alert.alert('Error', 'No se pudo eliminar la promoción')
-              setDeleting(false)
             }
           },
         },

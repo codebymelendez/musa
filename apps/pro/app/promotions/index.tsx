@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Modal, Animated, Alert, RefreshControl,
@@ -7,12 +7,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import {
-  getPromotions, createPromotion, broadcastPromotion,
-  type PromotionItem,
-} from '../../lib/api'
+import { type PromotionItem } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF } from '../../lib/utils'
 import DatePickerModal, { formatDateSpanish } from '../../components/DatePickerModal'
+import { usePromotions, useCreatePromotion, useBroadcastPromotion } from '../../hooks/queries'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -53,7 +51,7 @@ const STATUS_CONFIG = {
 
 // ─── promotion card ───────────────────────────────────────────────────────────
 
-function PromoCard({ item, onBroadcast }: { item: PromotionItem; onBroadcast: () => void }) {
+const PromoCard = memo(function PromoCard({ item, onBroadcast }: { item: PromotionItem; onBroadcast: (p: PromotionItem) => void }) {
   const status = promoStatus(item)
   const { label, bg, text } = STATUS_CONFIG[status]
 
@@ -90,7 +88,7 @@ function PromoCard({ item, onBroadcast }: { item: PromotionItem; onBroadcast: ()
       {status === 'active' && (
         <TouchableOpacity
           style={promoStyles.broadcastBtn}
-          onPress={e => { e.stopPropagation(); onBroadcast() }}
+          onPress={e => { e.stopPropagation(); onBroadcast(item) }}
           activeOpacity={0.85}
         >
           <Ionicons name="notifications-outline" size={15} color={PRIMARY} />
@@ -99,7 +97,7 @@ function PromoCard({ item, onBroadcast }: { item: PromotionItem; onBroadcast: ()
       )}
     </TouchableOpacity>
   )
-}
+})
 
 // ─── create modal ─────────────────────────────────────────────────────────────
 
@@ -115,7 +113,8 @@ function CreateModal({
   const [validUntil, setValidUntil] = useState<string | null>(null)
   const [showFromPicker, setShowFromPicker] = useState(false)
   const [showUntilPicker, setShowUntilPicker] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const createPromotionMutation = useCreatePromotion()
+  const saving = createPromotionMutation.isPending
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -127,9 +126,8 @@ function CreateModal({
   async function handleCreate() {
     if (!title.trim()) { Alert.alert('', 'El título es requerido'); return }
     if (!discount.trim()) { Alert.alert('', 'El descuento es requerido'); return }
-    setSaving(true)
     try {
-      const p = await createPromotion({
+      const p = await createPromotionMutation.mutateAsync({
         title: title.trim(),
         description: description.trim() || undefined,
         discount: parseFloat(discount) || 0,
@@ -140,7 +138,7 @@ function CreateModal({
       onCreated(p)
     } catch {
       Alert.alert('Error', 'No se pudo crear la promoción')
-    } finally { setSaving(false) }
+    }
   }
 
   const slideAnim = useRef(new Animated.Value(400)).current
@@ -259,25 +257,22 @@ function Skeleton() {
 type LoadState = 'loading' | 'error' | 'ready'
 
 export default function PromotionsScreen() {
-  const [loadState, setLoadState] = useState<LoadState>('loading')
-  const [promos, setPromos] = useState<PromotionItem[]>([])
-  const [refreshing, setRefreshing] = useState(false)
+  const promotionsQuery = usePromotions()
+  const broadcastMutation = useBroadcastPromotion()
   const [showModal, setShowModal] = useState(false)
 
-  const load = useCallback(async () => {
-    setLoadState('loading')
-    try {
-      const data = await getPromotions()
-      setPromos(data)
-      setLoadState('ready')
-    } catch { setLoadState('error') }
-  }, [])
+  const promos: PromotionItem[] = promotionsQuery.data ?? []
+  const loadState: LoadState = promotionsQuery.data
+    ? 'ready'
+    : promotionsQuery.isLoading
+      ? 'loading'
+      : 'error'
 
-  useEffect(() => { load() }, [load])
+  const refreshing = promotionsQuery.isRefetching
+  const load = () => { promotionsQuery.refetch() }
+  const onRefresh = () => { promotionsQuery.refetch() }
 
-  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false) }
-
-  function handleBroadcast(p: PromotionItem) {
+  const handleBroadcast = useCallback((p: PromotionItem) => {
     Alert.alert(
       'Enviar notificación',
       `¿Enviar notificación push de "${p.title}" a todas tus clientas?`,
@@ -287,7 +282,7 @@ export default function PromotionsScreen() {
           text: 'Enviar',
           onPress: async () => {
             try {
-              await broadcastPromotion(p.id)
+              await broadcastMutation.mutateAsync(p.id)
               Alert.alert('', 'Notificación enviada correctamente')
             } catch {
               Alert.alert('Error', 'No se pudo enviar la notificación')
@@ -296,7 +291,11 @@ export default function PromotionsScreen() {
         },
       ]
     )
-  }
+  }, [broadcastMutation.mutateAsync])
+
+  const renderItem = useCallback(({ item }: { item: PromotionItem }) => (
+    <PromoCard item={item} onBroadcast={handleBroadcast} />
+  ), [handleBroadcast])
 
   return (
     <SafeAreaView style={promoStyles.safe} edges={['top']}>
@@ -339,9 +338,7 @@ export default function PromotionsScreen() {
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} colors={[PRIMARY]} />}
-          renderItem={({ item }) => (
-            <PromoCard item={item} onBroadcast={() => handleBroadcast(item)} />
-          )}
+          renderItem={renderItem}
         />
       )}
 
@@ -354,7 +351,7 @@ export default function PromotionsScreen() {
       <CreateModal
         visible={showModal}
         onClose={() => setShowModal(false)}
-        onCreated={p => { setPromos(prev => [p, ...prev]); setShowModal(false) }}
+        onCreated={() => { setShowModal(false) }}
       />
     </SafeAreaView>
   )

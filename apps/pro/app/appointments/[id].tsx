@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, Switch,
   StyleSheet, Linking, ActivityIndicator, Platform, Alert, KeyboardAvoidingView,
@@ -7,12 +7,14 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, router } from 'expo-router'
 import {
-  getAppointmentById, triggerAppointmentAction, completeAppointment, registerPayment,
-  getSettings, getBusinessTZ, getBcvRate,
-  type AppointmentItem, type AppointmentStatus, type AppointmentPayment, type SettingsData,
+  getBcvRate,
+  type AppointmentItem, type AppointmentStatus, type AppointmentPayment,
 } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, formatTime, formatDate, formatMoney } from '../../lib/utils'
-import { cacheManager } from '../../lib/cache'
+import {
+  useAppointment, useAppointmentAction, useCompleteAppointment, useRegisterPayment,
+  useSettings, useBusinessTimezone,
+} from '../../hooks/queries'
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -149,24 +151,23 @@ type State =
 
 export default function AppointmentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
-  const [state, setState] = useState<State>({ kind: 'loading' })
-  const [acting, setActing] = useState(false)
   const insets = useSafeAreaInsets()
 
-  // Timezone state — read cache synchronously so first render is already in business TZ
-  const [businessTz, setBusinessTz] = useState(() => {
-    const cached = cacheManager.get('settings')
-    return cached ? getBusinessTZ(cached) : 'America/Caracas'
-  })
+  const aptQuery = useAppointment(id)
+  const { data: settingsData } = useSettings()
+  const businessTz = useBusinessTimezone()
 
-  useEffect(() => {
-    const cached = cacheManager.get('settings')
-    if (cached) {
-      setBusinessTz(getBusinessTZ(cached))
-    } else {
-      getSettings().then((s) => { if (s) setBusinessTz(getBusinessTZ(s)) }).catch(() => {})
-    }
-  }, [])
+  const actionMutation = useAppointmentAction(id ?? '')
+  const completeMutation = useCompleteAppointment(id ?? '')
+  const paymentMutation = useRegisterPayment(id ?? '')
+
+  const state: State = aptQuery.data
+    ? { kind: 'ok', data: aptQuery.data }
+    : aptQuery.isError || aptQuery.data === null
+      ? { kind: 'error' }
+      : { kind: 'loading' }
+
+  const acting = actionMutation.isPending || completeMutation.isPending
 
   // Payment form state
   const [amount, setAmount] = useState('')
@@ -175,7 +176,7 @@ export default function AppointmentDetailScreen() {
   const [isPaid, setIsPaid] = useState(true)
   const [payNotes, setPayNotes] = useState('')
   const [editingPayment, setEditingPayment] = useState(false)
-  const [registering, setRegistering] = useState(false)
+  const registering = paymentMutation.isPending
 
   // BCV state
   const [bcvRate, setBcvRate]     = useState<number | null>(null)
@@ -185,28 +186,26 @@ export default function AppointmentDetailScreen() {
   // usdBase stores the USD service price so we can restore it when switching back
   const usdBaseRef = useRef<string>('')
 
-  const load = useCallback(async () => {
-    if (!id) return
-    setState({ kind: 'loading' })
-    try {
-      const data = await getAppointmentById(id)
-      setState(data ? { kind: 'ok', data } : { kind: 'error' })
-      if (data && !data.payment) {
-        const priceStr = data.service?.price ? String(data.service.price) : ''
-        usdBaseRef.current = priceStr
-        setAmount(priceStr)
-        setCurrency('USD')
-        setMethod(null)
-        setIsPaid(true)
-        setPayNotes('')
-        setEditingPayment(false)
-      }
-    } catch {
-      setState({ kind: 'error' })
+  // Initialize the payment form once per appointment — background refetches
+  // must not wipe what the user is typing.
+  const initializedForRef = useRef<string | null>(null)
+  useEffect(() => {
+    const data = aptQuery.data
+    if (!data || initializedForRef.current === data.id) return
+    initializedForRef.current = data.id
+    if (!data.payment) {
+      const priceStr = data.service?.price ? String(data.service.price) : ''
+      usdBaseRef.current = priceStr
+      setAmount(priceStr)
+      setCurrency('USD')
+      setMethod(null)
+      setIsPaid(true)
+      setPayNotes('')
+      setEditingPayment(false)
     }
-  }, [id])
+  }, [aptQuery.data])
 
-  useEffect(() => { load() }, [load])
+  const load = () => { aptQuery.refetch() }
 
   function startEditPayment(payment: AppointmentPayment) {
     const amtStr = String(payment.amount)
@@ -257,17 +256,10 @@ export default function AppointmentDetailScreen() {
 
   async function doAction(action: 'confirm' | 'cancel') {
     if (!id) return
-    setActing(true)
     try {
-      await triggerAppointmentAction(id, action)
-      cacheManager.invalidate('dashboard')
-      cacheManager.invalidate('calendar')
-      cacheManager.invalidate('stats')
-      await load()
+      await actionMutation.mutateAsync(action)
     } catch {
-      // non-blocking
-    } finally {
-      setActing(false)
+      // non-blocking — the optimistic update is rolled back by the mutation
     }
   }
 
@@ -282,9 +274,8 @@ export default function AppointmentDetailScreen() {
       Alert.alert('', 'Selecciona un método de pago')
       return
     }
-    setRegistering(true)
     try {
-      const updated = await registerPayment(id, {
+      const updated = await paymentMutation.mutateAsync({
         amount: parsedAmount,
         method,
         currency,
@@ -293,16 +284,10 @@ export default function AppointmentDetailScreen() {
         completeAppointment: apt.status === 'confirmed' && !editingPayment,
       })
       if (updated) {
-        cacheManager.invalidate('dashboard')
-        cacheManager.invalidate('calendar')
-        cacheManager.invalidate('stats')
-        setState({ kind: 'ok', data: updated })
         setEditingPayment(false)
       }
     } catch {
       Alert.alert('Error', 'No se pudo registrar el cobro. Intenta de nuevo.')
-    } finally {
-      setRegistering(false)
     }
   }
 
@@ -316,16 +301,11 @@ export default function AppointmentDetailScreen() {
           text: 'Completar',
           onPress: async () => {
             if (!id) return
-            setActing(true)
             try {
-              await completeAppointment(id)
-              cacheManager.invalidate('dashboard')
-              cacheManager.invalidate('calendar')
-              cacheManager.invalidate('stats')
-              await load()
+              await completeMutation.mutateAsync()
             } catch {
               Alert.alert('Error', 'No se pudo completar la cita')
-            } finally { setActing(false) }
+            }
           },
         },
       ]
@@ -379,7 +359,7 @@ export default function AppointmentDetailScreen() {
         const showPaymentForm = apt.status === 'confirmed' && (!apt.payment || editingPayment)
         const showPaymentSummary = !!apt.payment && !showPaymentForm
 
-        const _rawPayMethods = (cacheManager.get('settings') as SettingsData | null)?.settings?.paymentMethods
+        const _rawPayMethods = settingsData?.settings?.paymentMethods
         const enabledPayMethods = _rawPayMethods !== undefined
           ? PAYMENT_METHODS.filter(m => _rawPayMethods.includes(m.id))
           : [...PAYMENT_METHODS]

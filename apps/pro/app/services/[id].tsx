@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Animated, Alert, KeyboardAvoidingView, Platform,
@@ -6,9 +6,8 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, router } from 'expo-router'
-import { getServices, updateService, deleteService, type ServiceItem } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, SERIF, MONO, formatMoney } from '../../lib/utils'
-import { cacheManager } from '../../lib/cache'
+import { useServices, useUpdateService, useDeleteService } from '../../hooks/queries'
 
 const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120]
 
@@ -34,54 +33,55 @@ type LoadState = 'loading' | 'error' | 'ready'
 
 export default function ServiceEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
-  const [loadState, setLoadState] = useState<LoadState>('loading')
-  const [service, setService] = useState<ServiceItem | null>(null)
+  const servicesQuery = useServices()
+  const updateServiceMutation = useUpdateService(id ?? '')
+  const deleteServiceMutation = useDeleteService()
 
   const [name, setName] = useState('')
   const [durationMin, setDurationMin] = useState(30)
   const [price, setPrice] = useState('')
   const [description, setDescription] = useState('')
-
-  const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState(false)
   const [savedMsg, setSavedMsg] = useState(false)
 
   const insets = useSafeAreaInsets()
 
-  const load = useCallback(async () => {
-    setLoadState('loading')
-    try {
-      const all = await getServices()
-      const found = all.find(s => s.id === id)
-      if (!found) { setLoadState('error'); return }
-      setService(found)
-      setName(found.name)
-      setDurationMin(found.durationMin)
-      setPrice(String(found.price))
-      setDescription(found.description ?? '')
-      setLoadState('ready')
-    } catch { setLoadState('error') }
-  }, [id])
+  const service = servicesQuery.data?.find(s => s.id === id) ?? null
+  const loadState: LoadState = service
+    ? 'ready'
+    : servicesQuery.isLoading
+      ? 'loading'
+      : 'error'
 
-  useEffect(() => { load() }, [load])
+  // Populate the form once per service — background refetches must not
+  // overwrite what the user is editing.
+  const initializedForRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!service || initializedForRef.current === service.id) return
+    initializedForRef.current = service.id
+    setName(service.name)
+    setDurationMin(service.durationMin)
+    setPrice(String(service.price))
+    setDescription(service.description ?? '')
+  }, [service])
+
+  const saving = updateServiceMutation.isPending
+  const deleting = deleteServiceMutation.isPending
+  const load = () => { servicesQuery.refetch() }
 
   async function handleSave() {
     if (!name.trim()) { Alert.alert('', 'El nombre es requerido'); return }
-    setSaving(true)
     try {
-      await updateService(id!, {
+      await updateServiceMutation.mutateAsync({
         name: name.trim(),
         durationMin,
         price: parseFloat(price) || 0,
         description: description.trim() || undefined,
       })
-      cacheManager.invalidate('business')
-      cacheManager.invalidate('dashboard')
       setSavedMsg(true)
       setTimeout(() => setSavedMsg(false), 2000)
     } catch {
       Alert.alert('Error', 'No se pudo guardar el servicio')
-    } finally { setSaving(false) }
+    }
   }
 
   function handleDelete() {
@@ -93,15 +93,11 @@ export default function ServiceEditScreen() {
         {
           text: 'Eliminar', style: 'destructive',
           onPress: async () => {
-            setDeleting(true)
             try {
-              await deleteService(id!)
-              cacheManager.invalidate('business')
-              cacheManager.invalidate('dashboard')
+              await deleteServiceMutation.mutateAsync(id!)
               router.back()
             } catch {
               Alert.alert('Error', 'No se pudo eliminar el servicio')
-              setDeleting(false)
             }
           },
         },

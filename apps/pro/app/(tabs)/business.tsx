@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, RefreshControl,
 } from 'react-native'
@@ -7,13 +7,8 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { Image } from 'expo-image'
 import { router } from 'expo-router'
-import {
-  getSettings, getServices, getPromotions, getLoyaltyProgram,
-  type LoyaltyProgram,
-} from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, SERIF, initials } from '../../lib/utils'
-import { cacheManager } from '../../lib/cache'
-import { ob } from '../../lib/observability'
+import { useSettings, useServices, usePromotions, useLoyaltyProgram } from '../../hooks/queries'
 
 const APP_URL = (process.env.EXPO_PUBLIC_APP_URL ?? 'https://getmusa.app').replace(/\/$/, '')
 
@@ -86,164 +81,36 @@ function NavRow({
 // ─── screen ───────────────────────────────────────────────────────────────────
 
 export default function BusinessScreen() {
-  const [loading, setLoading] = useState(() => !cacheManager.has('business'))
-  const [refreshing, setRefreshing] = useState(false)
+  const settingsQuery = useSettings()
+  const servicesQuery = useServices()
+  const promotionsQuery = usePromotions()
+  const loyaltyQuery = useLoyaltyProgram()
 
-  const [businessName, setBusinessName] = useState(() => {
-    const c = cacheManager.get('business')
-    return c?.sData?.business?.name ?? ''
-  })
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(() => {
-    const c = cacheManager.get('business')
-    return c?.sData?.avatarUrl ?? null
-  })
-  const [slug, setSlug] = useState(() => {
-    const c = cacheManager.get('business')
-    return c?.sData?.slug ?? ''
-  })
-  const [planName, setPlanName] = useState<string | null>(() => {
-    const c = cacheManager.get('business')
-    return c?.sData?.business?.plan?.name ?? null
-  })
-  const [teamCount, setTeamCount] = useState(() => {
-    const c = cacheManager.get('business')
-    return c?.sData?.business?.users?.length ?? 0
-  })
-  const [serviceCount, setServiceCount] = useState(() => {
-    const c = cacheManager.get('business')
-    return c?.services?.length ?? 0
-  })
-  const [activePromoCount, setActivePromoCount] = useState(() => {
-    const c = cacheManager.get('business')
-    if (!c?.promos) return 0
-    const now = new Date()
-    return c.promos.filter((p: any) => !p.validUntil || new Date(p.validUntil) >= now).length
-  })
-  const [loyaltyProgram, setLoyaltyProgram] = useState<LoyaltyProgram | null>(() => {
-    const c = cacheManager.get('business')
-    return c?.program ?? null
-  })
   const [copied, setCopied] = useState(false)
-  const [city, setCity] = useState(() => {
-    const c = cacheManager.get('business')
-    return c?.sData?.business?.city ?? ''
-  })
+
+  const sData = settingsQuery.data ?? null
+  const businessName = sData?.business?.name ?? ''
+  const avatarUrl = sData?.avatarUrl ?? null
+  const slug = sData?.slug ?? ''
+  const planName = sData?.business?.plan?.name ?? null
+  const teamCount = sData?.business?.users?.length ?? 0
+  const city = sData?.business?.city ?? 'Caracas'
+  const serviceCount = servicesQuery.data?.length ?? 0
+  const now = new Date()
+  const activePromoCount = (promotionsQuery.data ?? [])
+    .filter(p => !p.validUntil || new Date(p.validUntil) >= now).length
+  const loyaltyProgram = loyaltyQuery.data ?? null
 
   const isTeamPlan = planName?.toLowerCase() === 'team'
 
-  const load = useCallback(async (force = false) => {
-    const cache = cacheManager.get('business')
-    const timestamp = cacheManager.getTimestamp('business')
-    
-    if (cache) {
-      setBusinessName(cache.sData?.business?.name ?? '')
-      setAvatarUrl(cache.sData?.avatarUrl ?? null)
-      setSlug(cache.sData?.slug ?? '')
-      setPlanName(cache.sData?.business?.plan?.name ?? null)
-      setTeamCount(cache.sData?.business?.users?.length ?? 0)
-      setServiceCount(cache.services?.length ?? 0)
-      setCity(cache.sData?.business?.city ?? 'Caracas')
-      const now = new Date()
-      setActivePromoCount(
-        cache.promos?.filter((p: any) => !p.validUntil || new Date(p.validUntil) >= now).length ?? 0
-      )
-      setLoyaltyProgram(cache.program ?? null)
-      
-      // If cache is fresh and we aren't forcing, skip background reload
-      if (!force && (Date.now() - timestamp < 30000)) {
-        setLoading(false)
-        return
-      }
-    } else {
-      setLoading(true)
-    }
-
-    try {
-      const results = await Promise.allSettled([
-        getSettings(),
-        getServices(),
-        getPromotions(),
-        getLoyaltyProgram(),
-      ])
-
-      const sData = results[0].status === 'fulfilled' ? results[0].value as any : null
-      const services = results[1].status === 'fulfilled' ? results[1].value as any[] : []
-      const promos = results[2].status === 'fulfilled' ? results[2].value as any[] : []
-      const program = results[3].status === 'fulfilled' ? results[3].value as any : null
-
-      const newBusinessName = sData?.business?.name ?? ''
-      const newAvatarUrl = sData?.avatarUrl ?? null
-      const newSlug = sData?.slug ?? ''
-      const newPlanName = sData?.business?.plan?.name ?? null
-      const newTeamCount = sData?.business?.users?.length ?? 0
-      const newServiceCount = services.length
-      const newCity = sData?.business?.city ?? 'Caracas'
-      const now = new Date()
-      const newActivePromoCount = promos.filter((p: any) => !p.validUntil || new Date(p.validUntil) >= now).length
-      const newLoyaltyProgram = program
-
-      setBusinessName(newBusinessName)
-      setAvatarUrl(newAvatarUrl)
-      setSlug(newSlug)
-      setPlanName(newPlanName)
-      setTeamCount(newTeamCount)
-      setServiceCount(newServiceCount)
-      setCity(newCity)
-      setActivePromoCount(newActivePromoCount)
-      setLoyaltyProgram(newLoyaltyProgram)
-
-      const businessCacheData = {
-        sData,
-        services,
-        promos,
-        program,
-      }
-      await cacheManager.saveToDisk('business', businessCacheData)
-    } catch (e) {
-      ob.logError('BusinessScreen load', e)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    // 1. Load from disk first
-    cacheManager.loadFromDisk('business').then(cache => {
-      if (cache) {
-        setBusinessName(cache.sData?.business?.name ?? '')
-        setAvatarUrl(cache.sData?.avatarUrl ?? null)
-        setSlug(cache.sData?.slug ?? '')
-        setPlanName(cache.sData?.business?.plan?.name ?? null)
-        setTeamCount(cache.sData?.business?.users?.length ?? 0)
-        setServiceCount(cache.services?.length ?? 0)
-        setCity(cache.sData?.business?.city ?? 'Caracas')
-        const now = new Date()
-        setActivePromoCount(
-          cache.promos?.filter((p: any) => !p.validUntil || new Date(p.validUntil) >= now).length ?? 0
-        )
-        setLoyaltyProgram(cache.program ?? null)
-      }
-    })
-  }, [])
-
-  // Telemetry of render time
-  useEffect(() => {
-    const endTrack = ob.trackTime()
-    load(false).then(() => {
-      ob.logPerformance('BusinessScreen', endTrack())
-    })
-  }, [load])
-
-  // Reactive subscription
-  useEffect(() => {
-    return cacheManager.subscribe('business', () => {
-      if (!cacheManager.has('business')) {
-        load(true)
-      }
-    })
-  }, [load])
-
-  const onRefresh = async () => { setRefreshing(true); await load(true); setRefreshing(false) }
+  const loading = settingsQuery.isLoading && !sData
+  const refreshing = settingsQuery.isRefetching
+  const onRefresh = () => {
+    settingsQuery.refetch()
+    servicesQuery.refetch()
+    promotionsQuery.refetch()
+    loyaltyQuery.refetch()
+  }
 
   async function handleCopy() {
     await Clipboard.setStringAsync(`${APP_URL}/p/${slug}`)
@@ -283,7 +150,7 @@ export default function BusinessScreen() {
             <View style={styles.hero}>
               <View style={styles.avatarContainer}>
                 {avatarUrl ? (
-                  <Image source={{ uri: avatarUrl }} style={styles.avatarCircle} />
+                  <Image source={{ uri: avatarUrl }} style={styles.avatarCircle} cachePolicy="memory-disk" transition={100} />
                 ) : (
                   <View style={styles.avatarCircle}>
                     {businessName ? (

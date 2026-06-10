@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Animated, Platform, Alert, KeyboardAvoidingView,
@@ -6,17 +6,14 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import {
-  getClients, getServices, getSettings, createAppointment,
-  getBusinessTZ,
-  type ClientItem, type ServiceItem, type SettingsData,
-} from '../../lib/api'
+import { useQuery } from '@tanstack/react-query'
+import { getBusinessTZ, type ClientItem, type ServiceItem } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO } from '../../lib/utils'
 import DatePickerModal from '../../components/DatePickerModal'
 import { getAvailableSlots } from '@musa/availability'
 import { supabase } from '../../lib/supabase'
 import { toZonedTime, format } from 'date-fns-tz'
-import { cacheManager } from '../../lib/cache'
+import { useClients, useServices, useSettings, useCreateAppointment, keys } from '../../hooks/queries'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -55,11 +52,19 @@ export default function NewAppointmentScreen() {
   const tomorrow = addDays(today, 1)
   const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 
-  const [loading, setLoading] = useState(true)
-  const [clients, setClients] = useState<ClientItem[]>([])
-  const [services, setServices] = useState<ServiceItem[]>([])
-  const [settingsData, setSettingsData] = useState<SettingsData | null>(null)
-  const [businessTz, setBusinessTz] = useState('America/Caracas')
+  const clientsQuery = useClients()
+  const servicesQuery = useServices()
+  const settingsQuery = useSettings()
+  const createAppointmentMutation = useCreateAppointment()
+
+  const clients: ClientItem[] = clientsQuery.data ?? []
+  const services: ServiceItem[] = servicesQuery.data ?? []
+  const settingsData = settingsQuery.data ?? null
+  const businessTz = getBusinessTZ(settingsData)
+  const loading =
+    (clientsQuery.isLoading && !clientsQuery.data) ||
+    (servicesQuery.isLoading && !servicesQuery.data) ||
+    (settingsQuery.isLoading && !settingsQuery.data)
 
   // form state
   const [clientQuery, setClientQuery] = useState('')
@@ -73,9 +78,6 @@ export default function NewAppointmentScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [selectedSlot, setSelectedSlot] = useState<{ start: Date; end: Date } | null>(null)
   const [notes, setNotes] = useState('')
-  const [creating, setCreating] = useState(false)
-  const [slotsLoading, setSlotsLoading] = useState(false)
-  const [availableSlots, setAvailableSlots] = useState<Array<{ start: Date; end: Date }>>([])
 
   const insets = useSafeAreaInsets()
   const dateStr = dateMode === 'today'
@@ -85,51 +87,25 @@ export default function NewAppointmentScreen() {
       : pickedDate
   const businessId = settingsData?.businessId || settingsData?.business?.id
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const [cls, svcs, sdata] = await Promise.all([getClients(), getServices(), getSettings()])
-      setClients(cls)
-      setServices(svcs)
-      setSettingsData(sdata)
-      setBusinessTz(getBusinessTZ(sdata))
-    } catch { /* silently fail */ }
-    finally { setLoading(false) }
-  }, [])
-
-  useEffect(() => { load() }, [load])
-
-  useEffect(() => {
-    let cancelled = false
-
-    if (!selectedService?.id || !dateStr || !businessId) {
-      setAvailableSlots([])
-      setSlotsLoading(false)
-      return
-    }
-
-    setSlotsLoading(true)
-
-    getAvailableSlots({
-      businessId,
+  // Slots come straight from React Query keyed by (business, date, service):
+  // changing any of the three triggers exactly one fetch, no effect loops.
+  // staleTime 0 + exclusion from the persister keep them always fresh.
+  const slotsQuery = useQuery({
+    queryKey: keys.availableSlots(businessId, dateStr, selectedService?.id),
+    queryFn: () => getAvailableSlots({
+      businessId: businessId!,
       date: dateStr,
-      serviceId: selectedService.id,
+      serviceId: selectedService!.id,
       supabase,
-    })
-      .then(result => {
-        if (!cancelled) setAvailableSlots(result)
-      })
-      .catch(() => {
-        if (!cancelled) setAvailableSlots([])
-      })
-      .finally(() => {
-        if (!cancelled) setSlotsLoading(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [selectedService?.id, dateStr, businessId])
+    }),
+    enabled: !!(selectedService?.id && dateStr && businessId),
+    staleTime: 0,
+    gcTime: 60_000,
+    retry: 1,
+  })
+  const availableSlots = slotsQuery.data ?? []
+  const slotsLoading = slotsQuery.isLoading && !!(selectedService?.id && businessId)
+  const creating = createAppointmentMutation.isPending
 
   const filteredClients = clientQuery.length > 0
     ? clients.filter(c =>
@@ -160,26 +136,21 @@ export default function NewAppointmentScreen() {
     if (!selectedService) { Alert.alert('', 'Selecciona un servicio'); return }
     if (!selectedSlot) { Alert.alert('', 'Selecciona una hora'); return }
 
-    setCreating(true)
-    const businessId = settingsData?.businessId || settingsData?.business?.id || undefined
     try {
-      const result = await createAppointment({
+      await createAppointmentMutation.mutateAsync({
         clientId: clientId,
         serviceId: selectedService.id,
         startTime: selectedSlot.start.toISOString(),
         endTime: selectedSlot.end.toISOString(),
         notes: notes.trim() || undefined,
         status: 'confirmed',
-        businessId: businessId,
+        businessId: settingsData?.businessId || settingsData?.business?.id || undefined,
         businessTimezone: businessTz,
       })
-      cacheManager.invalidate('dashboard')
-      cacheManager.invalidate('calendar')
-      cacheManager.invalidate('stats')
       router.back()
     } catch (e) {
       Alert.alert('Error', 'No se pudo crear la cita. Intenta de nuevo.')
-    } finally { setCreating(false) }
+    }
   }
 
   return (

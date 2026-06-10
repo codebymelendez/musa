@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Animated, Modal, KeyboardAvoidingView,
@@ -11,7 +11,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import { supabase } from '../../lib/supabase'
-import { getSettings, updateSettings, type SettingsData } from '../../lib/api'
+import { type SettingsData } from '../../lib/api'
+import { useSettings, useUpdateSettings } from '../../hooks/queries'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials, hhmmToDisplay } from '../../lib/utils'
 
 const APP_URL = (process.env.EXPO_PUBLIC_APP_URL ?? 'https://getmusa.app').replace(/\/$/, '')
@@ -149,50 +150,40 @@ function SRow({
 type LoadState = 'loading' | 'error' | 'ready'
 
 export default function SettingsTabScreen() {
-  const [loadState, setLoadState] = useState<LoadState>('loading')
-  const [profile, setProfile] = useState<SettingsData | null>(null)
-  const [name, setName] = useState('')
-  const [whatsapp, setWhatsapp] = useState('')
-  const [instagram, setInstagram] = useState('')
+  const settingsQuery = useSettings()
+  const updateSettingsMutation = useUpdateSettings()
   const [copied, setCopied] = useState(false)
-  const [bookingEnabled, setBookingEnabled] = useState(true)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [showEditName, setShowEditName] = useState(false)
   const [showEditWhatsapp, setShowEditWhatsapp] = useState(false)
   const [showEditInstagram, setShowEditInstagram] = useState(false)
 
-  const load = useCallback(async () => {
-    setLoadState('loading')
-    try {
-      const data = await getSettings()
-      if (!data) { setLoadState('error'); return }
-      setProfile(data)
-      setName(data.name ?? '')
-      setWhatsapp(data.whatsapp ?? '')
-      setInstagram(data.instagram ?? '')
-      setBookingEnabled(data.settings?.bookingEnabled ?? true)
-      setLoadState('ready')
-    } catch { setLoadState('error') }
-  }, [])
+  const profile: SettingsData | null = settingsQuery.data ?? null
+  const loadState: LoadState = profile
+    ? 'ready'
+    : settingsQuery.isLoading
+      ? 'loading'
+      : 'error'
 
-  useEffect(() => { load() }, [load])
+  const name = profile?.name ?? ''
+  const whatsapp = profile?.whatsapp ?? ''
+  const instagram = profile?.instagram ?? ''
+  const bookingEnabled = profile?.settings?.bookingEnabled ?? true
+
+  const load = () => { settingsQuery.refetch() }
 
   async function saveName(newName: string) {
-    await updateSettings({ name: newName })
-    setName(newName)
-    setProfile(prev => prev ? { ...prev, name: newName } : prev)
+    await updateSettingsMutation.mutateAsync({ name: newName })
     setShowEditName(false)
   }
 
   async function saveWhatsapp(newVal: string) {
-    await updateSettings({ whatsapp: newVal })
-    setWhatsapp(newVal)
+    await updateSettingsMutation.mutateAsync({ whatsapp: newVal })
     setShowEditWhatsapp(false)
   }
 
   async function saveInstagram(newVal: string) {
-    await updateSettings({ instagram: newVal })
-    setInstagram(newVal)
+    await updateSettingsMutation.mutateAsync({ instagram: newVal })
     setShowEditInstagram(false)
   }
 
@@ -241,22 +232,19 @@ export default function SettingsTabScreen() {
         .from('staff-avatars')
         .getPublicUrl(path)
 
-      await updateSettings({ avatarUrl: publicUrl })
-      setProfile(prev => prev ? { ...prev, avatarUrl: publicUrl } : prev)
+      await updateSettingsMutation.mutateAsync({ avatarUrl: publicUrl })
     } catch (e) {
       console.error('[avatar upload]', e)
       Alert.alert('Error', 'No se pudo subir la foto')
     } finally { setUploadingAvatar(false) }
   }
 
-  async function handleToggleBooking(val: boolean) {
-    setBookingEnabled(val)
-    try {
-      await updateSettings({ settings: { bookingEnabled: val } })
-    } catch {
-      setBookingEnabled(!val)
-      Alert.alert('Error', 'No se pudo actualizar las reservas online')
-    }
+  function handleToggleBooking(val: boolean) {
+    // The mutation applies the change optimistically and rolls back on error.
+    updateSettingsMutation.mutate(
+      { settings: { bookingEnabled: val } },
+      { onError: () => Alert.alert('Error', 'No se pudo actualizar las reservas online') }
+    )
   }
 
   function handleSignOut() {
@@ -281,7 +269,7 @@ export default function SettingsTabScreen() {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           {profile?.avatarUrl ? (
-            <Image source={{ uri: profile.avatarUrl }} style={styles.headerAvatar} />
+            <Image source={{ uri: profile.avatarUrl }} style={styles.headerAvatar} cachePolicy="memory-disk" transition={100} />
           ) : (
             <View style={styles.headerAvatarFallback}>
               <Text style={styles.headerAvatarText}>
@@ -320,7 +308,7 @@ export default function SettingsTabScreen() {
                 activeOpacity={0.78}
               >
                 {profile.avatarUrl ? (
-                  <Image source={{ uri: profile.avatarUrl }} style={styles.bentoAvatar} />
+                  <Image source={{ uri: profile.avatarUrl }} style={styles.bentoAvatar} cachePolicy="memory-disk" transition={100} />
                 ) : (
                   <View style={styles.bentoAvatar}>
                     <Text style={styles.bentoAvatarText}>

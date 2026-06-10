@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Linking, Modal, RefreshControl,
@@ -9,11 +9,12 @@ import DatePickerModal, { formatDateSpanish } from '../../components/DatePickerM
 import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, router } from 'expo-router'
 import {
-  getClientById, updateClient,
-  getLoyaltyProgram, findLoyaltyAccountByClientId, redeemLoyaltyReward,
   type ClientItem, type AppointmentStatus, type AppointmentPayment, type LoyaltyProgram, type LoyaltyAccount,
 } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials, formatShortDate, formatMoney } from '../../lib/utils'
+import {
+  useClient, useUpdateClient, useLoyaltyProgram, useLoyaltyAccounts, useRedeemLoyaltyReward,
+} from '../../hooks/queries'
 
 // ─── status pill (mini) ───────────────────────────────────────────────────────
 
@@ -364,45 +365,40 @@ type State = { kind: 'loading' } | { kind: 'error' } | { kind: 'ok'; data: Clien
 
 export default function ClientDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
-  const [state, setState] = useState<State>({ kind: 'loading' })
-  const [refreshing, setRefreshing] = useState(false)
   const [editModal, setEditModal] = useState(false)
 
-  const [loyaltyProgram, setLoyaltyProgram] = useState<LoyaltyProgram | null>(null)
-  const [loyaltyAccount, setLoyaltyAccount] = useState<LoyaltyAccount | null>(null)
-  const [redeeming, setRedeeming] = useState(false)
+  const clientQuery = useClient(id)
+  const loyaltyProgramQuery = useLoyaltyProgram()
+  const loyaltyAccountsQuery = useLoyaltyAccounts()
+  const updateClientMutation = useUpdateClient(id ?? '')
+  const redeemMutation = useRedeemLoyaltyReward()
 
-  const load = useCallback(async () => {
-    if (!id) return
-    setState({ kind: 'loading' })
-    try {
-      const [data, program, account] = await Promise.all([
-        getClientById(id),
-        getLoyaltyProgram(),
-        findLoyaltyAccountByClientId(id),
-      ])
-      setState(data ? { kind: 'ok', data } : { kind: 'error' })
-      setLoyaltyProgram(program)
-      setLoyaltyAccount(account)
-    } catch { setState({ kind: 'error' }) }
-  }, [id])
+  const state: State = clientQuery.data
+    ? { kind: 'ok', data: clientQuery.data }
+    : clientQuery.isError || clientQuery.data === null
+      ? { kind: 'error' }
+      : { kind: 'loading' }
 
-  useEffect(() => { load() }, [load])
-  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false) }
+  const loyaltyProgram: LoyaltyProgram | null = loyaltyProgramQuery.data ?? null
+  const loyaltyAccount: LoyaltyAccount | null =
+    (loyaltyAccountsQuery.data ?? []).find(a => a.clientId === id) ?? null
+
+  const refreshing = clientQuery.isRefetching
+  const load = () => { clientQuery.refetch() }
+  const onRefresh = () => {
+    clientQuery.refetch()
+    loyaltyProgramQuery.refetch()
+    loyaltyAccountsQuery.refetch()
+  }
 
   async function saveClient(data: ClientUpdate) {
     if (!id) return
     try {
-      await updateClient(id, data)
+      await updateClientMutation.mutateAsync(data)
     } catch {
       Alert.alert('Error', 'No se pudieron guardar los cambios')
       return
     }
-    setState(prev =>
-      prev.kind === 'ok'
-        ? { ...prev, data: { ...prev.data, ...data } }
-        : prev
-    )
     setEditModal(false)
   }
 
@@ -416,18 +412,13 @@ export default function ClientDetailScreen() {
         {
           text: 'Confirmar canje',
           onPress: async () => {
-            setRedeeming(true)
             try {
-              const result = await redeemLoyaltyReward(loyaltyAccount.id)
-              setLoyaltyAccount(prev => prev
-                ? { ...prev, totalPoints: prev.totalPoints - result.pointsUsed }
-                : prev
-              )
+              const result = await redeemMutation.mutateAsync(loyaltyAccount.id)
               Alert.alert('', `¡Canje registrado! Se descontaron ${result.pointsUsed} puntos.`)
             } catch (e) {
               const msg = e instanceof Error ? e.message : 'Error al registrar el canje'
               Alert.alert('Error', msg)
-            } finally { setRedeeming(false) }
+            }
           },
         },
       ]

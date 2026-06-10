@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Animated, Share, Linking, Alert,
@@ -7,8 +7,8 @@ import * as Clipboard from 'expo-clipboard'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import { getSettings, updateSettings } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF } from '../../lib/utils'
+import { useSettings, useUpdateSettings } from '../../hooks/queries'
 
 const APP_URL = (process.env.EXPO_PUBLIC_APP_URL ?? 'https://getmusa.app').replace(/\/$/, '')
 
@@ -33,13 +33,8 @@ function Skeleton() {
 type LoadState = 'loading' | 'error' | 'ready'
 
 export default function BusinessSettingsScreen() {
-  const [loadState, setLoadState] = useState<LoadState>('loading')
-  const [slug, setSlug] = useState('')
-  const [planName, setPlanName] = useState('')
-  const [planLimits, setPlanLimits] = useState<{ maxMonthlyAppointments?: number; maxStaff?: number }>({})
-  const [planStatus, setPlanStatus] = useState('free')
-  const [planExpiresAt, setPlanExpiresAt] = useState<string | null>(null)
-  const [latestPayment, setLatestPayment] = useState<any | null>(null)
+  const settingsQuery = useSettings()
+  const updateSettingsMutation = useUpdateSettings()
 
   const [businessName, setBusinessName] = useState('')
   const [address, setAddress] = useState('')
@@ -48,41 +43,47 @@ export default function BusinessSettingsScreen() {
   const [instagram, setInstagram] = useState('')
 
   const [dirty, setDirty] = useState(false)
-  const [saving, setSaving] = useState(false)
   const [savedMsg, setSavedMsg] = useState(false)
   const [copied, setCopied] = useState(false)
 
   const insets = useSafeAreaInsets()
 
-  const load = useCallback(async () => {
-    setLoadState('loading')
-    try {
-      const data = await getSettings()
-      if (!data) { setLoadState('error'); return }
-      setSlug(data.slug ?? '')
-      setBusinessName(data.business?.name ?? '')
-      setAddress(data.business?.address ?? '')
-      setDescription(data.bio ?? '')
-      setWhatsapp(data.whatsapp ?? '')
-      setInstagram(data.instagram ?? '')
-      setPlanName(data.business?.plan?.name ?? 'Free')
-      setPlanLimits(data.business?.plan?.limits ?? {})
-      setPlanStatus(data.business?.planStatus ?? 'free')
-      setPlanExpiresAt(data.business?.planExpiresAt ?? null)
-      setLatestPayment(data.latestPayment ?? null)
-      setDirty(false)
-      setLoadState('ready')
-    } catch { setLoadState('error') }
-  }, [])
+  const data = settingsQuery.data ?? null
+  const loadState: LoadState = data
+    ? 'ready'
+    : settingsQuery.isLoading
+      ? 'loading'
+      : 'error'
 
-  useEffect(() => { load() }, [load])
+  const slug = data?.slug ?? ''
+  const planName = data?.business?.plan?.name ?? 'Free'
+  const planLimits = data?.business?.plan?.limits ?? {}
+  const planStatus = data?.business?.planStatus ?? 'free'
+  const planExpiresAt = data?.business?.planExpiresAt ?? null
+  const latestPayment = data?.latestPayment ?? null
+
+  // Seed the editable form once — background refetches must not overwrite
+  // what the user is typing.
+  const initializedRef = useRef(false)
+  useEffect(() => {
+    if (!data || initializedRef.current) return
+    initializedRef.current = true
+    setBusinessName(data.business?.name ?? '')
+    setAddress(data.business?.address ?? '')
+    setDescription(data.bio ?? '')
+    setWhatsapp(data.whatsapp ?? '')
+    setInstagram(data.instagram ?? '')
+    setDirty(false)
+  }, [data])
+
+  const saving = updateSettingsMutation.isPending
+  const load = () => { settingsQuery.refetch() }
 
   function markDirty() { setDirty(true) }
 
   async function handleSave() {
-    setSaving(true)
     try {
-      await updateSettings({
+      await updateSettingsMutation.mutateAsync({
         businessName: businessName.trim(),
         businessAddress: address.trim(),
         bio: description.trim(),
@@ -94,7 +95,7 @@ export default function BusinessSettingsScreen() {
       setTimeout(() => setSavedMsg(false), 2000)
     } catch {
       Alert.alert('Error', 'No se pudieron guardar los cambios')
-    } finally { setSaving(false) }
+    }
   }
 
   async function handleCopy() {

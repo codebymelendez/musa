@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, Switch,
   StyleSheet, Animated, Alert,
@@ -6,8 +6,8 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import { getSettings, updateSettings } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, SERIF } from '../../lib/utils'
+import { useSettings, useUpdateSettings } from '../../hooks/queries'
 
 type Method = {
   key: string
@@ -45,32 +45,30 @@ function Skeleton() {
 type LoadState = 'loading' | 'error' | 'ready'
 
 export default function PaymentMethodsScreen() {
-  const [loadState, setLoadState] = useState<LoadState>('loading')
-  const [active, setActive] = useState<string[]>([])
+  const settingsQuery = useSettings()
+  const updateSettingsMutation = useUpdateSettings()
   const [saving, setSaving] = useState<string | null>(null)
   const insets = useSafeAreaInsets()
 
-  const load = useCallback(async () => {
-    setLoadState('loading')
-    try {
-      const data = await getSettings()
-      if (!data) { setLoadState('error'); return }
-      setActive(data.settings?.paymentMethods ?? [])
-      setLoadState('ready')
-    } catch { setLoadState('error') }
-  }, [])
+  const data = settingsQuery.data ?? null
+  const loadState: LoadState = data
+    ? 'ready'
+    : settingsQuery.isLoading
+      ? 'loading'
+      : 'error'
 
-  useEffect(() => { load() }, [load])
+  // The settings query is the source of truth; the mutation updates it
+  // optimistically and rolls back on error.
+  const active = data?.settings?.paymentMethods ?? []
+
+  const load = () => { settingsQuery.refetch() }
 
   async function handleToggle(key: string, newVal: boolean) {
-    const prev = active
     const next = newVal ? [...active, key] : active.filter(k => k !== key)
-    setActive(next)
     setSaving(key)
     try {
-      await updateSettings({ settings: { paymentMethods: next } })
+      await updateSettingsMutation.mutateAsync({ settings: { paymentMethods: next } })
     } catch {
-      setActive(prev)
       Alert.alert('Error', 'No se pudo guardar el cambio')
     } finally { setSaving(null) }
   }
