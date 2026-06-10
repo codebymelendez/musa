@@ -6,14 +6,14 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import { PRIMARY, DARK, SURFACE, BORDER, GRAY, SERIF } from '../../lib/utils'
+import { PRIMARY, DARK, SURFACE, BORDER, GRAY, SERIF, normalizePaymentMethods, type CanonicalPaymentMethod } from '../../lib/utils'
 import { Pulse, Bone } from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
 import { useSettings, useUpdateSettings } from '../../hooks/queries'
 import { MaxWidthContainer } from '../../components/ui/MaxWidthContainer'
 
 type Method = {
-  key: string
+  key: CanonicalPaymentMethod
   label: string
   icon: React.ComponentProps<typeof Ionicons>['name']
   hint?: string
@@ -54,11 +54,14 @@ export default function PaymentMethodsScreen() {
 
   // The settings query is the source of truth; the mutation updates it
   // optimistically and rolls back on error.
-  const active = data?.settings?.paymentMethods ?? []
+  // Lectura defensiva: la BD puede traer valores legacy ("Efectivo", "Pago
+  // Móvil") duplicados con las keys canónicas — mapear + deduplicar siempre.
+  const active = normalizePaymentMethods(data?.settings?.paymentMethods ?? [])
 
   const load = () => { settingsQuery.refetch() }
 
   async function handleToggle(key: string, newVal: boolean) {
+    // active ya es canónico y deduplicado → se persiste solo formato canónico
     const next = newVal ? [...active, key] : active.filter(k => k !== key)
     setSaving(key)
     try {
@@ -141,7 +144,9 @@ export default function PaymentMethodsScreen() {
                 <View style={styles.pillsWrap}>
                   {active.map(key => (
                     <View key={key} style={styles.pill}>
-                      <Text style={styles.pillText}>{key}</Text>
+                      <Text style={styles.pillText}>
+                        {METHODS.find(m => m.key === key)?.label ?? key}
+                      </Text>
                     </View>
                   ))}
                 </View>

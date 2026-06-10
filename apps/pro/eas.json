@@ -1,5 +1,7 @@
 {
-  "cli": { "version": ">= 10.0.0" },
+  "cli": {
+    "version": ">= 10.0.0"
+  },
   "build": {
     "development": {
       "developmentClient": true,
@@ -7,24 +9,32 @@
     },
     "preview": {
       "distribution": "internal",
-      "ios": { "simulator": false },
-      "android": { "buildType": "apk" },
+      "ios": {
+        "simulator": false
+      },
+      "android": {
+        "buildType": "apk"
+      },
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://eeqecovvimohstwdmnkz.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_HiRGtaPRccnrbu5xmNgOLg_CWoE2Keh",
         "EXPO_PUBLIC_API_URL": "https://getmusa.app",
         "EXPO_PUBLIC_APP_URL": "https://getmusa.app",
-        "EXPO_PUBLIC_APP_ENV": "preview"
+        "EXPO_PUBLIC_APP_ENV": "preview",
+        "EXPO_PUBLIC_GOOGLE_PLACES_KEY": "AIzaSyCYqW7q46eelGXHq7FrxJe9alpgEzLjkf4"
       }
     },
     "production": {
-      "android": { "buildType": "app-bundle" },
+      "android": {
+        "buildType": "app-bundle"
+      },
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://eeqecovvimohstwdmnkz.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_HiRGtaPRccnrbu5xmNgOLg_CWoE2Keh",
         "EXPO_PUBLIC_API_URL": "https://getmusa.app",
         "EXPO_PUBLIC_APP_URL": "https://getmusa.app",
-        "EXPO_PUBLIC_APP_ENV": "production"
+        "EXPO_PUBLIC_APP_ENV": "production",
+        "EXPO_PUBLIC_GOOGLE_PLACES_KEY": "AIzaSyCYqW7q46eelGXHq7FrxJe9alpgEzLjkf4"
       }
     }
   },

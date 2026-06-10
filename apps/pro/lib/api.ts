@@ -31,7 +31,7 @@ function normalizeAppointment(apt: AppointmentItem): AppointmentItem {
   }
 }
 
-async function authHeaders(): Promise<Record<string, string> | null> {
+export async function authHeaders(): Promise<Record<string, string> | null> {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session?.access_token) return null
   return {

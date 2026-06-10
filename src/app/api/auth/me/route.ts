@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { getSession } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { parseBusinessHoursToSettings } from "@/lib/utils";
+import { parsePaymentMethods } from "@/lib/paymentMethods";
 
 export async function GET(req: NextRequest) {
   const response = NextResponse.json({ user: null });
@@ -83,7 +84,7 @@ export async function GET(req: NextRequest) {
             workDays: computedHours.workDays,
             startHour: computedHours.startHour,
             endHour: computedHours.endHour,
-            paymentMethods: s.paymentMethods ? JSON.parse(s.paymentMethods) : [],
+            paymentMethods: parsePaymentMethods(s.paymentMethods),
           }
         : null,
     };

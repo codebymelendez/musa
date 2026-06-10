@@ -62,6 +62,55 @@ export function formatBs(amount: number): string {
   return `Bs ${grouped},${dec}`
 }
 
+// ─── Métodos de pago ─────────────────────────────────────────────────────────
+// La BD tiene mezcla de formato viejo (etiquetas: "Efectivo", "Pago Móvil",
+// "Divisas") y nuevo (keys canónicas). Mapear + deduplicar siempre antes de
+// usar la lista, y persistir solo keys canónicas.
+// ⚠️ Mapa duplicado en src/lib/paymentMethods.ts (no hay package compartido
+// consumido por ambas apps). Si cambias algo aquí, cámbialo también allí.
+
+export const CANONICAL_PAYMENT_METHODS = [
+  'efectivo_usd', 'efectivo_bs', 'pago_movil', 'zelle', 'transferencia', 'otro',
+] as const
+
+export type CanonicalPaymentMethod = (typeof CANONICAL_PAYMENT_METHODS)[number]
+
+// Comparación case/acento-tolerante
+function foldPaymentKey(value: string): string {
+  return value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
+}
+
+const LEGACY_PAYMENT_MAP: Record<string, CanonicalPaymentMethod> = {
+  'efectivo': 'efectivo_usd',
+  'divisas': 'efectivo_usd',
+  'pago movil': 'pago_movil',
+  'zelle': 'zelle',
+  'transferencia': 'transferencia',
+  'transferencia bancaria': 'transferencia',
+}
+
+export function normalizePaymentMethods(raw: unknown): CanonicalPaymentMethod[] {
+  if (!Array.isArray(raw)) return []
+  const out: CanonicalPaymentMethod[] = []
+  for (const item of raw) {
+    if (typeof item !== 'string' || !item.trim()) continue
+    const folded = foldPaymentKey(item)
+    let canonical: CanonicalPaymentMethod
+    if ((CANONICAL_PAYMENT_METHODS as readonly string[]).includes(folded)) {
+      canonical = folded as CanonicalPaymentMethod
+    } else if (LEGACY_PAYMENT_MAP[folded]) {
+      canonical = LEGACY_PAYMENT_MAP[folded]
+    } else {
+      canonical = 'otro'
+      if (__DEV__) {
+        console.error(`[paymentMethods] valor no reconocido → "otro": "${item}"`)
+      }
+    }
+    if (!out.includes(canonical)) out.push(canonical)
+  }
+  return out
+}
+
 // HHMM integer (e.g. 830) → { h: '08', m: '30' }
 export function hhmmToParts(hhmm: number): { h: string; m: string } {
   return {

@@ -73,11 +73,10 @@ Los formularios enviaban datos con checks mínimos (`if (!name.trim())`). Se cre
 | Fidelidad (`settings/loyalty`) | `loyaltyFormSchema` | umbrales enteros ≥ 1, descripción |
 | Ajustes negocio (`settings/`) | `businessSettingsFormSchema` | nombre, WhatsApp 7–15 dígitos, handle Instagram |
 
-### M-2 · Clave de Google Places viaja en el binario 📋 **ACCIÓN DEL OWNER**
-`EXPO_PUBLIC_GOOGLE_PLACES_KEY` se embebe en el binario (`app.config.js` → `android.config.googleMaps.apiKey` y `BusinessInfoScreen`). Cualquiera puede extraerla del APK/IPA. En Google Cloud Console:
-1. **Restricción de aplicación:** Android apps → package `app.getmusa.pro` + huella SHA-1 del keystore de EAS; iOS apps → bundle `app.getmusa.pro`.
-2. **Restricción de APIs:** limitar a *Places API*, *Maps SDK for Android/iOS* y *Time Zone API* (la pantalla de negocio llama `maps.googleapis.com/maps/api/timezone` vía fetch — nota: la restricción por app Android/iOS **no aplica a llamadas REST** como Time Zone; considerar mover esa llamada al backend o usar una key separada restringida).
-3. Activar alertas de cuota.
+### M-2 · Clave de Google Places viaja en el binario ✅ **MITIGADO (2026-06-10)** / 📋 acción residual del owner
+Las llamadas REST (Places Autocomplete/Details y Time Zone) ya **no** usan key en el cliente: pasan por el proxy autenticado del backend (`/api/google/place/*`, `/api/google/timezone`) con `GOOGLE_MAPS_SERVER_KEY` (variable de servidor en Vercel, restringida por API: Places API + Time Zone API, sin restricción de app/referrer).
+
+Residual: `EXPO_PUBLIC_GOOGLE_PLACES_KEY` solo queda en `app.config.js` para el **SDK nativo de mapas** (`android.config.googleMaps.apiKey`). Esa key debe restringirse en Google Cloud Console a *Maps SDK for Android/iOS* únicamente, con restricción de aplicación (package `app.getmusa.pro` + SHA-1 de EAS / bundle iOS) y alertas de cuota.
 
 ### M-3 · Caché con PII en AsyncStorage sin cifrar 📋 (riesgo residual aceptado)
 `musa-pro-query-cache` guarda nombres/teléfonos de clientas e ingresos en texto plano (sandbox de la app). Mitigado por A-1 (se purga al cerrar sesión). Si se quiere defensa adicional en dispositivos comprometidos/rooteados: cifrar el snapshot con una clave en SecureStore o reducir `maxAge`.

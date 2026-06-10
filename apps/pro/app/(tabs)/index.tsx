@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo } from 'react'
+import { useFocusEffect } from 'expo-router'
 import { View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -15,8 +16,10 @@ import EmptyState from '../../components/ui/EmptyState'
 import { PRIMARY, DARK, SURFACE, GRAY, SERIF, formatTime, isBs } from '../../lib/utils'
 import { useDashboard } from '../../hooks/queries'
 
-function getGreeting(tz: string): string {
-  const h = new Date(new Date().toLocaleString('en-US', { timeZone: tz })).getHours()
+// Saludo según la hora LOCAL del dispositivo (no la timezone del negocio):
+// quien está en Madrid con negocio en Caracas debe ver "Buenos días" a sus 9:00.
+function getGreeting(): string {
+  const h = new Date().getHours()
   if (h >= 5 && h < 12) return 'Buenos días'
   if (h >= 12 && h < 19) return 'Buenas tardes'
   return 'Buenas noches'
@@ -25,6 +28,11 @@ function getGreeting(tz: string): string {
 export default function HomeScreen() {
   const { data, isLoading, isError, refetch, isRefetching } = useDashboard()
   const [showAddClient, setShowAddClient] = useState(false)
+
+  // Recalculado al recuperar foco: con caché persistido de React Query el home
+  // puede montar con datos de hace horas y el saludo quedaría congelado.
+  const [greeting, setGreeting] = useState(getGreeting)
+  useFocusEffect(useCallback(() => { setGreeting(getGreeting()) }, []))
 
   const loading = isLoading && !data
   const businessTz = data?.businessTz ?? 'America/Caracas'
@@ -104,7 +112,7 @@ export default function HomeScreen() {
     <View>
       {/* ─── Greeting & Profile ─── */}
       <View style={styles.greetingSection}>
-        <Text style={styles.sublabel}>{getGreeting(businessTz).toUpperCase()}</Text>
+        <Text style={styles.sublabel}>{greeting.toUpperCase()}</Text>
         <Text style={styles.greetingName}>{userName || 'Bienvenida'}</Text>
       </View>
 

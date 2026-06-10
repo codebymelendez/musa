@@ -18,12 +18,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '../../lib/supabase'
 import { ob } from '../../lib/observability'
-import { getSettings } from '../../lib/api'
+import { getSettings, authHeaders } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials } from '../../lib/utils'
 import { keys } from '../../hooks/queries'
 import { MaxWidthContainer } from '../ui/MaxWidthContainer'
 
-const GOOGLE_PLACES_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_KEY ?? ''
+// Las llamadas a Google Places / Time Zone pasan por nuestro proxy autenticado
+// (/api/google/*); la key de Google vive solo en el servidor.
+const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
 interface BusinessHoursState {
   id?: string
@@ -154,6 +156,50 @@ export default function BusinessInfoScreen() {
   const insets = useSafeAreaInsets()
   const placesRef = useRef<any>(null)
   const mapRef = useRef<MapView | null>(null)
+
+  // El header Authorization debe existir al montar GooglePlacesAutocomplete,
+  // así que resolvemos el token antes de renderizarlo.
+  const [placesToken, setPlacesToken] = useState<string | null>(null)
+  const [addressSearchError, setAddressSearchError] = useState(false)
+  const addressRef = useRef('')
+  addressRef.current = address
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (cancelled) return
+      if (!session?.access_token) {
+        setAddressSearchError(true)
+        return
+      }
+      setPlacesToken(session.access_token)
+      // Probe: la librería traga respuestas no-200, así que detectamos aquí
+      // un proxy sin sesión (401) o sin key configurada (503).
+      try {
+        const res = await fetch(`${API_URL}/api/google/place/autocomplete/json?language=es`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        })
+        if (!cancelled && (res.status === 401 || res.status === 503)) {
+          setAddressSearchError(true)
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setAddressSearchError(true)
+          ob.logError('business-info/places-probe', e)
+        }
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  // Si el autocomplete monta después de que el formulario ya se sembró,
+  // re-sembramos el texto de la dirección.
+  useEffect(() => {
+    if (!placesToken) return
+    const t = setTimeout(() => placesRef.current?.setAddressText(addressRef.current), 150)
+    return () => clearTimeout(t)
+  }, [placesToken])
 
   // Animate map when coordinates change
   useEffect(() => {
@@ -623,58 +669,86 @@ export default function BusinessInfoScreen() {
 
                 <Text style={styles.label}>Dirección física del negocio</Text>
                 <View style={styles.autocompleteWrapper}>
-                  <GooglePlacesAutocomplete
-                    ref={placesRef}
-                    keyboardShouldPersistTaps="handled"
-                    placeholder="Busca la dirección..."
-                    fetchDetails={true}
-                    onPress={async (data, details = null) => {
-                      if (details) {
-                        const detailsAny = details as any
-                        const lat = detailsAny.geometry.location.lat
-                        const lng = detailsAny.geometry.location.lng
-                        const formattedAddress = detailsAny.formatted_address
+                  {placesToken ? (
+                    <GooglePlacesAutocomplete
+                      ref={placesRef}
+                      keyboardShouldPersistTaps="handled"
+                      placeholder="Busca la dirección..."
+                      fetchDetails={true}
+                      requestUrl={{
+                        useOnPlatform: 'all',
+                        url: `${API_URL}/api/google`,
+                        headers: { Authorization: `Bearer ${placesToken}` },
+                      }}
+                      onPress={async (data, details = null) => {
+                        if (details) {
+                          const detailsAny = details as any
+                          const lat = detailsAny.geometry.location.lat
+                          const lng = detailsAny.geometry.location.lng
+                          const formattedAddress = detailsAny.formatted_address
 
-                        const countryComp = detailsAny.address_components.find((c: any) => c.types.includes('country'))
-                        const detectedCountry = countryComp ? countryComp.short_name : 'VE'
+                          const countryComp = detailsAny.address_components.find((c: any) => c.types.includes('country'))
+                          const detectedCountry = countryComp ? countryComp.short_name : 'VE'
 
-                        setAddress(formattedAddress)
-                        setLatitude(lat)
-                        setLongitude(lng)
-                        setCountry(detectedCountry)
+                          setAddress(formattedAddress)
+                          setLatitude(lat)
+                          setLongitude(lng)
+                          setCountry(detectedCountry)
+                          setAddressSearchError(false)
 
-                        // Fetch Timezone dynamically using Places API coordinates
-                        if (GOOGLE_PLACES_API_KEY) {
+                          // Timezone vía proxy; si falla se conserva la actual
                           try {
-                            const tzRes = await fetch(
-                              `https://maps.googleapis.com/maps/api/timezone/json?location=${lat},${lng}&timestamp=${Math.floor(Date.now() / 1000)}&key=${GOOGLE_PLACES_API_KEY}`
-                            )
-                            const tzData = await tzRes.json()
-                            if (tzData.timeZoneId) {
-                              setTimezone(tzData.timeZoneId)
+                            const headers = await authHeaders()
+                            if (headers) {
+                              const tzRes = await fetch(
+                                `${API_URL}/api/google/timezone?location=${lat},${lng}&timestamp=${Math.floor(Date.now() / 1000)}`,
+                                { headers }
+                              )
+                              const tzData = await tzRes.json()
+                              if (tzData.timeZoneId) {
+                                setTimezone(tzData.timeZoneId)
+                              }
                             }
                           } catch (e) {
                             ob.logError('business-info/timezone', e)
                           }
                         }
-                      }
-                    }}
-                    query={{
-                      key: GOOGLE_PLACES_API_KEY,
-                      language: 'es',
-                      components: 'country:ve|country:es|country:mx|country:co',
-                    }}
-                    onFail={(error) => console.error('Places error:', error)}
-                    styles={{
-                      textInput: styles.autocompleteInput,
-                      container: { flex: 0 },
-                      listView: styles.autocompleteList,
-                    }}
-                    textInputProps={{
-                      placeholderTextColor: '#AAAAAA',
-                    }}
-                  />
+                      }}
+                      query={{
+                        // La librería exige key no vacía; el proxy la ignora
+                        // (no está en la whitelist) y usa la key del servidor.
+                        key: 'proxied',
+                        language: 'es',
+                        components: 'country:ve|country:es|country:mx|country:co',
+                      }}
+                      onFail={(error) => {
+                        ob.logError('business-info/places', error)
+                        setAddressSearchError(true)
+                      }}
+                      styles={{
+                        textInput: styles.autocompleteInput,
+                        container: { flex: 0 },
+                        listView: styles.autocompleteList,
+                      }}
+                      textInputProps={{
+                        placeholderTextColor: '#AAAAAA',
+                      }}
+                    />
+                  ) : (
+                    <TextInput
+                      style={styles.autocompleteInput}
+                      value={address}
+                      editable={false}
+                      placeholder="Busca la dirección..."
+                      placeholderTextColor="#AAAAAA"
+                    />
+                  )}
                 </View>
+                {addressSearchError && (
+                  <Text style={styles.searchErrorText}>
+                    No se pudo buscar la dirección. Intenta de nuevo.
+                  </Text>
+                )}
 
                 {/* Map Preview */}
                 <View style={styles.mapContainer}>
@@ -990,6 +1064,7 @@ const styles = StyleSheet.create({
   },
   galleryAddText: { fontFamily: 'System', fontSize: 10, color: PRIMARY, fontWeight: '500' },
   autocompleteWrapper: { marginBottom: 14, zIndex: 1000, elevation: 1000, position: 'relative' },
+  searchErrorText: { fontFamily: 'System', fontSize: 11, color: '#D32F2F', marginTop: -8, marginBottom: 12 },
   autocompleteInput: {
     fontFamily: 'System', height: 48, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
     paddingHorizontal: 14, fontSize: 15, color: DARK, backgroundColor: SURFACE,

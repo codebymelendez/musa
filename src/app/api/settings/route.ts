@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { parseBusinessHoursToSettings } from "@/lib/utils";
+import { normalizePaymentMethods, parsePaymentMethods } from "@/lib/paymentMethods";
 
 const updateSchema = z.object({
   name: z.string().min(2).optional(),
@@ -103,7 +104,7 @@ export async function GET(req: NextRequest) {
             workDays: computedHours.workDays,
             startHour: computedHours.startHour,
             endHour: computedHours.endHour,
-            paymentMethods: s.paymentMethods ? JSON.parse(s.paymentMethods) : [],
+            paymentMethods: parsePaymentMethods(s.paymentMethods),
             timezone: user.business?.timezone || "America/Caracas",
           }
         : null,
@@ -239,7 +240,7 @@ export async function PATCH(req: NextRequest) {
           ...(settings.slotDuration !== undefined && { slotDuration: settings.slotDuration }),
           ...(settings.currency && { currency: settings.currency }),
           ...(settings.bookingEnabled !== undefined && { bookingEnabled: settings.bookingEnabled }),
-          ...(settings.paymentMethods !== undefined && { paymentMethods: JSON.stringify(settings.paymentMethods) }),
+          ...(settings.paymentMethods !== undefined && { paymentMethods: JSON.stringify(normalizePaymentMethods(settings.paymentMethods)) }),
         }, { onConflict: 'userId', ignoreDuplicates: false });
 
       const { data: cu } = await admin
@@ -339,7 +340,7 @@ export async function PATCH(req: NextRequest) {
             workDays: computedHours.workDays,
             startHour: computedHours.startHour,
             endHour: computedHours.endHour,
-            paymentMethods: s.paymentMethods ? JSON.parse(s.paymentMethods) : [],
+            paymentMethods: parsePaymentMethods(s.paymentMethods),
             timezone: updated?.business?.timezone || "America/Caracas",
           }
         : null,

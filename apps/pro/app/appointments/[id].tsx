@@ -11,7 +11,7 @@ import {
   getBcvRate,
   type AppointmentItem, type AppointmentStatus, type AppointmentPayment,
 } from '../../lib/api'
-import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, formatTime, formatDate, formatMoney, formatBs, isBs as isBsCurrency, normalizeCurrency } from '../../lib/utils'
+import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, formatTime, formatDate, formatMoney, formatBs, isBs as isBsCurrency, normalizeCurrency, normalizePaymentMethods } from '../../lib/utils'
 import { Pulse, Bone } from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
 import { validate, paymentFormSchema } from '../../lib/validation'
@@ -351,9 +351,11 @@ export default function AppointmentDetailScreen() {
         const showPaymentForm = apt.status === 'confirmed' && (!apt.payment || editingPayment)
         const showPaymentSummary = !!apt.payment && !showPaymentForm
 
+        // Lectura defensiva: mapear valores legacy a keys canónicas y deduplicar
         const _rawPayMethods = settingsData?.settings?.paymentMethods
-        const enabledPayMethods = _rawPayMethods !== undefined
-          ? PAYMENT_METHODS.filter(m => _rawPayMethods.includes(m.id))
+        const _normalizedPayMethods = _rawPayMethods !== undefined ? normalizePaymentMethods(_rawPayMethods) : undefined
+        const enabledPayMethods = _normalizedPayMethods !== undefined
+          ? PAYMENT_METHODS.filter(m => _normalizedPayMethods.includes(m.id))
           : [...PAYMENT_METHODS]
         const noMethodsConfigured = _rawPayMethods !== undefined && enabledPayMethods.length === 0
 

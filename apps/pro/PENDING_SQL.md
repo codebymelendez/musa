@@ -129,10 +129,87 @@ update "Payment" set currency = 'USD' where upper(currency) <> 'BS' and currency
 update "Payment" set currency = 'USD' where currency is null;
 ```
 
-## 6 · Checklist al terminar
+## 6 · Normalización de métodos de pago en ProfessionalSettings (2026-06-10)
+
+`ProfessionalSettings.paymentMethods` (texto JSON) contiene mezcla de formato viejo (etiquetas: `"Efectivo"`, `"Pago Móvil"`, `"Zelle"`, `"Divisas"`, `"Transferencia Bancaria"`) y nuevo (keys canónicas: `efectivo_usd, efectivo_bs, pago_movil, zelle, transferencia, otro`). El código ya lee con normalización defensiva (`src/lib/paymentMethods.ts` / `apps/pro/lib/utils.ts`) y escribe solo keys canónicas, así que esto es limpieza de datos históricos.
+
+Mapeo: `Efectivo`→`efectivo_usd`, `Divisas`→`efectivo_usd`, `Pago Móvil`→`pago_movil`, `Zelle`→`zelle`, `Transferencia`/`Transferencia Bancaria`→`transferencia`, no reconocido→`otro`. Case/acento-tolerante. Deduplicar al final.
+
+```sql
+-- 1) Diagnóstico previo: cuántas filas y qué valores existen hoy
+select count(*) as filas_con_metodos
+from "ProfessionalSettings"
+where "paymentMethods" is not null and "paymentMethods" not in ('', '[]');
+
+select valor, count(*) as ocurrencias
+from "ProfessionalSettings",
+     lateral jsonb_array_elements_text("paymentMethods"::jsonb) as valor
+where "paymentMethods" is not null and "paymentMethods" <> ''
+group by valor
+order by ocurrencias desc;
+
+-- 2) Preview del resultado (no escribe nada): fila original vs normalizada
+with normalizado as (
+  select ps."userId",
+         ps."paymentMethods" as original,
+         (
+           select coalesce(jsonb_agg(distinct c.canon), '[]'::jsonb)
+           from lateral jsonb_array_elements_text(ps."paymentMethods"::jsonb) as v(valor),
+                lateral (
+                  select case lower(translate(trim(v.valor), 'áéíóúÁÉÍÓÚ', 'aeiouAEIOU'))
+                    when 'efectivo'                then 'efectivo_usd'
+                    when 'divisas'                 then 'efectivo_usd'
+                    when 'pago movil'              then 'pago_movil'
+                    when 'transferencia bancaria'  then 'transferencia'
+                    when 'efectivo_usd'            then 'efectivo_usd'
+                    when 'efectivo_bs'             then 'efectivo_bs'
+                    when 'pago_movil'              then 'pago_movil'
+                    when 'zelle'                   then 'zelle'
+                    when 'transferencia'           then 'transferencia'
+                    when 'otro'                    then 'otro'
+                    else 'otro'
+                  end as canon
+                ) c
+         ) as normalizada
+  from "ProfessionalSettings" ps
+  where ps."paymentMethods" is not null and ps."paymentMethods" <> ''
+)
+select * from normalizado where original::jsonb <> normalizada;
+
+-- 3) UPDATE definitivo (mismo mapeo; ejecutar solo tras revisar el preview)
+update "ProfessionalSettings" ps
+set "paymentMethods" = (
+  select coalesce(jsonb_agg(distinct c.canon), '[]'::jsonb)::text
+  from lateral jsonb_array_elements_text(ps."paymentMethods"::jsonb) as v(valor),
+       lateral (
+         select case lower(translate(trim(v.valor), 'áéíóúÁÉÍÓÚ', 'aeiouAEIOU'))
+           when 'efectivo'                then 'efectivo_usd'
+           when 'divisas'                 then 'efectivo_usd'
+           when 'pago movil'              then 'pago_movil'
+           when 'transferencia bancaria'  then 'transferencia'
+           when 'efectivo_usd'            then 'efectivo_usd'
+           when 'efectivo_bs'             then 'efectivo_bs'
+           when 'pago_movil'              then 'pago_movil'
+           when 'zelle'                   then 'zelle'
+           when 'transferencia'           then 'transferencia'
+           when 'otro'                    then 'otro'
+           else 'otro'
+         end as canon
+       ) c
+)
+where ps."paymentMethods" is not null and ps."paymentMethods" <> '';
+```
+
+Notas:
+- El `case` compara contra valores ya en minúsculas/sin acentos, por eso `'Pago Móvil'` cae en `'pago movil'`.
+- Si el diagnóstico (paso 1) revela valores no contemplados, añadirlos al `case` antes del UPDATE en vez de dejar que caigan en `otro`.
+- No es urgente: la lectura defensiva en código ya elimina los duplicados en UI, y cada guardado desde la pantalla de métodos de pago reescribe la fila del usuario en formato canónico.
+
+## 7 · Checklist al terminar
 
 - [ ] §1 ejecutado: todas las tablas listadas tienen `rls_activo = true`
 - [ ] Políticas de escritura por negocio en Business / BusinessHours / BusinessException / BusinessPhoto / ProfessionalSettings
 - [ ] Lectura de Appointment restringida (o vista/RPC para slots públicos)
 - [ ] Políticas de path en storage para ambos buckets
 - [ ] Probar en el móvil: editar negocio, subir foto, calendario (slots) y reserva pública web siguen funcionando
+- [ ] §6 ejecutado: `paymentMethods` históricos normalizados a keys canónicas
