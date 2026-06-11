@@ -690,6 +690,48 @@ export async function redeemLoyaltyReward(accountId: string): Promise<{ redempti
   return res.json()
 }
 
+// ─── Storage (signed uploads vía API) ────────────────────────────────────────
+// El cliente de Storage de supabase-js no adjunta la sesión en móvil (las
+// subidas directas chocan con RLS); la API firma la subida y decide la ruta.
+
+export type UploadKind = 'logo' | 'cover' | 'gallery' | 'avatar'
+
+export interface SignedUpload {
+  bucket: string
+  path: string
+  token: string
+  signedUrl: string
+  publicUrl: string
+}
+
+export async function getUploadUrl(kind: UploadKind, fileExt: string): Promise<SignedUpload> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); throw new Error('No auth') }
+  const res = await fetch(`${API_URL}/api/storage/upload-url`, {
+    method: 'POST', headers, body: JSON.stringify({ kind, fileExt }),
+  })
+  if (res.status === 401) { await handle401(); throw new Error('Unauthorized') }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function deleteStoragePhoto(path: string): Promise<{ storageDeleted: boolean; rowDeleted: boolean }> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); throw new Error('No auth') }
+  const res = await fetch(`${API_URL}/api/storage/delete`, {
+    method: 'POST', headers, body: JSON.stringify({ kind: 'gallery', path }),
+  })
+  if (res.status === 401) { await handle401(); throw new Error('Unauthorized') }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
 // ─── Time slot helper ────────────────────────────────────────────────────────
 
 export function generateTimeSlots(startHour: number, endHour: number, slotMin: number): string[] {

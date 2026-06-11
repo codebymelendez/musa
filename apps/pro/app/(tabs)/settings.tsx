@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import { supabase } from '../../lib/supabase'
-import { type SettingsData } from '../../lib/api'
+import { type SettingsData, getUploadUrl } from '../../lib/api'
 import { useSettings, useUpdateSettings } from '../../hooks/queries'
 import { clearPersistedCache } from '../../lib/queryClient'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials, hhmmToDisplay } from '../../lib/utils'
@@ -215,19 +215,30 @@ export default function SettingsTabScreen() {
     const localUri = result.assets[0].uri
     setUploadingAvatar(true)
     try {
+      // Signed URL de la API: la ruta la decide el servidor y la autorización
+      // viaja en el token firmado (Storage directo choca con RLS en móvil).
+      const rawExt = localUri.split('.').pop()?.toLowerCase() ?? 'jpg'
+      const fileExt = ['jpg', 'jpeg', 'png', 'webp'].includes(rawExt) ? rawExt : 'jpg'
+
+      let signed
+      try {
+        signed = await getUploadUrl('avatar', fileExt)
+      } catch (e) {
+        console.error('[avatar upload-url]', e)
+        Alert.alert('Error', 'No se pudo autorizar la subida. Intenta de nuevo.')
+        return
+      }
+
       const response = await fetch(localUri)
       const blob = await response.blob()
-      const path = `avatars/${user.id}-${Date.now()}.jpg`
       const { error: uploadError } = await supabase.storage
-        .from('staff-avatars')
-        .upload(path, blob, { contentType: 'image/jpeg', upsert: true })
+        .from(signed.bucket)
+        .uploadToSignedUrl(signed.path, signed.token, blob, {
+          contentType: `image/${fileExt === 'png' ? 'png' : fileExt === 'webp' ? 'webp' : 'jpeg'}`,
+        })
       if (uploadError) throw uploadError
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('staff-avatars')
-        .getPublicUrl(path)
-
-      await updateSettingsMutation.mutateAsync({ avatarUrl: publicUrl })
+      await updateSettingsMutation.mutateAsync({ avatarUrl: signed.publicUrl })
     } catch (e) {
       console.error('[avatar upload]', e)
       Alert.alert('Error', 'No se pudo subir la foto')
@@ -340,8 +351,8 @@ export default function SettingsTabScreen() {
           <View style={styles.card}>
             <SRow
               icon="business-outline"
-              label="Mi Negocio y Disponibilidad"
-              subtitle="Horarios, dirección, fotos y slots"
+              label="Perfil del negocio"
+              subtitle="Fotos, dirección, horarios y reservas"
               onPress={() => router.push('/settings/business-info' as Parameters<typeof router.push>[0])}
             />
             <View style={styles.rowDivider} />

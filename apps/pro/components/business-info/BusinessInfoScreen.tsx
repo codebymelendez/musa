@@ -18,7 +18,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '../../lib/supabase'
 import { ob } from '../../lib/observability'
-import { getSettings, authHeaders } from '../../lib/api'
+import { getSettings, authHeaders, getUploadUrl, deleteStoragePhoto, SignedUpload } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials } from '../../lib/utils'
 import { keys } from '../../hooks/queries'
 import { MaxWidthContainer } from '../ui/MaxWidthContainer'
@@ -201,8 +201,14 @@ export default function BusinessInfoScreen() {
     return () => clearTimeout(t)
   }, [placesToken])
 
-  // Animate map when coordinates change
+  // Animate map when coordinates change. Si el cambio viene de arrastrar la
+  // chincheta no re-centramos: resetearía el zoom con el que se está afinando.
+  const dragRef = useRef(false)
   useEffect(() => {
+    if (dragRef.current) {
+      dragRef.current = false
+      return
+    }
     if (latitude && longitude && mapRef.current) {
       mapRef.current.animateToRegion({
         latitude,
@@ -295,40 +301,58 @@ export default function BusinessInfoScreen() {
     uploadPhoto(localUri, target)
   }
 
+  // Subida vía signed URL de la API: el cliente de Storage de supabase-js no
+  // adjunta la sesión en móvil, así que la autorización viaja en el token
+  // firmado que emite el servidor (que además decide la ruta).
   const uploadPhoto = async (uri: string, target: 'logo' | 'cover' | 'gallery') => {
     if (!businessId) return
+    if (target === 'gallery' && galleryPhotos.length >= 6) {
+      Alert.alert('Límite alcanzado', 'Puedes subir un máximo de 6 fotos a la galería')
+      return
+    }
     try {
       setSaving(true)
+      const rawExt = uri.split('.').pop()?.toLowerCase() ?? 'jpg'
+      const fileExt = ['jpg', 'jpeg', 'png', 'webp'].includes(rawExt) ? rawExt : 'jpg'
+
+      let signed: SignedUpload
+      try {
+        signed = await getUploadUrl(target, fileExt)
+      } catch (err: any) {
+        ob.logError('business-info/upload-url', err)
+        Alert.alert('Error de subida', 'No se pudo autorizar la subida. Intenta de nuevo.')
+        return
+      }
+
       const response = await fetch(uri)
       const blob = await response.blob()
-      const fileExt = uri.split('.').pop()?.toLowerCase() ?? 'jpg'
-      const fileName = `${businessId}/${target}_${Date.now()}.${fileExt}`
-
       const { error: uploadError } = await supabase.storage
-        .from('business-photos')
-        .upload(fileName, blob, {
-          contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
-          upsert: true,
+        .from(signed.bucket)
+        .uploadToSignedUrl(signed.path, signed.token, blob, {
+          contentType: `image/${fileExt === 'png' ? 'png' : fileExt === 'webp' ? 'webp' : 'jpeg'}`,
         })
+      if (uploadError) {
+        ob.logError('business-info/upload', uploadError)
+        Alert.alert('Error de subida', 'La imagen no se pudo subir. Revisa tu conexión e intenta de nuevo.')
+        return
+      }
 
-      if (uploadError) throw uploadError
+      const publicUrl = signed.publicUrl
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('business-photos')
-        .getPublicUrl(fileName)
-
-      if (target === 'logo') {
-        setLogoUrl(publicUrl)
-      } else if (target === 'cover') {
-        setCoverUrl(publicUrl)
-      } else {
-        // Gallery photo
-        if (galleryPhotos.length >= 6) {
-          Alert.alert('Límite alcanzado', 'Puedes subir un máximo de 6 fotos a la galería')
-          return
+      if (target === 'logo' || target === 'cover') {
+        // Persistencia inmediata: la foto queda guardada sin pulsar "Guardar"
+        const { error: dbError } = await supabase
+          .from('Business')
+          .update(target === 'logo' ? { logoUrl: publicUrl } : { coverUrl: publicUrl })
+          .eq('id', businessId)
+        if (dbError) {
+          ob.logError('business-info/photo-persist', dbError)
+          Alert.alert('Error', 'La imagen se subió pero no se pudo guardar. Pulsa "Guardar cambios" para reintentar.')
         }
-
-        // Add to BusinessPhoto DB table
+        if (target === 'logo') setLogoUrl(publicUrl)
+        else setCoverUrl(publicUrl)
+      } else {
+        // Gallery photo: la fila se inserta inmediatamente, como antes
         const { data: newPhoto, error: dbError } = await supabase
           .from('BusinessPhoto')
           .insert({
@@ -341,13 +365,15 @@ export default function BusinessInfoScreen() {
           .single()
 
         if (dbError) throw dbError
-        
+
         setGalleryPhotos(prev => [...prev, {
           id: newPhoto.id,
           url: newPhoto.url,
           sortOrder: newPhoto.sortOrder,
         }])
       }
+
+      queryClient.invalidateQueries({ queryKey: keys.businessInfo })
     } catch (err: any) {
       Alert.alert('Error de subida', err.message || 'No se pudo subir la imagen')
     } finally {
@@ -355,16 +381,21 @@ export default function BusinessInfoScreen() {
     }
   }
 
-  const removeGalleryPhoto = async (photoId: string) => {
+  const removeGalleryPhoto = async (photo: BusinessPhotoItem) => {
+    // La API de borrado pide el path dentro del bucket; lo derivamos del
+    // publicUrl (…/storage/v1/object/public/business-photos/<path>).
+    const marker = '/storage/v1/object/public/business-photos/'
+    const idx = photo.url.indexOf(marker)
+    if (idx === -1) {
+      Alert.alert('Error', 'No se pudo identificar la imagen a eliminar')
+      return
+    }
+    const path = decodeURIComponent(photo.url.slice(idx + marker.length))
     try {
       setSaving(true)
-      const { error } = await supabase
-        .from('BusinessPhoto')
-        .delete()
-        .eq('id', photoId)
-
-      if (error) throw error
-      setGalleryPhotos(prev => prev.filter(p => p.id !== photoId))
+      await deleteStoragePhoto(path)
+      setGalleryPhotos(prev => prev.filter(p => p.id !== photo.id))
+      queryClient.invalidateQueries({ queryKey: keys.businessInfo })
     } catch (err: any) {
       Alert.alert('Error', err.message || 'No se pudo eliminar la imagen')
     } finally {
@@ -523,7 +554,7 @@ export default function BusinessInfoScreen() {
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="chevron-back-outline" size={24} color={DARK} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Rediseño de Negocio</Text>
+          <Text style={styles.headerTitle}>Perfil del negocio</Text>
           <View style={styles.backBtn} />
         </View>
 
@@ -622,13 +653,14 @@ export default function BusinessInfoScreen() {
                     </TouchableOpacity>
                   </View>
                   <View style={styles.photoDescContainer}>
-                    <Text style={styles.photoTitle}>Logo del Negocio</Text>
-                    <Text style={styles.photoSub}>Imagen circular recomendada (80x80px). Se muestra en búsquedas y reservas.</Text>
+                    <Text style={styles.photoTitle}>Logo del negocio</Text>
+                    <Text style={styles.photoSub}>Tu marca en búsquedas y reservas. Imagen cuadrada recomendada.</Text>
                   </View>
                 </View>
 
                 {/* Cover Photo */}
-                <Text style={styles.photoTitleLabel}>Foto de Portada</Text>
+                <Text style={styles.photoTitleLabel}>Foto de portada</Text>
+                <Text style={styles.photoSectionSub}>La primera imagen que ven tus clientas al abrir tu perfil.</Text>
                 <TouchableOpacity style={styles.coverWrapper} onPress={() => pickImage('cover')} activeOpacity={0.9}>
                   {coverUrl ? (
                     <Image source={{ uri: coverUrl }} style={styles.coverImage} cachePolicy="memory-disk" transition={100} />
@@ -642,14 +674,15 @@ export default function BusinessInfoScreen() {
 
                 {/* Place Gallery */}
                 <View style={styles.galleryHeader}>
-                  <Text style={styles.photoTitleLabel}>Galería del Lugar</Text>
+                  <Text style={styles.photoTitleLabel}>Galería del lugar</Text>
                   <Text style={styles.counter}>{galleryPhotos.length} / 6</Text>
                 </View>
+                <Text style={styles.photoSectionSub}>Muestra tu local y tus trabajos — esto verán tus clientas.</Text>
                 <View style={styles.galleryGrid}>
                   {galleryPhotos.map((photo) => (
                     <View key={photo.id} style={styles.galleryPhotoWrapper}>
                       <Image source={{ uri: photo.url }} style={styles.galleryPhoto} cachePolicy="memory-disk" transition={100} recyclingKey={photo.id} />
-                      <TouchableOpacity style={styles.photoDeleteBtn} onPress={() => removeGalleryPhoto(photo.id)}>
+                      <TouchableOpacity style={styles.photoDeleteBtn} onPress={() => removeGalleryPhoto(photo)}>
                         <Ionicons name="close-circle" size={18} color="#D32F2F" />
                       </TouchableOpacity>
                     </View>
@@ -681,37 +714,41 @@ export default function BusinessInfoScreen() {
                         headers: { Authorization: `Bearer ${placesToken}` },
                       }}
                       onPress={async (data, details = null) => {
-                        if (details) {
-                          const detailsAny = details as any
-                          const lat = detailsAny.geometry.location.lat
-                          const lng = detailsAny.geometry.location.lng
-                          const formattedAddress = detailsAny.formatted_address
+                        if (!details) {
+                          // fetchDetails está activo: details null = fallo de Place Details
+                          ob.logError('business-info/place-details', new Error(`details null para "${data?.description ?? ''}"`))
+                          setAddressSearchError(true)
+                          return
+                        }
+                        const detailsAny = details as any
+                        const lat = detailsAny.geometry.location.lat
+                        const lng = detailsAny.geometry.location.lng
+                        const formattedAddress = detailsAny.formatted_address
 
-                          const countryComp = detailsAny.address_components.find((c: any) => c.types.includes('country'))
-                          const detectedCountry = countryComp ? countryComp.short_name : 'VE'
+                        const countryComp = detailsAny.address_components.find((c: any) => c.types.includes('country'))
+                        const detectedCountry = countryComp ? countryComp.short_name : 'VE'
 
-                          setAddress(formattedAddress)
-                          setLatitude(lat)
-                          setLongitude(lng)
-                          setCountry(detectedCountry)
-                          setAddressSearchError(false)
+                        setAddress(formattedAddress)
+                        setLatitude(lat)
+                        setLongitude(lng)
+                        setCountry(detectedCountry)
+                        setAddressSearchError(false)
 
-                          // Timezone vía proxy; si falla se conserva la actual
-                          try {
-                            const headers = await authHeaders()
-                            if (headers) {
-                              const tzRes = await fetch(
-                                `${API_URL}/api/google/timezone?location=${lat},${lng}&timestamp=${Math.floor(Date.now() / 1000)}`,
-                                { headers }
-                              )
-                              const tzData = await tzRes.json()
-                              if (tzData.timeZoneId) {
-                                setTimezone(tzData.timeZoneId)
-                              }
+                        // Timezone vía proxy; si falla se conserva la actual
+                        try {
+                          const headers = await authHeaders()
+                          if (headers) {
+                            const tzRes = await fetch(
+                              `${API_URL}/api/google/timezone?location=${lat},${lng}&timestamp=${Math.floor(Date.now() / 1000)}`,
+                              { headers }
+                            )
+                            const tzData = await tzRes.json()
+                            if (tzData.timeZoneId) {
+                              setTimezone(tzData.timeZoneId)
                             }
-                          } catch (e) {
-                            ob.logError('business-info/timezone', e)
                           }
+                        } catch (e) {
+                          ob.logError('business-info/timezone', e)
                         }
                       }}
                       query={{
@@ -763,7 +800,16 @@ export default function BusinessInfoScreen() {
                         longitudeDelta: 0.005,
                       }}
                     >
-                      <Marker coordinate={{ latitude, longitude }} />
+                      <Marker
+                        coordinate={{ latitude, longitude }}
+                        draggable
+                        onDragEnd={(e) => {
+                          const { latitude: lat, longitude: lng } = e.nativeEvent.coordinate
+                          dragRef.current = true
+                          setLatitude(lat)
+                          setLongitude(lng)
+                        }}
+                      />
                     </MapView>
                   ) : (
                     <View style={styles.mapEmpty}>
@@ -772,6 +818,11 @@ export default function BusinessInfoScreen() {
                     </View>
                   )}
                 </View>
+                {latitude && longitude ? (
+                  <Text style={styles.mapHint}>
+                    Mantén pulsada la chincheta y arrástrala para ajustar la ubicación exacta
+                  </Text>
+                ) : null}
 
                 {/* Service Mode */}
                 <Text style={styles.photoTitleLabel}>Modalidad de Servicio</Text>
@@ -1045,6 +1096,7 @@ const styles = StyleSheet.create({
   photoTitle: { fontFamily: 'System', fontSize: 15, fontWeight: '500', color: DARK },
   photoSub: { fontFamily: 'System', fontSize: 11, color: GRAY, marginTop: 4, lineHeight: 15 },
   photoTitleLabel: { fontFamily: 'System', fontSize: 13, fontWeight: '500', color: DARK, marginTop: 14, marginBottom: 8 },
+  photoSectionSub: { fontFamily: 'System', fontSize: 11, color: GRAY, lineHeight: 15, marginTop: -4, marginBottom: 8 },
   coverWrapper: {
     height: 180, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
     overflow: 'hidden', backgroundColor: SURFACE,
@@ -1063,18 +1115,22 @@ const styles = StyleSheet.create({
     backgroundColor: SURFACE,
   },
   galleryAddText: { fontFamily: 'System', fontSize: 10, color: PRIMARY, fontWeight: '500' },
-  autocompleteWrapper: { marginBottom: 14, zIndex: 1000, elevation: 1000, position: 'relative' },
+  autocompleteWrapper: { marginBottom: 14 },
   searchErrorText: { fontFamily: 'System', fontSize: 11, color: '#D32F2F', marginTop: -8, marginBottom: 12 },
   autocompleteInput: {
     fontFamily: 'System', height: 48, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
     paddingHorizontal: 14, fontSize: 15, color: DARK, backgroundColor: SURFACE,
     fontWeight: 'normal',
   },
+  // En flujo (no absolute): en RN los toques fuera de los bounds del padre no
+  // se registran, así que una lista absoluta bajo un wrapper de 48px se ve
+  // pero no recibe taps. En flujo empuja el layout y todo es tocable.
   autocompleteList: {
     borderWidth: 1, borderColor: BORDER, borderRadius: 12, backgroundColor: '#fff',
-    marginTop: 4, position: 'absolute', top: 48, left: 0, right: 0, zIndex: 1001, elevation: 1001,
+    marginTop: 4,
   },
-  mapContainer: { height: 180, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: BORDER, marginBottom: 14 },
+  mapContainer: { height: 180, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: BORDER, marginBottom: 6 },
+  mapHint: { fontFamily: 'System', fontSize: 11, color: GRAY, marginBottom: 14, lineHeight: 15 },
   map: { width: '100%', height: '100%' },
   mapEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: SURFACE },
   mapEmptyText: { fontFamily: 'System', fontSize: 12, color: GRAY },

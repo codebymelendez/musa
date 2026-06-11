@@ -490,7 +490,7 @@ export default function AppointmentDetailScreen() {
                             <Ionicons name="settings-outline" size={16} color={GRAY} />
                             <Text style={pf.noMethodsText}>
                               Ningún método de pago habilitado.{'\n'}
-                              Ve a Ajustes → Mi negocio para configurarlos.
+                              Ve a Ajustes → Perfil del negocio para configurarlos.
                             </Text>
                           </View>
                         ) : (

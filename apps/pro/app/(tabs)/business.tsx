@@ -207,16 +207,13 @@ export default function BusinessScreen() {
                 subtitle="Ver rendimiento del negocio"
                 onPress={() => router.push('/stats' as Parameters<typeof router.push>[0])}
               />
-            </View>
-
-            {/* ─── Portfolio Gallery ─── */}
-            <View style={styles.sectionCard}>
-              <View style={styles.sectionCardHeader}>
-                <Text style={styles.bentoLabel}>GALERÍA</Text>
-              </View>
-              <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 20 }}>
-                <Text style={{ fontSize: 14, color: GRAY, textAlign: 'center' }}>Portafolio próximamente</Text>
-              </View>
+              <View style={styles.rowDivider} />
+              <NavRow
+                icon="images-outline"
+                label="Galería"
+                subtitle="Fotos de tu local y tus trabajos"
+                onPress={() => router.push('/settings/business-info' as Parameters<typeof router.push>[0])}
+              />
             </View>
           </>
         )}

@@ -139,9 +139,9 @@ export default function BusinessSettingsScreen() {
         <>
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-            {/* Mi negocio */}
+            {/* Perfil del negocio */}
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Mi negocio</Text>
+              <Text style={styles.cardTitle}>Perfil del negocio</Text>
 
               {/* Avatar placeholder */}
               <View style={styles.avatarSection}>
