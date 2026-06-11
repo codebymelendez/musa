@@ -6,6 +6,7 @@ import { proxyGoogleRequest } from "@/lib/googleProxy";
 export async function GET(req: NextRequest) {
   return proxyGoogleRequest(req, "/place/details/json", [
     "place_id",
+    "placeid",      // ← la librería RN envía el nombre legacy de este parámetro
     "fields",
     "language",
     "sessiontoken",

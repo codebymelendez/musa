@@ -19,6 +19,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { ob } from '../../lib/observability'
 import { getSettings, authHeaders, getUploadUrl, deleteStoragePhoto, SignedUpload } from '../../lib/api'
+import { uploadFileToSignedUrl } from '../../lib/storage'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials } from '../../lib/utils'
 import { keys } from '../../hooks/queries'
 import { MaxWidthContainer } from '../ui/MaxWidthContainer'
@@ -324,16 +325,14 @@ export default function BusinessInfoScreen() {
         return
       }
 
-      const response = await fetch(uri)
-      const blob = await response.blob()
-      const { error: uploadError } = await supabase.storage
-        .from(signed.bucket)
-        .uploadToSignedUrl(signed.path, signed.token, blob, {
-          contentType: `image/${fileExt === 'png' ? 'png' : fileExt === 'webp' ? 'webp' : 'jpeg'}`,
-        })
-      if (uploadError) {
-        ob.logError('business-info/upload', uploadError)
-        Alert.alert('Error de subida', 'La imagen no se pudo subir. Revisa tu conexión e intenta de nuevo.')
+      try {
+        const contentType = `image/${fileExt === 'png' ? 'png' : fileExt === 'webp' ? 'webp' : 'jpeg'}`
+        await uploadFileToSignedUrl(signed, uri, contentType)
+      } catch (err: any) {
+        ob.logError('business-info/upload', err)
+        Alert.alert('Error de subida', err?.message === 'EMPTY_FILE'
+          ? 'No se pudo leer la imagen seleccionada'
+          : 'La imagen no se pudo subir. Revisa tu conexión e intenta de nuevo.')
         return
       }
 

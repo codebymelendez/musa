@@ -12,6 +12,7 @@ import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { type SettingsData, getUploadUrl } from '../../lib/api'
+import { uploadFileToSignedUrl } from '../../lib/storage'
 import { useSettings, useUpdateSettings } from '../../hooks/queries'
 import { clearPersistedCache } from '../../lib/queryClient'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials, hhmmToDisplay } from '../../lib/utils'
@@ -229,19 +230,15 @@ export default function SettingsTabScreen() {
         return
       }
 
-      const response = await fetch(localUri)
-      const blob = await response.blob()
-      const { error: uploadError } = await supabase.storage
-        .from(signed.bucket)
-        .uploadToSignedUrl(signed.path, signed.token, blob, {
-          contentType: `image/${fileExt === 'png' ? 'png' : fileExt === 'webp' ? 'webp' : 'jpeg'}`,
-        })
-      if (uploadError) throw uploadError
+      const contentType = `image/${fileExt === 'png' ? 'png' : fileExt === 'webp' ? 'webp' : 'jpeg'}`
+      await uploadFileToSignedUrl(signed, localUri, contentType)
 
       await updateSettingsMutation.mutateAsync({ avatarUrl: signed.publicUrl })
     } catch (e) {
       console.error('[avatar upload]', e)
-      Alert.alert('Error', 'No se pudo subir la foto')
+      Alert.alert('Error', (e as Error)?.message === 'EMPTY_FILE'
+        ? 'No se pudo leer la imagen seleccionada'
+        : 'No se pudo subir la foto')
     } finally { setUploadingAvatar(false) }
   }
 
