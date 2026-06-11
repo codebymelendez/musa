@@ -7,12 +7,10 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { Image } from 'expo-image'
 import { router } from 'expo-router'
-import { PRIMARY, DARK, SURFACE, BORDER, GRAY, SERIF, initials } from '../../lib/utils'
+import { PRIMARY, DARK, SURFACE, BORDER, GRAY, SERIF, initials, getPublicProfileUrl } from '../../lib/utils'
 import { Pulse, Bone } from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
 import { useSettings, useServices, usePromotions, useLoyaltyProgram } from '../../hooks/queries'
-
-const APP_URL = (process.env.EXPO_PUBLIC_APP_URL ?? 'https://getmusa.app').replace(/\/$/, '')
 
 // ─── skeleton ─────────────────────────────────────────────────────────────────
 
@@ -84,8 +82,10 @@ export default function BusinessScreen() {
 
   const sData = settingsQuery.data ?? null
   const businessName = sData?.business?.name ?? ''
-  const avatarUrl = sData?.avatarUrl ?? null
-  const slug = sData?.slug ?? ''
+  // Contexto NEGOCIO en el hero → logo del negocio, fallback avatar de la dueña
+  const avatarUrl = sData?.business?.logoUrl ?? sData?.avatarUrl ?? null
+  // Slug canónico: Business.slug; User.slug solo como fallback legacy
+  const slug = sData?.business?.slug ?? sData?.slug ?? ''
   const planName = sData?.business?.plan?.name ?? null
   const teamCount = sData?.business?.users?.length ?? 0
   const city = sData?.business?.city ?? 'Caracas'
@@ -108,7 +108,7 @@ export default function BusinessScreen() {
   }
 
   async function handleCopy() {
-    await Clipboard.setStringAsync(`${APP_URL}/p/${slug}`)
+    await Clipboard.setStringAsync(getPublicProfileUrl(slug))
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -212,7 +212,7 @@ export default function BusinessScreen() {
                 icon="images-outline"
                 label="Galería"
                 subtitle="Fotos de tu local y tus trabajos"
-                onPress={() => router.push('/settings/business-info' as Parameters<typeof router.push>[0])}
+                onPress={() => router.push('/gallery' as Parameters<typeof router.push>[0])}
               />
             </View>
           </>

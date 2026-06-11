@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
@@ -49,6 +49,7 @@ const DISCOVERY_CITIES = ["maracaibo", "valencia", "caracas", "barquisimeto", "m
 export default function BottomNavBar() {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
+  const navRef = useRef<HTMLElement | null>(null);
 
   const isDiscovery = DISCOVERY_CITIES.some(
     (c) => pathname === `/${c}` || pathname.startsWith(`/${c}/`)
@@ -63,6 +64,27 @@ export default function BottomNavBar() {
     (pathname === "/client" || pathname.startsWith("/client/")) ||
     pathname.startsWith("/cita/") ||
     isDiscovery;
+
+  // Publica la altura real de la barra en una variable CSS compartida para que
+  // las páginas con CTAs fijos inferiores puedan posicionarse encima sin
+  // números mágicos (--musa-bottom-nav-height = 0 cuando la barra no existe).
+  useEffect(() => {
+    const root = document.documentElement;
+    const el = navRef.current;
+    if (isHidden || !el) {
+      root.style.setProperty("--musa-bottom-nav-height", "0px");
+      return;
+    }
+    const update = () =>
+      root.style.setProperty("--musa-bottom-nav-height", `${el.offsetHeight}px`);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      root.style.setProperty("--musa-bottom-nav-height", "0px");
+    };
+  }, [isHidden]);
 
   if (isHidden) return null;
 
@@ -148,7 +170,7 @@ export default function BottomNavBar() {
       )}
 
       {/* Main nav bar */}
-      <nav className="fixed bottom-0 left-0 w-full z-[110] glass-nav border-t border-border-subtle rounded-t-2xl">
+      <nav ref={navRef} className="fixed bottom-0 left-0 w-full z-[110] glass-nav border-t border-border-subtle rounded-t-2xl">
         <div
           className="flex justify-around items-center px-2 pt-2 pb-[max(1.5rem,env(safe-area-inset-bottom,1.5rem))]"
           style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom, 1.5rem))" }}

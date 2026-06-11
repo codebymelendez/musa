@@ -1,5 +1,20 @@
 import { Platform } from 'react-native'
 
+// ─── Enlace público del negocio ───────────────────────────────────────────────
+// Único punto donde se construye la URL del perfil público (/p/<slug>).
+// El slug canónico SIEMPRE sale de Business.slug; User.slug solo como
+// fallback legacy en el call-site si el canónico aún no está.
+export const APP_URL = (process.env.EXPO_PUBLIC_APP_URL ?? 'https://getmusa.app').replace(/\/$/, '')
+
+export function getPublicProfileUrl(slug: string): string {
+  return `${APP_URL}/p/${slug}`
+}
+
+// Variante legible para UI: "getmusa.app/p/<slug>" (sin protocolo)
+export function getPublicProfileDisplay(slug: string): string {
+  return getPublicProfileUrl(slug).replace(/^https?:\/\//, '')
+}
+
 export const PRIMARY  = '#B5593E'
 export const DARK     = '#34271E'
 export const SURFACE  = '#FAF9F7'

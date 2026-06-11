@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppStore } from "@/store/useAppStore";
 import { User, ProfessionalSettings, PaymentMethod } from "@/types";
 import ImageUploader from "@/components/ui/ImageUploader";
+import { normalizeSlug, validateSlug } from "@/lib/slug";
 import {
   PencilIcon,
   ClipboardDocumentIcon,
@@ -18,7 +19,14 @@ import {
   StarIcon,
   ArrowRightStartOnRectangleIcon,
   BanknotesIcon,
+  ShareIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  PencilSquareIcon,
 } from "@heroicons/react/24/outline";
+
+// Prefijo público fijo del enlace de reserva (mismo que la card móvil)
+const SLUG_PREFIX = "getmusa.app/p/";
 
 const ALL_PAYMENT_METHODS: { value: PaymentMethod; label: string; hint: string }[] = [
   { value: "efectivo_usd", label: "Efectivo USD",  hint: "Billetes dólares"   },
@@ -151,12 +159,118 @@ export default function Profile() {
   }, []);
 
   // Canónico: Business.slug; user.slug queda como fallback DEPRECATED
-  const bookingLink = `${fullUrl}/p/${user?.business?.slug ?? user?.slug ?? ""}`;
+  const currentSlug = user?.business?.slug ?? user?.slug ?? "";
+  const bookingLink = `${fullUrl}/p/${currentSlug}`;
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(bookingLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  // Web Share API con fallback a copiar (paridad con la card móvil)
+  const handleShareLink = async () => {
+    const name = user?.business?.name ?? user?.name ?? "mi negocio";
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ title: name, text: `Reserva tu cita con ${name} en Musa`, url: bookingLink });
+      } catch { /* cancelado */ }
+    } else {
+      await handleCopy();
+    }
+  };
+
+  // ── Editor de enlace (slug del Business — mismos endpoints que el móvil) ──
+  const [slugEditing, setSlugEditing] = useState(false);
+  const [slugInput, setSlugInput] = useState("");
+  const [slugStatus, setSlugStatus] = useState<"idle" | "unchanged" | "invalid" | "checking" | "available" | "taken">("idle");
+  const [slugMsg, setSlugMsg] = useState("");
+  const [slugSaving, setSlugSaving] = useState(false);
+  const slugReqRef = useRef("");
+
+  // Validación local instantánea (src/lib/slug.ts) + check remoto con debounce
+  // de 500ms y guard contra respuestas obsoletas.
+  useEffect(() => {
+    if (!slugEditing) return;
+    if (!slugInput.trim()) {
+      setSlugStatus("idle"); setSlugMsg("");
+      return;
+    }
+    const normalized = normalizeSlug(slugInput);
+    if (normalized === currentSlug.toLowerCase()) {
+      setSlugStatus("unchanged"); setSlugMsg("Ese es tu enlace actual.");
+      return;
+    }
+    const v = validateSlug(normalized);
+    if (!v.ok) {
+      setSlugStatus("invalid"); setSlugMsg(v.message);
+      return;
+    }
+    setSlugStatus("checking"); setSlugMsg("");
+    slugReqRef.current = normalized;
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/slug/check?slug=${encodeURIComponent(normalized)}`);
+        const d = await res.json();
+        if (slugReqRef.current !== normalized) return; // respuesta obsoleta
+        if (res.ok && d.available) {
+          setSlugStatus("available");
+          setSlugMsg(`Disponible: ${SLUG_PREFIX}${d.normalized}`);
+        } else {
+          setSlugStatus("taken");
+          setSlugMsg(d.reason ?? d.error ?? "Ese enlace no está disponible.");
+        }
+      } catch {
+        if (slugReqRef.current !== normalized) return;
+        setSlugStatus("idle");
+        setSlugMsg("No se pudo comprobar la disponibilidad. Intenta de nuevo.");
+      }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [slugInput, slugEditing, currentSlug]);
+
+  const closeSlugEditor = () => {
+    setSlugEditing(false); setSlugInput(""); setSlugStatus("idle"); setSlugMsg("");
+  };
+
+  const handleSlugSave = async () => {
+    const normalized = normalizeSlug(slugInput);
+    const ok = window.confirm(
+      `Tu enlace pasará a ser ${SLUG_PREFIX}${normalized}. El anterior seguirá redirigiendo aquí, pero el nuevo será el oficial. Podrás cambiarlo de nuevo en 30 días.`
+    );
+    if (!ok) return;
+    setSlugSaving(true);
+    try {
+      const res = await fetch("/api/business/slug", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: normalized }),
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        // Mostrar el mensaje del servidor tal cual (incluye el 429 de cooldown)
+        setSlugStatus("taken");
+        setSlugMsg(d.error ?? "No se pudo cambiar el enlace.");
+        return;
+      }
+      const updated = d.business ?? d.user;
+      if (user) {
+        const newUser = {
+          ...user,
+          business: user.business
+            ? { ...user.business, slug: updated.slug, slugChangedAt: updated.slugChangedAt }
+            : user.business,
+        } as User;
+        setLocalUser(newUser);
+        setUser(newUser);
+      }
+      closeSlugEditor();
+    } catch {
+      setSlugStatus("taken");
+      setSlugMsg("Error de conexión. Intenta de nuevo.");
+    } finally {
+      setSlugSaving(false);
+    }
   };
 
   const settings = user?.settings as ProfessionalSettings | null;
@@ -355,26 +469,110 @@ export default function Profile() {
       </section>
 
       {/* ── Enlace de Reserva ── */}
-      <section className="relative overflow-hidden bg-primary/5 rounded-2xl p-6 border border-primary/10">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-1">
-            <h3 className="text-lg font-bold text-primary">Enlace de Reserva</h3>
-            <p className="text-sm text-on-surface-variant">
-              Comparte este link con tus clientes para recibir citas.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="px-4 py-2 bg-white rounded-lg border border-outline-variant/30 text-xs font-mono text-on-surface-variant truncate max-w-[220px]">
-              {bookingLink || `.../p/${user?.business?.slug ?? user?.slug ?? "tu-negocio"}`}
+      <section className="relative overflow-hidden bg-primary-surface rounded-2xl p-6 border border-primary-border">
+        <div className="relative z-10 space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-1">
+              <h3 className="font-ui font-medium text-[16px] text-primary">Enlace de Reserva</h3>
+              <p className="text-sm text-on-surface-muted">
+                Comparte este link con tus clientes para recibir citas.
+              </p>
             </div>
-            <button
-              onClick={handleCopy}
-              className="bg-primary hover:bg-primary-hover text-on-primary px-5 py-2 rounded-full font-ui font-medium text-[13px] shadow-primary-sm transition-all active:scale-95 flex items-center gap-2"
-            >
-              {copied ? <CheckIcon className="w-4 h-4" /> : <ClipboardDocumentIcon className="w-4 h-4" />}
-              {copied ? "¡Copiado!" : "Copiar"}
-            </button>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="px-4 py-2 bg-surface-raised rounded-lg border border-border-subtle text-xs font-mono text-on-surface-muted truncate max-w-[220px]">
+                {bookingLink || `.../p/${currentSlug || "tu-negocio"}`}
+              </div>
+              <button
+                onClick={handleCopy}
+                className="bg-primary hover:bg-primary-hover text-on-primary px-5 py-2 rounded-full font-ui font-medium text-[13px] shadow-primary-sm transition-all active:scale-95 flex items-center gap-2"
+              >
+                {copied ? <CheckIcon className="w-4 h-4" /> : <ClipboardDocumentIcon className="w-4 h-4" />}
+                {copied ? "¡Copiado!" : "Copiar"}
+              </button>
+              <button
+                onClick={handleShareLink}
+                className="border border-primary text-primary px-5 py-2 rounded-full font-ui font-medium text-[13px] hover:bg-primary-surface transition-all active:scale-95 flex items-center gap-2"
+              >
+                <ShareIcon className="w-4 h-4" />
+                Compartir
+              </button>
+            </div>
           </div>
+
+          {/* Personalizar enlace — solo OWNER (el slug es del Business) */}
+          {user?.appRole === "owner" && currentSlug && (
+            !slugEditing ? (
+              <button
+                onClick={() => { setSlugEditing(true); setSlugInput(""); }}
+                className="flex items-center gap-1.5 font-ui text-[12px] font-medium text-on-surface-muted hover:text-primary transition-colors"
+              >
+                <PencilSquareIcon className="w-4 h-4" />
+                Personalizar enlace
+              </button>
+            ) : (
+              <div className="space-y-3 pt-1 border-t border-primary-border">
+                <label className="musa-sublabel block pt-3">Nuevo enlace</label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 flex items-center px-4 py-3 bg-surface-raised border border-border rounded-xl focus-within:border-border-focus">
+                    <span className="font-mono text-[13px] text-on-surface-subtle shrink-0">{SLUG_PREFIX}</span>
+                    <input
+                      value={slugInput}
+                      onChange={(e) => setSlugInput(e.target.value)}
+                      placeholder="tu-negocio"
+                      autoFocus
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      className="flex-1 min-w-0 bg-transparent font-mono text-[14px] text-on-surface focus:outline-none"
+                    />
+                  </div>
+                  <span className="w-5 shrink-0 flex items-center justify-center">
+                    {slugStatus === "available" && <CheckCircleIcon className="w-5 h-5 text-success" />}
+                    {(slugStatus === "taken" || slugStatus === "invalid") && <XCircleIcon className="w-5 h-5 text-error" />}
+                  </span>
+                </div>
+                {slugStatus === "checking" && (
+                  <p className="font-ui text-[12px] text-on-surface-subtle">Comprobando disponibilidad…</p>
+                )}
+                {slugMsg && (
+                  <p
+                    className={`font-ui text-[12px] leading-snug ${
+                      slugStatus === "available"
+                        ? "text-success"
+                        : slugStatus === "taken" || slugStatus === "invalid"
+                        ? "text-error"
+                        : "text-on-surface-muted"
+                    }`}
+                  >
+                    {slugMsg}
+                  </p>
+                )}
+                <p className="font-ui text-[12px] text-on-surface-muted leading-snug">
+                  Tu enlace anterior seguirá redirigiendo aquí, pero el nuevo será el oficial.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={closeSlugEditor}
+                    disabled={slugSaving}
+                    className="flex-1 py-2.5 font-ui font-medium text-[13px] text-on-surface-muted border border-border rounded-full hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleSlugSave}
+                    disabled={slugStatus !== "available" || slugSaving}
+                    className="flex-1 py-2.5 font-ui font-medium text-[13px] bg-primary text-on-primary rounded-full transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {slugSaving ? (
+                      <div className="w-4 h-4 border border-on-primary border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      "Guardar enlace"
+                    )}
+                  </button>
+                </div>
+              </div>
+            )
+          )}
         </div>
       </section>
 

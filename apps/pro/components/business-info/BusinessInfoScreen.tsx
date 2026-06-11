@@ -9,7 +9,7 @@ import * as Haptics from 'expo-haptics'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { Image } from 'expo-image'
-import { router } from 'expo-router'
+import { router, useLocalSearchParams } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import MapView, { Marker } from 'react-native-maps'
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete'
@@ -20,11 +20,15 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '../../lib/supabase'
 import { ob } from '../../lib/observability'
-import { getSettings, authHeaders, getUploadUrl, deleteStoragePhoto, SignedUpload, checkSlug, updateSlug } from '../../lib/api'
+import { authHeaders, getUploadUrl, SignedUpload, checkSlug, updateSlug } from '../../lib/api'
 import { uploadFileToSignedUrl } from '../../lib/storage'
-import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials, normalizeSlug, validateSlug } from '../../lib/utils'
+import {
+  PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials, normalizeSlug, validateSlug,
+  getPublicProfileUrl, getPublicProfileDisplay,
+} from '../../lib/utils'
 import { keys } from '../../hooks/queries'
 import { MaxWidthContainer } from '../ui/MaxWidthContainer'
+import GallerySection, { fetchBusinessInfo } from './GallerySection'
 
 // Las llamadas a Google Places / Time Zone pasan por nuestro proxy autenticado
 // (/api/google/*); la key de Google vive solo en el servidor.
@@ -36,12 +40,6 @@ interface BusinessHoursState {
   openTime: string
   closeTime: string
   isOpen: boolean
-}
-
-interface BusinessPhotoItem {
-  id: string
-  url: string
-  sortOrder: number
 }
 
 const SLOT_OPTIONS = [15, 30, 45, 60, 90]
@@ -84,37 +82,8 @@ const DAYS_OF_WEEK = [
   { label: 'Domingo', value: 0 },
 ]
 
-// Multi-source load for the edit form: settings (for businessId + slot
-// duration) plus Business row, gallery photos and business hours.
-async function fetchBusinessInfo() {
-  const settings = await getSettings()
-  const bId = settings?.businessId
-  if (!bId) throw new Error('NO_BUSINESS')
-
-  const { data: business, error: bError } = await supabase
-    .from('Business')
-    .select('*')
-    .eq('id', bId)
-    .single()
-  if (bError || !business) {
-    throw new Error(bError?.message ?? 'No se pudo cargar el negocio')
-  }
-
-  const { data: photos } = await supabase
-    .from('BusinessPhoto')
-    .select('*')
-    .eq('businessId', bId)
-    .eq('type', 'gallery')
-    .order('sortOrder', { ascending: true })
-
-  const { data: hours } = await supabase
-    .from('BusinessHours')
-    .select('*')
-    .eq('businessId', bId)
-    .is('userId', null)
-
-  return { settings, business, photos: photos ?? [], hours: hours ?? [] }
-}
+// fetchBusinessInfo vive en GallerySection.tsx (única definición de la query
+// keys.businessInfo, compartida con la pantalla /gallery).
 
 export default function BusinessInfoScreen() {
   const queryClient = useQueryClient()
@@ -146,10 +115,9 @@ export default function BusinessInfoScreen() {
   // Última normalización enviada al check remoto, para descartar respuestas tardías
   const slugReqRef = useRef('')
 
-  // Section 2: Photos
+  // Section 2: Photos (la galería vive en <GallerySection />, autocontenida)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [coverUrl, setCoverUrl] = useState<string | null>(null)
-  const [galleryPhotos, setGalleryPhotos] = useState<BusinessPhotoItem[]>([])
 
   // Section 3: Location & Modality
   const [address, setAddress] = useState('')
@@ -170,6 +138,28 @@ export default function BusinessInfoScreen() {
   const insets = useSafeAreaInsets()
   const placesRef = useRef<any>(null)
   const mapRef = useRef<MapView | null>(null)
+
+  // ?focus=photos (p.ej. desde "Galería" en el tab Negocio): al montar, scroll
+  // a la sección de fotos. La Y real llega por onLayout de la card de fotos;
+  // como la card "Tu enlace" aparece un render después del seed y empuja la
+  // sección, seguimos los reajustes de layout durante una ventana corta en
+  // lugar de fijar solo el primer Y.
+  const { focus } = useLocalSearchParams<{ focus?: string }>()
+  const scrollRef = useRef<ScrollView | null>(null)
+  const focusDoneRef = useRef(false)
+  const focusWindowRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => {
+    if (focusWindowRef.current) clearTimeout(focusWindowRef.current)
+  }, [])
+  const handlePhotosSectionLayout = (y: number) => {
+    if (focus !== 'photos' || focusDoneRef.current) return
+    if (!focusWindowRef.current) {
+      focusWindowRef.current = setTimeout(() => { focusDoneRef.current = true }, 1200)
+    }
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ y, animated: true })
+    })
+  }
 
   // El header Authorization debe existir al montar GooglePlacesAutocomplete,
   // así que resolvemos el token antes de renderizarlo.
@@ -241,7 +231,7 @@ export default function BusinessInfoScreen() {
     if (!data || seededRef.current) return
     seededRef.current = true
 
-    const { business, settings, photos, hours } = data
+    const { business, settings, hours } = data
     // El slug público canónico vive en Business.slug; el de settings (User.slug)
     // queda como fallback legacy
     setCurrentSlug(business.slug ?? settings?.slug ?? '')
@@ -262,12 +252,6 @@ export default function BusinessInfoScreen() {
     setTimezone(business.timezone ?? 'America/Caracas')
     setServiceMode((business.serviceMode as 'inStore' | 'homeVisit' | 'both') ?? 'inStore')
     setSlotDuration(settings?.settings?.slotDuration ?? 30)
-
-    setGalleryPhotos(photos.map(p => ({
-      id: p.id,
-      url: p.url,
-      sortOrder: p.sortOrder,
-    })))
 
     // Map to full 7 days, setting defaults if missing
     const hoursMap = hours.reduce((acc, curr) => {
@@ -299,7 +283,7 @@ export default function BusinessInfoScreen() {
   }, [businessInfoQuery.isError])
 
   // ── Enlace público (slug) ──────────────────────────────────────────────────
-  const profileUrl = `https://getmusa.app/p/${currentSlug}`
+  const profileUrl = getPublicProfileUrl(currentSlug)
 
   const handleShareLink = async () => {
     try {
@@ -341,7 +325,7 @@ export default function BusinessInfoScreen() {
         if (slugReqRef.current !== normalized) return // respuesta obsoleta
         if (res.available) {
           setSlugStatus('available')
-          setSlugMsg(`Disponible: getmusa.app/p/${res.normalized}`)
+          setSlugMsg(`Disponible: ${getPublicProfileDisplay(res.normalized)}`)
         } else {
           setSlugStatus('taken')
           setSlugMsg(res.reason ?? 'Ese enlace no está disponible.')
@@ -360,7 +344,7 @@ export default function BusinessInfoScreen() {
     const normalized = normalizeSlug(slugInput)
     Alert.alert(
       '¿Cambiar tu enlace?',
-      `Tu enlace pasará a ser getmusa.app/p/${normalized}. El anterior seguirá redirigiendo aquí, pero el nuevo será el oficial. Podrás cambiarlo de nuevo en 30 días.`,
+      `Tu enlace pasará a ser ${getPublicProfileDisplay(normalized)}. El anterior seguirá redirigiendo aquí, pero el nuevo será el oficial. Podrás cambiarlo de nuevo en 30 días.`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -389,7 +373,7 @@ export default function BusinessInfoScreen() {
     )
   }
 
-  const pickImage = async (target: 'logo' | 'cover' | 'gallery') => {
+  const pickImage = async (target: 'logo' | 'cover') => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (!permission.granted) {
       Alert.alert('Permiso requerido', 'Necesitamos acceso a tus fotos para cambiar las imágenes')
@@ -398,8 +382,8 @@ export default function BusinessInfoScreen() {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: target !== 'gallery',
-      aspect: target === 'logo' ? [1, 1] : target === 'cover' ? [16, 9] : undefined,
+      allowsEditing: true,
+      aspect: target === 'logo' ? [1, 1] : [16, 9],
       quality: 0.8,
     })
 
@@ -412,12 +396,8 @@ export default function BusinessInfoScreen() {
   // Subida vía signed URL de la API: el cliente de Storage de supabase-js no
   // adjunta la sesión en móvil, así que la autorización viaja en el token
   // firmado que emite el servidor (que además decide la ruta).
-  const uploadPhoto = async (uri: string, target: 'logo' | 'cover' | 'gallery') => {
+  const uploadPhoto = async (uri: string, target: 'logo' | 'cover') => {
     if (!businessId) return
-    if (target === 'gallery' && galleryPhotos.length >= 6) {
-      Alert.alert('Límite alcanzado', 'Puedes subir un máximo de 6 fotos a la galería')
-      return
-    }
     try {
       setSaving(true)
       const rawExt = uri.split('.').pop()?.toLowerCase() ?? 'jpg'
@@ -445,65 +425,21 @@ export default function BusinessInfoScreen() {
 
       const publicUrl = signed.publicUrl
 
-      if (target === 'logo' || target === 'cover') {
-        // Persistencia inmediata: la foto queda guardada sin pulsar "Guardar"
-        const { error: dbError } = await supabase
-          .from('Business')
-          .update(target === 'logo' ? { logoUrl: publicUrl } : { coverUrl: publicUrl })
-          .eq('id', businessId)
-        if (dbError) {
-          ob.logError('business-info/photo-persist', dbError)
-          Alert.alert('Error', 'La imagen se subió pero no se pudo guardar. Pulsa "Guardar cambios" para reintentar.')
-        }
-        if (target === 'logo') setLogoUrl(publicUrl)
-        else setCoverUrl(publicUrl)
-      } else {
-        // Gallery photo: la fila se inserta inmediatamente, como antes
-        const { data: newPhoto, error: dbError } = await supabase
-          .from('BusinessPhoto')
-          .insert({
-            businessId,
-            url: publicUrl,
-            type: 'gallery',
-            sortOrder: galleryPhotos.length,
-          })
-          .select()
-          .single()
-
-        if (dbError) throw dbError
-
-        setGalleryPhotos(prev => [...prev, {
-          id: newPhoto.id,
-          url: newPhoto.url,
-          sortOrder: newPhoto.sortOrder,
-        }])
+      // Persistencia inmediata: la foto queda guardada sin pulsar "Guardar"
+      const { error: dbError } = await supabase
+        .from('Business')
+        .update(target === 'logo' ? { logoUrl: publicUrl } : { coverUrl: publicUrl })
+        .eq('id', businessId)
+      if (dbError) {
+        ob.logError('business-info/photo-persist', dbError)
+        Alert.alert('Error', 'La imagen se subió pero no se pudo guardar. Pulsa "Guardar cambios" para reintentar.')
       }
+      if (target === 'logo') setLogoUrl(publicUrl)
+      else setCoverUrl(publicUrl)
 
       queryClient.invalidateQueries({ queryKey: keys.businessInfo })
     } catch (err: any) {
       Alert.alert('Error de subida', err.message || 'No se pudo subir la imagen')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const removeGalleryPhoto = async (photo: BusinessPhotoItem) => {
-    // La API de borrado pide el path dentro del bucket; lo derivamos del
-    // publicUrl (…/storage/v1/object/public/business-photos/<path>).
-    const marker = '/storage/v1/object/public/business-photos/'
-    const idx = photo.url.indexOf(marker)
-    if (idx === -1) {
-      Alert.alert('Error', 'No se pudo identificar la imagen a eliminar')
-      return
-    }
-    const path = decodeURIComponent(photo.url.slice(idx + marker.length))
-    try {
-      setSaving(true)
-      await deleteStoragePhoto(path)
-      setGalleryPhotos(prev => prev.filter(p => p.id !== photo.id))
-      queryClient.invalidateQueries({ queryKey: keys.businessInfo })
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'No se pudo eliminar la imagen')
     } finally {
       setSaving(false)
     }
@@ -673,6 +609,7 @@ export default function BusinessInfoScreen() {
             keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
           >
             <ScrollView
+              ref={scrollRef}
               contentContainerStyle={styles.content}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
@@ -750,7 +687,7 @@ export default function BusinessInfoScreen() {
 
                   <View style={styles.slugLinkRow}>
                     <Text style={styles.slugLinkText} numberOfLines={1}>
-                      getmusa.app/p/{currentSlug}
+                      {getPublicProfileDisplay(currentSlug)}
                     </Text>
                   </View>
 
@@ -778,7 +715,7 @@ export default function BusinessInfoScreen() {
                     <View style={styles.slugEditor}>
                       <Text style={styles.label}>Nuevo enlace</Text>
                       <View style={styles.slugInputRow}>
-                        <Text style={styles.slugPrefix}>getmusa.app/p/</Text>
+                        <Text style={styles.slugPrefix}>{getPublicProfileDisplay('')}</Text>
                         <TextInput
                           style={styles.slugInput}
                           value={slugInput}
@@ -840,7 +777,10 @@ export default function BusinessInfoScreen() {
               ) : null}
 
               {/* SECTION 2: FOTOS */}
-              <View style={styles.card}>
+              <View
+                style={styles.card}
+                onLayout={e => handlePhotosSectionLayout(e.nativeEvent.layout.y)}
+              >
                 <Text style={styles.sectionHeader}>Fotos</Text>
 
                 {/* Logo selection */}
@@ -877,28 +817,8 @@ export default function BusinessInfoScreen() {
                   )}
                 </TouchableOpacity>
 
-                {/* Place Gallery */}
-                <View style={styles.galleryHeader}>
-                  <Text style={styles.photoTitleLabel}>Galería del lugar</Text>
-                  <Text style={styles.counter}>{galleryPhotos.length} / 6</Text>
-                </View>
-                <Text style={styles.photoSectionSub}>Muestra tu local y tus trabajos — esto verán tus clientas.</Text>
-                <View style={styles.galleryGrid}>
-                  {galleryPhotos.map((photo) => (
-                    <View key={photo.id} style={styles.galleryPhotoWrapper}>
-                      <Image source={{ uri: photo.url }} style={styles.galleryPhoto} cachePolicy="memory-disk" transition={100} recyclingKey={photo.id} />
-                      <TouchableOpacity style={styles.photoDeleteBtn} onPress={() => removeGalleryPhoto(photo)}>
-                        <Ionicons name="close-circle" size={18} color="#D32F2F" />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                  {galleryPhotos.length < 6 && (
-                    <TouchableOpacity style={styles.galleryAddBtn} onPress={() => pickImage('gallery')}>
-                      <Ionicons name="add-outline" size={24} color={PRIMARY} />
-                      <Text style={styles.galleryAddText}>Añadir</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
+                {/* Place Gallery (componente compartido con /gallery) */}
+                <GallerySection />
               </View>
 
               {/* SECTION 3: LOCALIZACIÓN Y MODALIDAD */}
@@ -1309,17 +1229,6 @@ const styles = StyleSheet.create({
   coverImage: { width: '100%', height: '100%' },
   coverPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
   coverPlaceholderText: { fontFamily: 'System', fontSize: 12, color: GRAY },
-  galleryHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, marginBottom: 8 },
-  galleryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  galleryPhotoWrapper: { position: 'relative', width: 72, height: 72 },
-  galleryPhoto: { width: '100%', height: '100%', borderRadius: 8, borderWidth: 1, borderColor: BORDER },
-  photoDeleteBtn: { position: 'absolute', top: -6, right: -6 },
-  galleryAddBtn: {
-    width: 72, height: 72, borderRadius: 8, borderWidth: 1, borderColor: PRIMARY,
-    borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 4,
-    backgroundColor: SURFACE,
-  },
-  galleryAddText: { fontFamily: 'System', fontSize: 10, color: PRIMARY, fontWeight: '500' },
   autocompleteWrapper: { marginBottom: 14 },
   searchErrorText: { fontFamily: 'System', fontSize: 11, color: '#D32F2F', marginTop: -8, marginBottom: 12 },
   autocompleteInput: {

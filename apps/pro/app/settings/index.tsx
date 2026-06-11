@@ -6,14 +6,13 @@ import {
 import * as Clipboard from 'expo-clipboard'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { Image } from 'expo-image'
 import { router } from 'expo-router'
-import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF } from '../../lib/utils'
+import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, APP_URL, getPublicProfileUrl } from '../../lib/utils'
 import { Pulse, Bone } from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
 import { validate, businessSettingsFormSchema } from '../../lib/validation'
 import { useSettings, useUpdateSettings } from '../../hooks/queries'
-
-const APP_URL = (process.env.EXPO_PUBLIC_APP_URL ?? 'https://getmusa.app').replace(/\/$/, '')
 
 function SettingsSkeleton() {
   return (
@@ -50,7 +49,10 @@ export default function BusinessSettingsScreen() {
       ? 'loading'
       : 'error'
 
-  const slug = data?.slug ?? ''
+  // Slug canónico: Business.slug; User.slug solo como fallback legacy
+  const slug = data?.business?.slug ?? data?.slug ?? ''
+  // Contexto NEGOCIO en esta card → logo del negocio, fallback avatar de la dueña
+  const businessLogo = data?.business?.logoUrl ?? data?.avatarUrl ?? null
   const planName = data?.business?.plan?.name ?? 'Free'
   const planLimits = data?.business?.plan?.limits ?? {}
   const planStatus = data?.business?.planStatus ?? 'free'
@@ -102,21 +104,21 @@ export default function BusinessSettingsScreen() {
   }
 
   async function handleCopy() {
-    const link = `${APP_URL}/p/${slug}`
+    const link = getPublicProfileUrl(slug)
     await Clipboard.setStringAsync(link)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
   async function handleShare() {
-    const link = `${APP_URL}/p/${slug}`
+    const link = getPublicProfileUrl(slug)
     await Share.share({
       message: `Reserva tu cita en ${link}`,
       url: link,
     })
   }
 
-  const bookingLink = `${APP_URL}/p/${slug}`
+  const bookingLink = getPublicProfileUrl(slug)
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -143,12 +145,20 @@ export default function BusinessSettingsScreen() {
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Perfil del negocio</Text>
 
-              {/* Avatar placeholder */}
+              {/* Logo del negocio (fallback: avatar de la dueña) */}
               <View style={styles.avatarSection}>
-                <View style={styles.avatarCircle}>
-                  <Ionicons name="business-outline" size={32} color={GRAY} />
-                </View>
-                <TouchableOpacity style={styles.changePhotoBtn} activeOpacity={0.75}>
+                {businessLogo ? (
+                  <Image source={{ uri: businessLogo }} style={styles.avatarCircle} cachePolicy="memory-disk" transition={100} />
+                ) : (
+                  <View style={styles.avatarCircle}>
+                    <Ionicons name="business-outline" size={32} color={GRAY} />
+                  </View>
+                )}
+                <TouchableOpacity
+                  style={styles.changePhotoBtn}
+                  activeOpacity={0.75}
+                  onPress={() => router.push('/settings/business-info?focus=photos' as Parameters<typeof router.push>[0])}
+                >
                   <Text style={styles.changePhotoText}>Cambiar foto</Text>
                 </TouchableOpacity>
               </View>

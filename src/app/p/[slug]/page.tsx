@@ -428,7 +428,10 @@ export default function PublicBookingPage() {
         </div>
       </header>
 
-      <main className="pt-20 pb-36 px-5 max-w-2xl mx-auto space-y-7 min-h-[calc(100dvh-80px)]">
+      <main
+        className="pt-20 px-5 max-w-2xl mx-auto space-y-7 min-h-[calc(100dvh-80px)]"
+        style={{ paddingBottom: "calc(9rem + var(--musa-bottom-nav-height, 0px))" }}
+      >
 
         {/* Portada del negocio */}
         {business?.coverUrl && step === "service" && (
@@ -811,7 +814,7 @@ export default function PublicBookingPage() {
 
         {/* ── CONFIRMADO ─────────────────────────────────────────────── */}
         {step === "confirmed" && confirmed && (
-          <div className="fixed inset-0 z-[100] bg-espresso-900/60 backdrop-blur-sm flex items-center justify-center p-5">
+          <div className="fixed inset-0 z-[130] bg-espresso-900/60 backdrop-blur-sm flex items-center justify-center p-5">
             <div className="bg-background border border-border-subtle rounded-2xl shadow-xl max-w-sm w-full p-8 text-center space-y-6">
               <div className="w-14 h-14 rounded-full bg-success-surface flex items-center justify-center mx-auto">
                 <CheckCircleIcon className="w-7 h-7 text-success" />
@@ -886,7 +889,10 @@ export default function PublicBookingPage() {
 
       {/* ── Barra de acción inferior ──────────────────────────────────── */}
       {step !== "confirmed" && (
-        <div className="fixed bottom-0 left-0 w-full glass-nav border-t border-border-subtle z-50 px-5 pb-[max(1.5rem,env(safe-area-inset-bottom,1.5rem))] pt-4">
+        <div
+          className="fixed left-0 w-full glass-nav border-t border-border-subtle z-[120] px-5 pb-[max(1.5rem,env(safe-area-inset-bottom,1.5rem))] pt-4"
+          style={{ bottom: "var(--musa-bottom-nav-height, 0px)" }}
+        >
           <div className="max-w-2xl mx-auto flex items-center justify-between gap-4">
             <div>
               {step !== "service" && (

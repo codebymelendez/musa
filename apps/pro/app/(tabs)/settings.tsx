@@ -15,11 +15,12 @@ import { type SettingsData, getUploadUrl } from '../../lib/api'
 import { uploadFileToSignedUrl } from '../../lib/storage'
 import { useSettings, useUpdateSettings } from '../../hooks/queries'
 import { clearPersistedCache } from '../../lib/queryClient'
-import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials, hhmmToDisplay } from '../../lib/utils'
+import {
+  PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials, hhmmToDisplay,
+  APP_URL, getPublicProfileUrl, getPublicProfileDisplay,
+} from '../../lib/utils'
 import { Pulse, Bone } from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
-
-const APP_URL = (process.env.EXPO_PUBLIC_APP_URL ?? 'https://getmusa.app').replace(/\/$/, '')
 
 // ─── helper ───────────────────────────────────────────────────────────────────
 
@@ -165,6 +166,8 @@ export default function SettingsTabScreen() {
   const whatsapp = profile?.whatsapp ?? ''
   const instagram = profile?.instagram ?? ''
   const bookingEnabled = profile?.settings?.bookingEnabled ?? true
+  // Slug canónico: Business.slug; User.slug solo como fallback legacy
+  const slug = profile?.business?.slug ?? profile?.slug ?? ''
 
   const load = () => { settingsQuery.refetch() }
 
@@ -184,15 +187,15 @@ export default function SettingsTabScreen() {
   }
 
   async function handleCopy() {
-    if (!profile?.slug) return
-    await Clipboard.setStringAsync(`${APP_URL}/p/${profile.slug}`)
+    if (!slug) return
+    await Clipboard.setStringAsync(getPublicProfileUrl(slug))
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
   async function handleShare() {
-    if (!profile?.slug) return
-    const link = `${APP_URL}/p/${profile.slug}`
+    if (!slug) return
+    const link = getPublicProfileUrl(slug)
     await Share.share({ message: `Reserva tu cita en ${link}`, url: link })
   }
 
@@ -267,7 +270,7 @@ export default function SettingsTabScreen() {
   }
 
   const planName = profile?.business?.plan?.name ?? 'Free'
-  const bookingLink = profile?.slug ? `${APP_URL}/p/${profile.slug}` : ''
+  const bookingLink = slug ? getPublicProfileUrl(slug) : ''
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -358,7 +361,7 @@ export default function SettingsTabScreen() {
               label="Plan Actual"
               subtitle="Mejorar plan"
               value={planName}
-              onPress={() => Linking.openURL('https://getmusa.app/pricing')}
+              onPress={() => Linking.openURL(`${APP_URL}/settings/plans`)}
             />
             <View style={styles.rowDivider} />
             <View style={styles.sRow}>
@@ -426,7 +429,7 @@ export default function SettingsTabScreen() {
               rightBadge={
                 <View style={styles.linkBadge}>
                   <Text style={styles.linkBadgeText} numberOfLines={1}>
-                    {profile.slug ? `musa.pro/${profile.slug}` : 'Configurar'}
+                    {slug ? getPublicProfileDisplay(slug) : 'Configurar'}
                   </Text>
                   <Ionicons name={copied ? 'checkmark-outline' : 'copy-outline'} size={14} color={GRAY} />
                 </View>
