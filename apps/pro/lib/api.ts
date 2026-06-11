@@ -395,6 +395,39 @@ export async function updateSettings(data: SettingsPatch): Promise<void> {
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
 }
 
+// ─── Slug del perfil público ─────────────────────────────────────────────────
+
+export interface SlugCheckResult {
+  available: boolean
+  normalized: string
+  reason?: string
+}
+
+export async function checkSlug(slug: string): Promise<SlugCheckResult> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); throw new Error('No auth') }
+  const res = await fetch(`${API_URL}/api/slug/check?slug=${encodeURIComponent(slug)}`, { headers })
+  if (res.status === 401) { await handle401(); throw new Error('Unauthorized') }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}
+
+// Lanza con el mensaje del servidor tal cual (incluido el de cooldown con fecha)
+export async function updateSlug(slug: string): Promise<{ slug: string }> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); throw new Error('No auth') }
+  const res = await fetch(`${API_URL}/api/business/slug`, {
+    method: 'PATCH', headers, body: JSON.stringify({ slug }),
+  })
+  if (res.status === 401) { await handle401(); throw new Error('Unauthorized') }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`)
+  }
+  const json = await res.json()
+  return json.user
+}
+
 // ─── BCV Rate ────────────────────────────────────────────────────────────────
 
 export interface BcvRate { usd: number; fecha: string; stale?: boolean }

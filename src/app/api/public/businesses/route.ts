@@ -169,6 +169,7 @@ export async function GET(request: NextRequest) {
         staffCount,
         owner: {
           name:          owner?.name ?? "Desconocido",
+          // DEPRECATED: User.slug legacy — el canónico es el slug del Business (campo `slug` de arriba)
           slug:          owner?.slug,
           avatarUrl:     owner?.avatarUrl,
           // Truncate bio — prevents large payload and reduces scraping value

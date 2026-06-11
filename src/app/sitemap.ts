@@ -16,9 +16,10 @@ const TYPE_TO_SERVICIOS: Record<string, string[]> = {
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const admin = createAdminClient();
 
+  // El slug público canónico es Business.slug (User.slug queda deprecado)
   const { data: users } = await admin
     .from("User")
-    .select("slug, serviceType, business:Business(city)")
+    .select("slug, serviceType, business:Business(city, slug)")
     .eq("appRole", "owner")
     .not("slug", "is", null);
 
@@ -64,9 +65,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Individual profile pages
   for (const user of users ?? []) {
-    if (!user.slug) continue;
+    const biz = Array.isArray(user.business) ? user.business[0] : user.business;
+    const slug = (biz as { slug?: string } | null)?.slug ?? user.slug;
+    if (!slug) continue;
     entries.push({
-      url: `${BASE_URL}/p/${user.slug}`,
+      url: `${BASE_URL}/p/${slug}`,
       lastModified: new Date(),
       changeFrequency: "weekly",
       priority: 0.6,

@@ -36,8 +36,19 @@ interface PublicProfile {
   instagram: string | null;
 }
 
+interface PublicBusiness {
+  name: string;
+  slug: string;
+  logoUrl: string | null;
+  coverUrl: string | null;
+  city: string | null;
+  address: string | null;
+  photos: { id: string; url: string; sortOrder: number }[];
+}
+
 interface PublicData {
   professional: PublicProfile;
+  business?: PublicBusiness | null;
   services: Service[];
   settings: {
     workDays: number[];
@@ -150,7 +161,7 @@ export default function PublicBookingPage() {
   // Web Share API con fallback a clipboard
   const handleShare = useCallback(async () => {
     const url  = `${window.location.origin}/p/${slug}`;
-    const name = data?.professional.name ?? "esta profesional";
+    const name = data?.business?.name ?? data?.professional.name ?? "esta profesional";
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
         await navigator.share({ title: name, text: `Reserva una cita con ${name} en Musa`, url });
@@ -358,7 +369,11 @@ export default function PublicBookingPage() {
     );
   }
 
-  const { professional, services } = data;
+  const { professional, services, business } = data;
+  // Identidad visual del negocio: nombre y logo del Business con fallback al dueño
+  const displayName = business?.name ?? professional.name;
+  const displayLogo = business?.logoUrl ?? professional.avatarUrl;
+  const galleryPhotos = business?.photos ?? [];
   const isReturningClient = typeof window !== "undefined"
     ? !!localStorage.getItem(`musa_name_${slug}`)
     : false;
@@ -374,16 +389,16 @@ export default function PublicBookingPage() {
               <ArrowLeftIcon className="w-4 h-4" />
             </Link>
             <div className="w-9 h-9 rounded-full bg-rose-50 overflow-hidden relative flex-shrink-0">
-              {professional.avatarUrl ? (
-                <Image src={professional.avatarUrl} alt={professional.name} fill sizes="36px" className="object-cover" />
+              {displayLogo ? (
+                <Image src={displayLogo} alt={displayName} fill sizes="36px" className="object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center font-ui font-medium text-[13px] text-sienna-700">
-                  {professional.name[0]}
+                  {displayName[0]}
                 </div>
               )}
             </div>
             <div className="min-w-0">
-              <h1 className="font-ui font-medium text-[14px] text-on-surface leading-tight truncate">{professional.name}</h1>
+              <h1 className="font-ui font-medium text-[14px] text-on-surface leading-tight truncate">{displayName}</h1>
               {professional.serviceType && (
                 <p className="font-ui text-[11px] text-primary capitalize">{professional.serviceType}</p>
               )}
@@ -415,6 +430,20 @@ export default function PublicBookingPage() {
 
       <main className="pt-20 pb-36 px-5 max-w-2xl mx-auto space-y-7 min-h-[calc(100dvh-80px)]">
 
+        {/* Portada del negocio */}
+        {business?.coverUrl && step === "service" && (
+          <div className="relative h-40 sm:h-52 rounded-2xl overflow-hidden border border-border-subtle">
+            <Image
+              src={business.coverUrl}
+              alt={displayName}
+              fill
+              className="object-cover"
+              sizes="(max-width: 672px) 100vw, 672px"
+              priority
+            />
+          </div>
+        )}
+
         {/* Bienvenida de vuelta */}
         {isReturningClient && step === "service" && (
           <div className="bg-primary-surface border border-primary-border rounded-xl px-4 py-3 flex items-center gap-3">
@@ -442,6 +471,23 @@ export default function PublicBookingPage() {
             <p className="font-ui text-[14px] text-on-surface-muted mt-2 leading-relaxed max-w-md">{professional.bio}</p>
           )}
         </section>
+
+        {/* Galería del negocio */}
+        {galleryPhotos.length > 0 && step === "service" && (
+          <section className="space-y-3">
+            <h3 className="font-ui font-medium text-[16px] text-on-surface">Galería</h3>
+            <div className="flex gap-2.5 overflow-x-auto pb-1 -mx-5 px-5 snap-x">
+              {galleryPhotos.map((photo) => (
+                <div
+                  key={photo.id}
+                  className="relative w-32 h-32 flex-shrink-0 rounded-xl overflow-hidden border border-border-subtle snap-start"
+                >
+                  <Image src={photo.url} alt={displayName} fill className="object-cover" sizes="128px" />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* ── PASO 1: Servicio ─────────────────────────────────────────── */}
         {step === "service" && (

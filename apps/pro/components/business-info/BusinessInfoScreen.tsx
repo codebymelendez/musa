@@ -2,8 +2,10 @@ import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Animated, Alert, KeyboardAvoidingView, Platform,
-  ActivityIndicator, Switch, Modal,
+  ActivityIndicator, Switch, Modal, Share,
 } from 'react-native'
+import * as Clipboard from 'expo-clipboard'
+import * as Haptics from 'expo-haptics'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { Image } from 'expo-image'
@@ -18,9 +20,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '../../lib/supabase'
 import { ob } from '../../lib/observability'
-import { getSettings, authHeaders, getUploadUrl, deleteStoragePhoto, SignedUpload } from '../../lib/api'
+import { getSettings, authHeaders, getUploadUrl, deleteStoragePhoto, SignedUpload, checkSlug, updateSlug } from '../../lib/api'
 import { uploadFileToSignedUrl } from '../../lib/storage'
-import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials } from '../../lib/utils'
+import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials, normalizeSlug, validateSlug } from '../../lib/utils'
 import { keys } from '../../hooks/queries'
 import { MaxWidthContainer } from '../ui/MaxWidthContainer'
 
@@ -133,6 +135,17 @@ export default function BusinessInfoScreen() {
   const [website, setWebsite] = useState('')
   const [description, setDescription] = useState('')
 
+  // Section 1.5: Public profile link (Business.slug — canónico desde 2026-06)
+  const [currentSlug, setCurrentSlug] = useState('')
+  const [slugEditing, setSlugEditing] = useState(false)
+  const [slugInput, setSlugInput] = useState('')
+  const [slugStatus, setSlugStatus] = useState<'idle' | 'unchanged' | 'invalid' | 'checking' | 'available' | 'taken'>('idle')
+  const [slugMsg, setSlugMsg] = useState('')
+  const [slugSaving, setSlugSaving] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
+  // Última normalización enviada al check remoto, para descartar respuestas tardías
+  const slugReqRef = useRef('')
+
   // Section 2: Photos
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [coverUrl, setCoverUrl] = useState<string | null>(null)
@@ -229,6 +242,9 @@ export default function BusinessInfoScreen() {
     seededRef.current = true
 
     const { business, settings, photos, hours } = data
+    // El slug público canónico vive en Business.slug; el de settings (User.slug)
+    // queda como fallback legacy
+    setCurrentSlug(business.slug ?? settings?.slug ?? '')
     setName(business.name ?? '')
     setPhone(business.phone ?? '')
     setEmail(business.email ?? '')
@@ -281,6 +297,97 @@ export default function BusinessInfoScreen() {
       Alert.alert('Error', msg || 'Error al cargar la información')
     }
   }, [businessInfoQuery.isError])
+
+  // ── Enlace público (slug) ──────────────────────────────────────────────────
+  const profileUrl = `https://getmusa.app/p/${currentSlug}`
+
+  const handleShareLink = async () => {
+    try {
+      await Share.share({ message: profileUrl })
+    } catch {
+      // hoja de compartir cancelada o no disponible — sin acción
+    }
+  }
+
+  const handleCopyLink = async () => {
+    await Clipboard.setStringAsync(profileUrl)
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    setLinkCopied(true)
+    setTimeout(() => setLinkCopied(false), 2000)
+  }
+
+  // Validación local instantánea + check remoto con debounce de 500ms
+  useEffect(() => {
+    if (!slugEditing) return
+    if (!slugInput.trim()) {
+      setSlugStatus('idle'); setSlugMsg('')
+      return
+    }
+    const normalized = normalizeSlug(slugInput)
+    if (normalized === currentSlug.toLowerCase()) {
+      setSlugStatus('unchanged'); setSlugMsg('Ese es tu enlace actual.')
+      return
+    }
+    const v = validateSlug(normalized)
+    if (!v.ok) {
+      setSlugStatus('invalid'); setSlugMsg(v.message)
+      return
+    }
+    setSlugStatus('checking'); setSlugMsg('')
+    slugReqRef.current = normalized
+    const t = setTimeout(async () => {
+      try {
+        const res = await checkSlug(normalized)
+        if (slugReqRef.current !== normalized) return // respuesta obsoleta
+        if (res.available) {
+          setSlugStatus('available')
+          setSlugMsg(`Disponible: getmusa.app/p/${res.normalized}`)
+        } else {
+          setSlugStatus('taken')
+          setSlugMsg(res.reason ?? 'Ese enlace no está disponible.')
+        }
+      } catch (e) {
+        if (slugReqRef.current !== normalized) return
+        ob.logError('business-info/slug-check', e)
+        setSlugStatus('idle')
+        setSlugMsg('No se pudo comprobar la disponibilidad. Intenta de nuevo.')
+      }
+    }, 500)
+    return () => clearTimeout(t)
+  }, [slugInput, slugEditing, currentSlug])
+
+  const handleSlugSave = () => {
+    const normalized = normalizeSlug(slugInput)
+    Alert.alert(
+      '¿Cambiar tu enlace?',
+      `Tu enlace pasará a ser getmusa.app/p/${normalized}. El anterior seguirá redirigiendo aquí, pero el nuevo será el oficial. Podrás cambiarlo de nuevo en 30 días.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Cambiar',
+          onPress: async () => {
+            try {
+              setSlugSaving(true)
+              const updated = await updateSlug(normalized)
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+              setCurrentSlug(updated.slug)
+              setSlugEditing(false)
+              setSlugInput('')
+              setSlugStatus('idle')
+              setSlugMsg('')
+              queryClient.invalidateQueries({ queryKey: keys.businessInfo })
+              queryClient.invalidateQueries({ queryKey: keys.settings })
+            } catch (err: any) {
+              // El servidor responde mensajes específicos (ocupado, cooldown con fecha…)
+              Alert.alert('No se pudo cambiar el enlace', err?.message || 'Error inesperado')
+            } finally {
+              setSlugSaving(false)
+            }
+          },
+        },
+      ]
+    )
+  }
 
   const pickImage = async (target: 'logo' | 'cover' | 'gallery') => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
@@ -632,6 +739,105 @@ export default function BusinessInfoScreen() {
                   numberOfLines={4}
                 />
               </View>
+
+              {/* SECTION 1.5: TU ENLACE */}
+              {currentSlug ? (
+                <View style={styles.card}>
+                  <Text style={styles.sectionHeader}>Tu enlace</Text>
+                  <Text style={styles.photoSectionSub}>
+                    El enlace público de tu negocio. Compártelo en tu bio de Instagram y tus tarjetas — tus clientas reservan desde aquí.
+                  </Text>
+
+                  <View style={styles.slugLinkRow}>
+                    <Text style={styles.slugLinkText} numberOfLines={1}>
+                      getmusa.app/p/{currentSlug}
+                    </Text>
+                  </View>
+
+                  <View style={styles.slugActionsRow}>
+                    <TouchableOpacity style={styles.slugShareBtn} onPress={handleShareLink} activeOpacity={0.85}>
+                      <Ionicons name="share-outline" size={16} color="#FFF" />
+                      <Text style={styles.slugShareText}>Compartir</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.slugCopyBtn} onPress={handleCopyLink} activeOpacity={0.85}>
+                      <Ionicons name={linkCopied ? 'checkmark-outline' : 'copy-outline'} size={16} color={PRIMARY} />
+                      <Text style={styles.slugCopyText}>{linkCopied ? 'Copiado' : 'Copiar'}</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {!slugEditing ? (
+                    <TouchableOpacity
+                      style={styles.slugEditToggle}
+                      onPress={() => { setSlugEditing(true); setSlugInput('') }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="pencil-outline" size={13} color={GRAY} />
+                      <Text style={styles.slugEditToggleText}>Personalizar enlace</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={styles.slugEditor}>
+                      <Text style={styles.label}>Nuevo enlace</Text>
+                      <View style={styles.slugInputRow}>
+                        <Text style={styles.slugPrefix}>getmusa.app/p/</Text>
+                        <TextInput
+                          style={styles.slugInput}
+                          value={slugInput}
+                          onChangeText={setSlugInput}
+                          placeholder="tunegocio"
+                          placeholderTextColor="#AAAAAA"
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          maxLength={40}
+                        />
+                        {slugStatus === 'checking' && <ActivityIndicator size="small" color={GRAY} />}
+                        {slugStatus === 'available' && <Ionicons name="checkmark-circle" size={20} color="#2E7D32" />}
+                        {(slugStatus === 'taken' || slugStatus === 'invalid') && (
+                          <Ionicons name="close-circle" size={20} color="#D32F2F" />
+                        )}
+                      </View>
+                      {slugMsg ? (
+                        <Text style={[
+                          styles.slugStatusText,
+                          slugStatus === 'available' && { color: '#2E7D32' },
+                          (slugStatus === 'taken' || slugStatus === 'invalid') && { color: '#D32F2F' },
+                        ]}>
+                          {slugMsg}
+                        </Text>
+                      ) : null}
+                      <Text style={styles.slugNotice}>
+                        Tu enlace anterior seguirá redirigiendo aquí, pero el nuevo será el oficial.
+                        Podrás cambiarlo de nuevo en 30 días.
+                      </Text>
+                      <View style={styles.slugEditorActions}>
+                        <TouchableOpacity
+                          style={styles.slugCancelBtn}
+                          onPress={() => {
+                            setSlugEditing(false); setSlugInput(''); setSlugStatus('idle'); setSlugMsg('')
+                          }}
+                          disabled={slugSaving}
+                        >
+                          <Text style={styles.slugCancelText}>Cancelar</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[
+                            styles.slugSaveBtn,
+                            (slugStatus !== 'available' || slugSaving) && { opacity: 0.5 },
+                          ]}
+                          onPress={handleSlugSave}
+                          disabled={slugStatus !== 'available' || slugSaving}
+                          activeOpacity={0.85}
+                        >
+                          {slugSaving ? (
+                            <ActivityIndicator color="#FFF" size="small" />
+                          ) : (
+                            <Text style={styles.slugSaveText}>Guardar enlace</Text>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              ) : null}
 
               {/* SECTION 2: FOTOS */}
               <View style={styles.card}>
@@ -1199,6 +1405,53 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: PRIMARY,
   },
+  slugLinkRow: {
+    flexDirection: 'row', alignItems: 'center', marginTop: 6,
+    backgroundColor: SURFACE, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
+    paddingHorizontal: 14, height: 48,
+  },
+  slugLinkText: { flex: 1, fontFamily: MONO, fontSize: 14, color: DARK },
+  slugActionsRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  slugShareBtn: {
+    flex: 1, height: 44, borderRadius: 22, backgroundColor: PRIMARY,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+  },
+  slugShareText: { color: '#FFF', fontSize: 14, fontWeight: '500', fontFamily: 'System' },
+  slugCopyBtn: {
+    flex: 1, height: 44, borderRadius: 22, borderWidth: 1, borderColor: PRIMARY,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: '#FFF',
+  },
+  slugCopyText: { color: PRIMARY, fontSize: 14, fontWeight: '500', fontFamily: 'System' },
+  slugEditToggle: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    alignSelf: 'flex-start', marginTop: 14,
+  },
+  slugEditToggleText: { fontFamily: 'System', fontSize: 12, color: GRAY, fontWeight: '500' },
+  slugEditor: {
+    marginTop: 16, paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: BORDER,
+  },
+  slugInputRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderRadius: 12, borderWidth: 1, borderColor: BORDER,
+    paddingHorizontal: 14, height: 48, backgroundColor: SURFACE,
+  },
+  slugPrefix: { fontFamily: MONO, fontSize: 13, color: GRAY },
+  slugInput: { flex: 1, fontFamily: MONO, fontSize: 14, color: DARK, height: '100%', padding: 0 },
+  slugStatusText: { fontFamily: 'System', fontSize: 11, color: GRAY, marginTop: 6, lineHeight: 15 },
+  slugNotice: { fontFamily: 'System', fontSize: 11, color: GRAY, marginTop: 10, lineHeight: 15 },
+  slugEditorActions: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  slugCancelBtn: {
+    flex: 1, height: 44, borderRadius: 22, borderWidth: 1, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF',
+  },
+  slugCancelText: { color: GRAY, fontSize: 14, fontWeight: '500', fontFamily: 'System' },
+  slugSaveBtn: {
+    flex: 1, height: 44, borderRadius: 22, backgroundColor: PRIMARY,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  slugSaveText: { color: '#FFF', fontSize: 14, fontWeight: '500', fontFamily: 'System' },
   pillsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   dayPillActive: { backgroundColor: PRIMARY },
   dayPillText: { fontSize: 13, fontWeight: '500', color: '#666666' },

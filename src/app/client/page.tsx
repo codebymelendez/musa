@@ -359,6 +359,7 @@ export default function ClientPortalPage() {
                         <PencilSquareIcon className="w-4 h-4" /> Gestionar cita
                       </Link>
                     ) : (
+                      /* DEPRECATED: User.slug legacy — el canónico es Business.slug (redirige vía SlugHistory) */
                       <Link href={`/p/${appt.user.slug}`} className="flex-1 h-10 bg-primary/10 text-primary text-xs font-medium rounded-xl flex items-center justify-center gap-1 hover:bg-primary/20 transition-colors">
                         <CalendarDaysIcon className="w-4 h-4" /> Reservar de nuevo
                       </Link>

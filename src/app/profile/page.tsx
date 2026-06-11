@@ -150,7 +150,8 @@ export default function Profile() {
     }
   }, []);
 
-  const bookingLink = `${fullUrl}/p/${user?.slug ?? ""}`;
+  // Canónico: Business.slug; user.slug queda como fallback DEPRECATED
+  const bookingLink = `${fullUrl}/p/${user?.business?.slug ?? user?.slug ?? ""}`;
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(bookingLink);
@@ -364,7 +365,7 @@ export default function Profile() {
           </div>
           <div className="flex items-center gap-3">
             <div className="px-4 py-2 bg-white rounded-lg border border-outline-variant/30 text-xs font-mono text-on-surface-variant truncate max-w-[220px]">
-              {bookingLink || `.../p/${user?.slug ?? "tu-nombre"}`}
+              {bookingLink || `.../p/${user?.business?.slug ?? user?.slug ?? "tu-negocio"}`}
             </div>
             <button
               onClick={handleCopy}

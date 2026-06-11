@@ -25,17 +25,18 @@ interface PublicPromotion {
   discount: number;
   validUntil: string;
   business: { name: string; city: string | null } | null;
-  owner: { name: string; slug: string } | null;
+  owner: { name: string; slug: string } | null; // owner.slug DEPRECATED — usar business.slug
+  businessSlug: string | null;
 }
 
 interface FeaturedUser {
   id: string;
   name: string;
-  slug: string;
+  slug: string; // DEPRECATED: User.slug legacy — el canónico es business.slug
   avatarUrl: string | null;
   bio: string | null;
   serviceType: string | null;
-  business: { name: string; city: string | null } | null;
+  business: { name: string; city: string | null; slug?: string } | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -62,6 +63,7 @@ async function getPublicPromotions(): Promise<PublicPromotion[]> {
         business:Business(
           name,
           city,
+          slug,
           owner:User(name, slug, appRole)
         )
       `)
@@ -82,6 +84,7 @@ async function getPublicPromotions(): Promise<PublicPromotion[]> {
         validUntil: p.validUntil,
         business: business ? { name: business.name, city: business.city } : null,
         owner: owner ? { name: owner.name, slug: owner.slug } : null,
+        businessSlug: business?.slug ?? null,
       };
     });
   } catch {
@@ -117,7 +120,7 @@ async function getFeaturedProfessionals(): Promise<FeaturedUser[]> {
     if (topIds.length < 3) {
       const { data: recent } = await admin
         .from("User")
-        .select("id, name, slug, avatarUrl, bio, serviceType, business:Business(name, city)")
+        .select("id, name, slug, avatarUrl, bio, serviceType, business:Business(name, city, slug)")
         .eq("appRole", "owner")
         .order("createdAt", { ascending: false })
         .limit(8);
@@ -129,7 +132,7 @@ async function getFeaturedProfessionals(): Promise<FeaturedUser[]> {
 
     const { data: users } = await admin
       .from("User")
-      .select("id, name, slug, avatarUrl, bio, serviceType, business:Business(name, city)")
+      .select("id, name, slug, avatarUrl, bio, serviceType, business:Business(name, city, slug)")
       .in("id", topIds);
 
     return (users ?? [])
@@ -153,7 +156,7 @@ async function getFeaturedBusinesses(): Promise<FeaturedUser[]> {
       .from("User")
       .select(`
         id, name, slug, avatarUrl, bio, serviceType,
-        business:Business(name, city),
+        business:Business(name, city, slug),
         services:Service(isActive, price)
       `)
       .eq("appRole", "owner")
@@ -274,7 +277,7 @@ async function PromoList() {
   return (
     <div>
       {promotions.map((promo) => (
-        <Link key={promo.id} href={promo.owner ? `/p/${promo.owner.slug}` : "/explore"} className="group block">
+        <Link key={promo.id} href={promo.businessSlug ? `/p/${promo.businessSlug}` : "/explore"} className="group block">
           <div className="py-5 border-t border-border-subtle flex items-center gap-5 md:gap-8 -mx-3 px-3 rounded-lg hover:bg-surface-tinted/50 transition-colors duration-200">
             <div className="flex-shrink-0 w-[72px] text-right">
               <span className="font-display font-normal text-primary" style={{ fontSize: "34px", lineHeight: "1" }}>
@@ -329,7 +332,7 @@ function FeaturedCard({ user }: { user: FeaturedUser }) {
     ? (SERVICE_TYPE_LABEL[user.serviceType] ?? user.serviceType)
     : null;
   const city = (user.business as { city?: string | null } | null)?.city ?? null;
-  const href = `/p/${user.slug}`;
+  const href = `/p/${user.business?.slug ?? user.slug}`;
 
   return (
     <Link href={href} className="group flex-shrink-0 w-40 md:w-44 block">

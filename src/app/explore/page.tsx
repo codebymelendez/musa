@@ -287,7 +287,7 @@ function ExploreContent() {
         ) : (
           <div className="space-y-3">
             {businesses.map((biz) => (
-              <Link key={biz.id} href={`/p/${biz.owner.slug}`} className="block group">
+              <Link key={biz.id} href={`/p/${biz.slug}`} className="block group">
                 <div className="bg-surface-raised border border-border-subtle rounded-xl p-4 shadow-xs hover:shadow-md hover:border-primary-border transition-all duration-[160ms] group-active:scale-[0.99] flex items-start gap-4">
                   {/* Avatar */}
                   <div className="w-14 h-14 rounded-xl bg-rose-50 overflow-hidden relative flex-shrink-0">

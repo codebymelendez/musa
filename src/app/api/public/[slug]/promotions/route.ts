@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
+import { escapeIlike } from "@/lib/slug";
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -8,14 +9,16 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
   try {
     const supabase = await createClient();
-    
-    const { data: user } = await supabase
-      .from('User')
-      .select('businessId')
-      .eq('slug', slug)
-      .single();
 
-    if (!user?.businessId) {
+    // El slug público canónico es Business.slug
+    const { data: bizRows } = await supabase
+      .from('Business')
+      .select('id')
+      .ilike('slug', escapeIlike(slug))
+      .limit(1);
+    const biz = bizRows?.[0];
+
+    if (!biz?.id) {
       return NextResponse.json({ promotions: [] });
     }
 
@@ -23,7 +26,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const { data: promotions } = await supabase
       .from('Promotion')
       .select('*')
-      .eq('businessId', user.businessId)
+      .eq('businessId', biz.id)
       .eq('isActive', true)
       .lte('validFrom', now)
       .gte('validUntil', now)

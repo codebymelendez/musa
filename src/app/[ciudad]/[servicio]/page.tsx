@@ -71,11 +71,11 @@ const SERVICE_LABEL: Record<string, string> = {
 interface Professional {
   id: string;
   name: string;
-  slug: string;
+  slug: string; // DEPRECATED: User.slug legacy — el canónico es business.slug
   avatarUrl: string | null;
   bio: string | null;
   serviceType: string | null;
-  business: { name: string; city: string | null } | null;
+  business: { name: string; city: string | null; slug: string } | null;
 }
 
 // ── Static params ─────────────────────────────────────────────────────────────
@@ -164,7 +164,7 @@ async function getProfessionals(
   const admin = createAdminClient();
   const { data } = await admin
     .from("User")
-    .select("id, name, slug, avatarUrl, bio, serviceType, business:Business(name, city)")
+    .select("id, name, slug, avatarUrl, bio, serviceType, business:Business(name, city, slug)")
     .eq("appRole", "owner")
     .eq("serviceType", serviceType)
     .not("slug", "is", null)
@@ -192,7 +192,7 @@ function ProfessionalCard({ professional }: { professional: Professional }) {
     : null;
 
   return (
-    <Link href={`/p/${professional.slug}`} className="group block">
+    <Link href={`/p/${professional.business?.slug ?? professional.slug}`} className="group block">
       <div className="bg-surface-raised border border-border-subtle rounded-xl overflow-hidden hover:shadow-md hover:-translate-y-px transition-all duration-200">
         <div className="relative h-28 bg-surface-sunken overflow-hidden">
           {professional.avatarUrl ? (

@@ -47,6 +47,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       await sendClientNotification(appointment.clientId, {
         title: "Cita cancelada",
         body: `Tu cita de ${appointment.service.name} a las ${startStr} fue cancelada.`,
+        // DEPRECATED: User.slug legacy — el canónico es Business.slug (redirige vía SlugHistory)
         url: `/p/${appointment.user.slug}`,
       });
     }

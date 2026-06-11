@@ -309,6 +309,7 @@ export default function CitaPortalPage() {
             )}
           </div>
           {appointment && (
+            /* DEPRECATED: User.slug legacy — el canónico es Business.slug (redirige vía SlugHistory) */
             <Link
               href={`/p/${appointment.user.slug}`}
               className="inline-flex items-center gap-2 font-ui text-[14px] font-medium px-6 py-3 rounded-full bg-primary text-on-primary shadow-primary-sm hover:bg-primary-hover transition-colors"
@@ -454,6 +455,7 @@ export default function CitaPortalPage() {
                   <p className="font-ui text-[13px] text-on-surface-subtle">Esta cita ya no se puede modificar.</p>
                 </div>
               )}
+              {/* DEPRECATED: User.slug legacy — el canónico es Business.slug (redirige vía SlugHistory) */}
               <Link
                 href={`/p/${appointment.user.slug}`}
                 className="w-full h-11 bg-primary rounded-full font-ui font-medium text-[14px] text-on-primary flex items-center justify-center gap-2 shadow-primary-sm hover:bg-primary-hover transition-colors"

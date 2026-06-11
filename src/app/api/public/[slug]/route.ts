@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase-admin";
 import { generateTimeSlots, dayRangeUTC, DEFAULT_TZ, parseBusinessHoursToSettings } from "@/lib/utils";
 import { ProfessionalSettings } from "@/types";
 import { getBlocksInRange } from "@/lib/availability";
+import { escapeIlike } from "@/lib/slug";
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -15,18 +16,43 @@ export async function GET(req: NextRequest, { params }: Params) {
   try {
     const admin = createAdminClient();
 
-    // Buscar profesional por slug + servicios + settings + business
-    const { data: user, error: userError } = await admin
-      .from('User')
-      .select('*, services:Service(*), settings:ProfessionalSettings(*), business:Business(timezone)')
-      .eq('slug', slug)
-      .eq('Service.isActive', true)
-      .single();
+    // El slug público canónico es Business.slug: resolver el negocio y de ahí
+    // su dueña (User) con servicios + settings
+    const { data: bizRows, error: bizError } = await admin
+      .from('Business')
+      .select('id, name, slug, timezone, logoUrl, coverUrl, city, address')
+      .ilike('slug', escapeIlike(slug))
+      .limit(1);
+    const biz = bizRows?.[0];
 
-    if (userError || !user) {
-      console.error("[public slug GET] user not found for slug:", slug, userError);
+    if (bizError || !biz) {
+      console.error("[public slug GET] business not found for slug:", slug, bizError);
       return NextResponse.json({ error: "Profesional no encontrada" }, { status: 404 });
     }
+
+    // Dueña primero ('owner' < 'staff' alfabéticamente); hoy la relación es 1:1
+    const { data: userRows, error: userError } = await admin
+      .from('User')
+      .select('*, services:Service(*), settings:ProfessionalSettings(*)')
+      .eq('businessId', biz.id)
+      .in('appRole', ['owner', 'staff'])
+      .eq('Service.isActive', true)
+      .order('appRole', { ascending: true })
+      .limit(1);
+    const user = userRows?.[0];
+
+    if (userError || !user) {
+      console.error("[public slug GET] user not found for business:", biz.id, userError);
+      return NextResponse.json({ error: "Profesional no encontrada" }, { status: 404 });
+    }
+
+    // Fotos del negocio (galería) para el perfil público
+    const { data: bizPhotos } = await admin
+      .from('BusinessPhoto')
+      .select('id, url, sortOrder')
+      .eq('businessId', biz.id)
+      .eq('type', 'gallery')
+      .order('sortOrder', { ascending: true });
 
     // Supabase might return a single object or an array for settings depending on constraints
     let rawSettings = user.settings;
@@ -35,19 +61,14 @@ export async function GET(req: NextRequest, { params }: Params) {
     }
 
     // Query BusinessHours
-    let bizHours = null;
-    if (user.businessId) {
-      const { data } = await admin
-        .from('BusinessHours')
-        .select('*')
-        .eq('businessId', user.businessId)
-        .is('userId', null);
-      bizHours = data;
-    }
+    const { data: bizHours } = await admin
+      .from('BusinessHours')
+      .select('*')
+      .eq('businessId', biz.id)
+      .is('userId', null);
     const computedHours = parseBusinessHoursToSettings(bizHours);
 
-    const businessObj = Array.isArray(user.business) ? user.business[0] : user.business;
-    const businessTz = businessObj?.timezone || rawSettings?.timezone || DEFAULT_TZ;
+    const businessTz = biz.timezone || rawSettings?.timezone || DEFAULT_TZ;
 
     const settings = {
       workDays: computedHours.workDays,
@@ -146,12 +167,21 @@ export async function GET(req: NextRequest, { params }: Params) {
     return NextResponse.json({
       professional: {
         name: user.name,
-        slug: user.slug,
+        slug: biz.slug, // canónico: Business.slug
         bio: user.bio,
         avatarUrl: user.avatarUrl,
         serviceType: user.serviceType,
         whatsapp: user.whatsapp,
         instagram: user.instagram,
+      },
+      business: {
+        name: biz.name,
+        slug: biz.slug,
+        logoUrl: biz.logoUrl ?? null,
+        coverUrl: biz.coverUrl ?? null,
+        city: biz.city ?? null,
+        address: biz.address ?? null,
+        photos: bizPhotos ?? [],
       },
       services: user.services,
       settings,

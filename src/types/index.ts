@@ -49,6 +49,7 @@ export interface Business {
   id: string;
   name: string;
   slug: string;
+  slugChangedAt?: string | null;
   category: string | null;
   phone: string | null;
   city: string | null;
@@ -93,7 +94,7 @@ export interface User {
   phone: string;
   email: string | null;
   name: string;
-  slug: string;
+  slug: string; // DEPRECATED: canónico en Business.slug desde 2026-06
   appRole: "owner" | "staff" | "client";
   businessId: string | null;
   serviceType: string | null;
@@ -102,6 +103,7 @@ export interface User {
   whatsapp: string | null;
   instagram: string | null;
   onboardingDone: boolean;
+  slugChangedAt?: string | null;
   createdAt: string;
   settings?: ProfessionalSettings | null;
   business?: Business | null;

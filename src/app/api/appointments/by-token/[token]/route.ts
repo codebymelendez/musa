@@ -151,6 +151,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   sendClientNotification(appointment.clientId, {
     title: "Cita cancelada",
     body: `Tu cita de ${service?.name} el ${dateStr} fue cancelada.`,
+    // DEPRECATED: User.slug legacy — el canónico es Business.slug (redirige vía SlugHistory)
     url: `/p/${user?.slug}`,
     appointmentId: appointment.id,
   }).catch(() => {});
@@ -209,6 +210,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
           <p style="color:#6b7280;font-size:15px">Puedes reservar una nueva cita cuando quieras.</p>
           <table cellpadding="0" cellspacing="0" style="margin:24px auto 0">
             <tr><td style="background:#B5593E;border-radius:50px;text-align:center">
+              <!-- DEPRECATED: User.slug legacy — el canónico es Business.slug (redirige vía SlugHistory) -->
               <a href="${APP_URL}/p/${user?.slug}" style="display:inline-block;padding:14px 32px;color:#fff;font-size:15px;font-weight:600;text-decoration:none">
                 Reservar nueva cita →
               </a>

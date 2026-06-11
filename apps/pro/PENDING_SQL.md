@@ -205,7 +205,190 @@ Notas:
 - Si el diagnóstico (paso 1) revela valores no contemplados, añadirlos al `case` antes del UPDATE en vez de dejar que caigan en `otro`.
 - No es urgente: la lectura defensiva en código ya elimina los duplicados en UI, y cada guardado desde la pantalla de métodos de pago reescribe la fila del usuario en formato canónico.
 
-## 7 · Checklist al terminar
+## 7 · Slug personalizable del perfil público (2026-06-11)
+
+> **OJO — tabla real:** aunque la spec hablaba de `Business.slug`, el perfil público `/p/[slug]` se resuelve por **`User.slug`** (la profesional dueña): `src/app/api/public/[slug]/route.ts`, `src/app/p/[slug]/layout.tsx`, `sitemap.ts`, `[ciudad]/[servicio]` — todos consultan `User.slug`. `Business.slug` existe pero solo se usa internamente (se genera con sufijo timestamp en `/api/settings`) y **no** se toca en esta feature. Por eso el índice único, `slugChangedAt` y la FK de `SlugHistory` van sobre `"User"`.
+
+### 7.1 · Diagnóstico previo: colisiones case-insensitive existentes
+
+Si esto devuelve filas, hay slugs que chocan en minúsculas y el índice único fallará — resolver a mano antes de continuar:
+
+```sql
+select lower(slug) as slug_lower, count(*) as n,
+       array_agg(id) as user_ids, array_agg(slug) as slugs_originales
+from "User"
+where slug is not null
+group by lower(slug)
+having count(*) > 1;
+```
+
+### 7.2 · Índice único case-insensitive sobre el slug actual
+
+```sql
+create unique index "User_slug_lower_key" on "User" (lower(slug));
+```
+
+### 7.3 · Tabla SlugHistory
+
+```sql
+create table "SlugHistory" (
+  "id"        text primary key default gen_random_uuid()::text,
+  "userId"    text not null references "User"(id) on delete cascade,
+  "slug"      text not null,
+  "createdAt" timestamptz not null default now()
+);
+
+create unique index "SlugHistory_slug_lower_key" on "SlugHistory" (lower(slug));
+create index "SlugHistory_userId_idx" on "SlugHistory" ("userId");
+```
+
+Nota: el índice único en historial garantiza que un mismo slug viejo no apunte a dos negocios distintos. El API además valida que un slug nuevo no exista ni en `User` ni en `SlugHistory` (salvo en el historial propio, que se elimina al reclamarlo).
+
+### 7.4 · Columna de cooldown
+
+```sql
+alter table "User" add column "slugChangedAt" timestamptz;
+```
+
+`null` = nunca lo cambió → el primer cambio no tiene cooldown.
+
+### 7.5 · RLS de SlugHistory
+
+Lectura pública (la web pública resuelve redirecciones de slugs viejos con anon key); **sin ninguna política de escritura** — solo escribe el admin client (service role, que bypasea RLS):
+
+```sql
+alter table "SlugHistory" enable row level security;
+create policy "slughistory_select_all" on "SlugHistory" for select using (true);
+-- Sin políticas de insert/update/delete a propósito: escritura solo vía service role.
+```
+
+## 8 · Migración: Business como entidad pública canónica (2026-06-11)
+
+> Decisión de arquitectura: el slug público pasa de `User.slug` a `Business.slug`. El slug que las usuarias conocen y han compartido (`User.slug`) **gana** y se copia a `Business.slug`; el `Business.slug` actual (sufijo timestamp, nunca expuesto) se descarta pero se archiva en `SlugHistory` como seguro. `SlugHistory` pasa a FK por `businessId`.
+>
+> **Orden importa**: 8.2 (reestructurar SlugHistory) y 8.3a (archivar Business.slug viejos) deben ejecutarse ANTES del UPDATE de 8.3b, que pisa los valores antiguos. Ejecutar 8.1, revisar, y luego 8.2–8.5 en orden.
+
+### 8.1 · Diagnóstico previo (revisar antes de tocar nada)
+
+```sql
+-- a) User.slug vs Business.slug lado a lado (solo owners: el slug del negocio
+--    se canonicaliza desde la dueña; staff tiene slug propio que queda deprecado)
+select u.id as user_id, u."appRole", u.slug as user_slug,
+       b.id as business_id, b.slug as business_slug,
+       (lower(u.slug) is distinct from lower(b.slug)) as difieren
+from "User" u
+join "Business" b on b.id = u."businessId"
+where u."appRole" = 'owner'
+order by difieren desc, u.slug;
+
+-- b) Negocios con más de un User (equipo): la canonicalización copia SOLO el
+--    slug de la owner; si algún negocio tiene 2+ owners, resolver a mano antes
+select b.id, b.name, count(*) filter (where u."appRole" = 'owner') as owners,
+       count(*) as usuarios
+from "Business" b
+join "User" u on u."businessId" = b.id
+group by b.id, b.name
+having count(*) > 1 or count(*) filter (where u."appRole" = 'owner') <> 1;
+
+-- c) Colisiones que tendría lower(Business.slug) DESPUÉS de canonicalizar
+--    (simulación: slug futuro = User.slug de la owner, o el actual si no hay owner)
+with futuro as (
+  select b.id, coalesce(u.slug, b.slug) as slug_final
+  from "Business" b
+  left join "User" u on u."businessId" = b.id and u."appRole" = 'owner'
+)
+select lower(slug_final) as slug_lower, count(*) as n, array_agg(id) as business_ids
+from futuro
+group by lower(slug_final)
+having count(*) > 1;
+
+-- d) Filas de SlugHistory cuyo User no tiene businessId (huérfanas para la
+--    migración a businessId; si aparecen, se borran en 8.2 — revisar cuáles son)
+select sh.*
+from "SlugHistory" sh
+join "User" u on u.id = sh."userId"
+where u."businessId" is null;
+```
+
+### 8.2 · Reestructurar SlugHistory: FK por businessId
+
+```sql
+begin;
+
+alter table "SlugHistory" add column "businessId" text;
+
+update "SlugHistory" sh
+set "businessId" = u."businessId"
+from "User" u
+where u.id = sh."userId";
+
+-- Huérfanas (User sin negocio): sin businessId no pueden redirigir a nada
+delete from "SlugHistory" where "businessId" is null;
+
+alter table "SlugHistory" alter column "businessId" set not null;
+alter table "SlugHistory"
+  add constraint "SlugHistory_businessId_fkey"
+  foreign key ("businessId") references "Business"(id) on delete cascade;
+create index "SlugHistory_businessId_idx" on "SlugHistory" ("businessId");
+
+-- userId queda fuera: el historial pertenece al negocio
+drop index if exists "SlugHistory_userId_idx";
+alter table "SlugHistory" drop column "userId";
+
+commit;
+```
+
+(El índice único `SlugHistory_slug_lower_key` sobre `lower(slug)` y la RLS del §7.5 no cambian.)
+
+### 8.3 · Canonicalizar: User.slug → Business.slug (+ slugChangedAt)
+
+```sql
+begin;
+
+alter table "Business" add column "slugChangedAt" timestamptz;
+
+-- 8.3a · Archivar el Business.slug ANTIGUO antes de pisarlo: cualquier enlace
+-- que (improbablemente) lo usara seguirá redirigiendo. Los User.slug NO se
+-- siembran en el historial: pasan a ser los slugs canónicos del Business —
+-- meterlos en SlugHistory crearía una colisión consigo mismos en el índice
+-- único y un lookup ambiguo (canónico y "viejo" a la vez).
+insert into "SlugHistory" ("businessId", "slug")
+select b.id, b.slug
+from "Business" b
+join "User" u on u."businessId" = b.id and u."appRole" = 'owner'
+where lower(b.slug) is distinct from lower(u.slug)
+on conflict ((lower("slug"))) do nothing;
+
+-- 8.3b · El slug que las usuarias conocen gana
+update "Business" b
+set slug = u.slug,
+    "slugChangedAt" = u."slugChangedAt"
+from "User" u
+where u."businessId" = b.id and u."appRole" = 'owner';
+
+commit;
+```
+
+### 8.4 · Índice único case-insensitive sobre Business.slug
+
+Después de 8.3 (con los valores finales ya en sitio; 8.1c debe haber salido limpio):
+
+```sql
+create unique index "Business_slug_lower_key" on "Business" (lower(slug));
+```
+
+### 8.5 · Deprecación suave de User.slug
+
+NO borrar las columnas todavía (hay lecturas legacy en código):
+
+```sql
+comment on column "User".slug is 'DEPRECATED: canónico en Business.slug desde 2026-06';
+comment on column "User"."slugChangedAt" is 'DEPRECATED: canónico en Business."slugChangedAt" desde 2026-06';
+```
+
+Nota: el índice único `User_slug_lower_key` del §7.2 se conserva — `User.slug` ya no se edita, así que no estorba, y mantiene la integridad de los datos legacy.
+
+## 9 · Checklist al terminar
 
 - [ ] §1 ejecutado: todas las tablas listadas tienen `rls_activo = true`
 - [ ] Políticas de escritura por negocio en Business / BusinessHours / BusinessException / BusinessPhoto / ProfessionalSettings
@@ -213,3 +396,5 @@ Notas:
 - [ ] Políticas de path en storage para ambos buckets
 - [ ] Probar en el móvil: editar negocio, subir foto, calendario (slots) y reserva pública web siguen funcionando
 - [ ] §6 ejecutado: `paymentMethods` históricos normalizados a keys canónicas
+- [ ] §7 ejecutado: diagnóstico de colisiones limpio, índice único `lower(User.slug)`, tabla `SlugHistory` + RLS, columna `User.slugChangedAt`
+- [ ] §8 ejecutado: diagnóstico limpio (owners 1:1, sin colisiones futuras), SlugHistory por `businessId`, `Business.slug` canonicalizado desde la owner, slugs viejos de Business archivados, índice único `lower(Business.slug)`, comentarios DEPRECATED en `User.slug`

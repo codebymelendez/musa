@@ -7,6 +7,7 @@ import { getBlocksInRange, isSlotBlocked } from "@/lib/availability";
 import { checkAppointmentLimit } from "@/lib/limits";
 import { sendWhatsAppMessage, buildBookingConfirmationMsg, normalizePhone } from "@/lib/whatsapp";
 import { rateLimit } from "@/lib/rateLimit";
+import { escapeIlike } from "@/lib/slug";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -59,15 +60,31 @@ export async function POST(req: NextRequest, { params }: Params) {
       parsed.data;
     const admin = createAdminClient();
 
-    // Buscar profesional por slug
-    const { data: user, error: userError } = await admin
+    // El slug público canónico es Business.slug: resolver el negocio y de ahí
+    // su dueña. Solo cambia la resolución; la lógica de reserva es la misma.
+    const { data: bizRows, error: bizError } = await admin
+      .from('Business')
+      .select('id, timezone')
+      .ilike('slug', escapeIlike(slug))
+      .limit(1);
+    const biz = bizRows?.[0];
+
+    if (bizError || !biz) {
+      console.error("[book POST] business not found:", slug, bizError);
+      return NextResponse.json({ error: "Profesional no encontrada" }, { status: 404 });
+    }
+
+    const { data: userRows, error: userError } = await admin
       .from('User')
-      .select('*, settings:ProfessionalSettings(*), business:Business(timezone)')
-      .eq('slug', slug)
-      .single();
+      .select('*, settings:ProfessionalSettings(*)')
+      .eq('businessId', biz.id)
+      .in('appRole', ['owner', 'staff'])
+      .order('appRole', { ascending: true })
+      .limit(1);
+    const user = userRows?.[0] ? { ...userRows[0], business: { timezone: biz.timezone } } : null;
 
     if (userError || !user) {
-      console.error("[book POST] user not found:", slug, userError);
+      console.error("[book POST] user not found for business:", slug, userError);
       return NextResponse.json({ error: "Profesional no encontrada" }, { status: 404 });
     }
 

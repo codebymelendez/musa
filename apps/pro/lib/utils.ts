@@ -128,3 +128,64 @@ export function hhmmToDisplay(hhmm: number): string {
   const { h, m } = hhmmToParts(hhmm)
   return `${h}:${m}`
 }
+
+// ─── Slug del perfil público ──────────────────────────────────────────────────
+// ⚠️ Duplicado de src/lib/slug.ts para validación local instantánea en el móvil.
+// El servidor revalida siempre en PATCH /api/business/slug — mantener en sincronía.
+
+export const SLUG_MIN = 3
+export const SLUG_MAX = 30
+
+// 3–30 chars, solo a-z 0-9 y guiones, sin empezar/terminar en guion
+export const SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{1,28})[a-z0-9]$/
+
+export const RESERVED_SLUGS = new Set([
+  // Rutas reales en src/app (web)
+  'api', 'appointments', 'auth', 'booking', 'calendar', 'cita', 'client',
+  'clients', 'explore', 'forgot-password', 'home', 'login', 'loyalty',
+  'notifications', 'onboarding', 'p', 'para-profesionales', 'profile',
+  'promotions', 'reset-password', 'services', 'settings', 'sobre', 'staff',
+  'stats', 'team',
+  // Reservados de sistema/marca
+  'admin', 'app', 'www', 'b', 's', 'logout', 'signup', 'register',
+  'ajustes', 'negocio', 'business', 'perfil', 'ayuda', 'help', 'soporte',
+  'support', 'legal', 'privacidad', 'terminos', 'getmusa', 'musa',
+  'pago', 'pagos', 'planes', 'pricing',
+])
+
+export function normalizeSlug(input: string): string {
+  return input
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+export type SlugValidation =
+  | { ok: true }
+  | { ok: false; reason: 'short' | 'long' | 'chars' | 'reserved'; message: string }
+
+// Valida un slug YA normalizado. Mensajes idénticos a los del servidor.
+export function validateSlug(slug: string): SlugValidation {
+  if (slug.length < SLUG_MIN) {
+    return { ok: false, reason: 'short', message: `El enlace debe tener al menos ${SLUG_MIN} caracteres.` }
+  }
+  if (slug.length > SLUG_MAX) {
+    return { ok: false, reason: 'long', message: `El enlace no puede superar los ${SLUG_MAX} caracteres.` }
+  }
+  if (!SLUG_REGEX.test(slug)) {
+    return {
+      ok: false,
+      reason: 'chars',
+      message: 'Solo se permiten letras minúsculas, números y guiones, sin empezar ni terminar en guion.',
+    }
+  }
+  if (RESERVED_SLUGS.has(slug)) {
+    return { ok: false, reason: 'reserved', message: 'Ese enlace está reservado por MUSA. Elige otro.' }
+  }
+  return { ok: true }
+}
