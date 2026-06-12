@@ -6,6 +6,7 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import { onlineManager } from '@tanstack/react-query'
 import NetInfo from '@react-native-community/netinfo'
 import { supabase } from '../lib/supabase'
+import { usePushNotifications } from '../hooks/usePushNotifications'
 import { queryClient, asyncStoragePersister, shouldDehydrateQuery } from '../lib/queryClient'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
 import OfflineBanner from '../components/ui/OfflineBanner'
@@ -28,6 +29,9 @@ export default function RootLayout() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
   const router = useRouter()
   const segments = useSegments()
+
+  // Registro de push token (login + arranque) y navegación al tocar notificaciones
+  usePushNotifications(session)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {

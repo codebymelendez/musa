@@ -765,6 +765,30 @@ export async function deleteStoragePhoto(path: string): Promise<{ storageDeleted
   return res.json()
 }
 
+// ─── Notifications (campanita) ───────────────────────────────────────────────
+// Las lecturas van directo a Supabase (paginación + Realtime); los writes de
+// "marcar leída" reutilizan el endpoint existente de la web.
+
+export async function markNotificationRead(id: string): Promise<void> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); return }
+  const res = await fetch(`${API_URL}/api/notifications`, {
+    method: 'PATCH', headers, body: JSON.stringify({ id }),
+  })
+  if (res.status === 401) { await handle401(); return }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  const headers = await authHeaders()
+  if (!headers) { await handle401(); return }
+  const res = await fetch(`${API_URL}/api/notifications`, {
+    method: 'PATCH', headers, body: JSON.stringify({ readAll: true }),
+  })
+  if (res.status === 401) { await handle401(); return }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+}
+
 // ─── Time slot helper ────────────────────────────────────────────────────────
 
 export function generateTimeSlots(startHour: number, endHour: number, slotMin: number): string[] {

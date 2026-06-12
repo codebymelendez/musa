@@ -14,6 +14,7 @@ import { supabase } from '../../lib/supabase'
 import { type SettingsData, getUploadUrl } from '../../lib/api'
 import { uploadFileToSignedUrl } from '../../lib/storage'
 import { useSettings, useUpdateSettings } from '../../hooks/queries'
+import { unregisterPushToken } from '../../hooks/usePushNotifications'
 import { clearPersistedCache } from '../../lib/queryClient'
 import {
   PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials, hhmmToDisplay,
@@ -259,6 +260,9 @@ export default function SettingsTabScreen() {
       {
         text: 'Cerrar sesión', style: 'destructive',
         onPress: async () => {
+          // Antes del signOut: el DELETE de la suscripción necesita la sesión.
+          // Solo borra la fila de ESTE dispositivo (fcmToken actual).
+          await unregisterPushToken()
           await supabase.auth.signOut()
           // Datos del negocio no pueden quedar en el dispositivo para la
           // siguiente sesión: vaciar caché en memoria + persistido.

@@ -28,6 +28,11 @@ export const keys = {
     program: ['loyalty', 'program'] as const,
     accounts: ['loyalty', 'accounts'] as const,
   },
+  notifications: {
+    all: ['notifications'] as const,
+    list: ['notifications', 'list'] as const,
+    unreadCount: ['notifications', 'unread-count'] as const,
+  },
   bcvRate: ['bcv-rate'] as const,
   businessInfo: ['business-info'] as const,
   businessDay: (businessId: string | null, date: string) => ['businessDay', businessId, date] as const,

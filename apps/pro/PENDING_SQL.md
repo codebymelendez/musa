@@ -398,3 +398,54 @@ Nota: el índice único `User_slug_lower_key` del §7.2 se conserva — `User.sl
 - [ ] §6 ejecutado: `paymentMethods` históricos normalizados a keys canónicas
 - [ ] §7 ejecutado: diagnóstico de colisiones limpio, índice único `lower(User.slug)`, tabla `SlugHistory` + RLS, columna `User.slugChangedAt`
 - [ ] §8 ejecutado: diagnóstico limpio (owners 1:1, sin colisiones futuras), SlugHistory por `businessId`, `Business.slug` canonicalizado desde la owner, slugs viejos de Business archivados, índice único `lower(Business.slug)`, comentarios DEPRECATED en `User.slug`
+
+## 10 · Push móvil + campanita (2026-06-12)
+
+El móvil accede DIRECTO a `PushSubscription` (registro/baja del Expo push token)
+y lee DIRECTO de `Notification` (lista paginada + badge). Si esas tablas tienen
+RLS activo sin políticas para `authenticated`, el registro falla y la campanita
+sale vacía. `User.id = auth.uid()::text` (mismo supuesto del §3).
+
+```sql
+-- 10.1 · PushSubscription: el profesional gestiona SUS suscripciones
+alter table "PushSubscription" enable row level security;
+
+create policy "push_select_own" on "PushSubscription"
+  for select to authenticated
+  using ("userId" = auth.uid()::text);
+
+create policy "push_insert_own" on "PushSubscription"
+  for insert to authenticated
+  with check ("userId" = auth.uid()::text);
+
+create policy "push_update_own" on "PushSubscription"
+  for update to authenticated
+  using ("userId" = auth.uid()::text)
+  with check ("userId" = auth.uid()::text);
+
+create policy "push_delete_own" on "PushSubscription"
+  for delete to authenticated
+  using ("userId" = auth.uid()::text);
+
+-- 10.2 · Notification: lectura de las propias (writes van por la API web)
+alter table "Notification" enable row level security;
+
+create policy "notification_select_own" on "Notification"
+  for select to authenticated
+  using ("userId" = auth.uid()::text);
+
+-- 10.3 · Realtime para el badge en vivo (si no, queda el fallback on-focus)
+alter publication supabase_realtime add table "Notification";
+```
+
+Nota §10.1: el SELECT por `fcmToken` del registro solo ve filas propias; si el
+token quedó registrado a nombre de OTRA usuaria (cambio de cuenta en el mismo
+dispositivo sin logout), el INSERT crea una fila nueva y la vieja queda
+huérfana hasta que Expo devuelva DeviceNotRegistered y el backend la borre.
+
+## 11 · Checklist §10
+
+- [ ] §10.1–10.2 ejecutados
+- [ ] §10.3 ejecutado (o asumir fallback on-focus)
+- [ ] Probar: login en dispositivo físico crea fila en PushSubscription con platform ios/android
+- [ ] Probar: logout borra SOLO la fila de ese dispositivo

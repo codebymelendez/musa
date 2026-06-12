@@ -18,22 +18,82 @@ interface PushPayload {
   actions?: { action: string; title: string }[];
 }
 
+interface PushSubscriptionRow {
+  id: string;
+  endpoint: string | null;
+  keys: { p256dh: string; auth: string } | string | null;
+  platform?: string | null;
+  fcmToken?: string | null;
+}
+
+const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
+const EXPO_BATCH_SIZE = 100; // límite de mensajes por request de la API de Expo
+
 async function sendPushToSubscriptions(
-  subscriptions: { id: string; endpoint: string; keys: any }[],
+  subscriptions: PushSubscriptionRow[],
   payload: PushPayload
 ) {
   const admin = createAdminClient();
+
+  const expoSubs: PushSubscriptionRow[] = [];
+  const webSubs: PushSubscriptionRow[] = [];
   for (const sub of subscriptions) {
+    if (sub.fcmToken && sub.fcmToken.startsWith("ExponentPushToken")) {
+      expoSubs.push(sub);
+    } else {
+      webSubs.push(sub);
+    }
+  }
+
+  // ── Web Push (navegadores) ──────────────────────────────────────────────
+  for (const sub of webSubs) {
+    if (!sub.endpoint) continue;
     try {
       const keys = typeof sub.keys === 'string' ? JSON.parse(sub.keys) : sub.keys;
       await webpush.sendNotification(
         { endpoint: sub.endpoint, keys },
         JSON.stringify(payload)
       );
-    } catch (err: any) {
-      if (err.statusCode === 410 || err.statusCode === 404) {
+    } catch (err) {
+      const statusCode = (err as { statusCode?: number }).statusCode;
+      if (statusCode === 410 || statusCode === 404) {
         await admin.from('PushSubscription').delete().eq('id', sub.id);
       }
+    }
+  }
+
+  // ── Expo Push (apps móviles) ────────────────────────────────────────────
+  for (let i = 0; i < expoSubs.length; i += EXPO_BATCH_SIZE) {
+    const batch = expoSubs.slice(i, i + EXPO_BATCH_SIZE);
+    try {
+      const res = await fetch(EXPO_PUSH_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          batch.map((sub) => ({
+            to: sub.fcmToken,
+            title: payload.title,
+            body: payload.body,
+            data: { url: payload.url, appointmentId: payload.appointmentId },
+            sound: "default",
+          }))
+        ),
+      });
+      const json = await res.json().catch(() => null);
+      // Los tickets vienen en el mismo orden que los mensajes enviados
+      const tickets: { status?: string; details?: { error?: string } }[] =
+        Array.isArray(json?.data) ? json.data : [];
+      for (let j = 0; j < tickets.length; j++) {
+        const ticket = tickets[j];
+        if (
+          ticket?.status === "error" &&
+          ticket?.details?.error === "DeviceNotRegistered"
+        ) {
+          await admin.from('PushSubscription').delete().eq('id', batch[j].id);
+        }
+      }
+    } catch (err) {
+      console.error("[sendPushToSubscriptions] Expo push error:", err);
     }
   }
 }
@@ -59,7 +119,7 @@ export async function sendNotification(
 
     const { data: subscriptions } = await admin
       .from('PushSubscription')
-      .select('id, endpoint, keys')
+      .select('id, endpoint, keys, platform, fcmToken')
       .eq('userId', userId);
 
     if (subscriptions) {
@@ -92,7 +152,7 @@ export async function sendClientNotification(
 
     const { data: subscriptions } = await admin
       .from('PushSubscription')
-      .select('id, endpoint, keys')
+      .select('id, endpoint, keys, platform, fcmToken')
       .eq('clientId', clientId);
 
     if (subscriptions) {
@@ -113,7 +173,7 @@ export async function broadcastToBusinessClients(
     const admin = createAdminClient();
     const { data: clients } = await admin
       .from('Client')
-      .select('id, pushSubscriptions:PushSubscription(id, endpoint, keys)')
+      .select('id, pushSubscriptions:PushSubscription(id, endpoint, keys, platform, fcmToken)')
       .eq('businessId', businessId)
       .eq('wantsNotifications', true);
 
@@ -128,7 +188,7 @@ export async function broadcastToBusinessClients(
           type: "PROMOTION",
         });
 
-        const subs = (client as any).pushSubscriptions;
+        const subs = (client as { pushSubscriptions?: PushSubscriptionRow[] }).pushSubscriptions;
         if (subs && subs.length > 0) {
           await sendPushToSubscriptions(subs, data);
         }

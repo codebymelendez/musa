@@ -126,6 +126,29 @@ export function buildReminderMsg({
   );
 }
 
+export function buildReminder2hMsg({
+  clientName,
+  professionalName,
+  dateStr,
+  startStr,
+  rescheduleToken,
+}: {
+  clientName: string;
+  professionalName: string;
+  dateStr: string;
+  startStr: string;
+  rescheduleToken: string;
+}) {
+  return (
+    `¡Hola ${clientName}! Tu cita es en 2 horas ⏰\n\n` +
+    `📅 ${dateStr} a las ${startStr}\n` +
+    `💇 Con: ${professionalName}\n\n` +
+    `Si necesitas cancelar:\n` +
+    `👉 ${APP_URL}/cita/${rescheduleToken}\n\n` +
+    `— Equipo MUSA`
+  );
+}
+
 export function buildAppointmentLookupSingleMsg({
   clientName,
   dateStr,

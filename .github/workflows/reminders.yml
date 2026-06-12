@@ -1,15 +1,14 @@
-name: WhatsApp Reminders
+name: Appointment Reminders
 
+# El scheduling productivo vive en pg_cron (Supabase, cada 5 min) desde
+# junio 2026. Este workflow queda solo para disparo manual (testing)
+# desde la pestaña Actions.
 on:
-  schedule:
-    # Cada hora en punto (UTC)
-    - cron: "0 * * * *"
-  # Permite lanzarlo manualmente desde GitHub → Actions
   workflow_dispatch:
 
 jobs:
   send-reminders:
-    name: Send 24h appointment reminders
+    name: Send 24h + 2h appointment reminders
     runs-on: ubuntu-latest
     timeout-minutes: 5
 

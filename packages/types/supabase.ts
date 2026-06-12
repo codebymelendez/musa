@@ -29,6 +29,8 @@ export type Database = {
           businessTimezone: string
           bufferMin: number
           source: string
+          reminder24hSentAt: string | null
+          reminder2hSentAt: string | null
         }
         Insert: {
           id: string
@@ -49,6 +51,8 @@ export type Database = {
           businessTimezone?: string
           bufferMin?: number
           source?: string
+          reminder24hSentAt?: string | null
+          reminder2hSentAt?: string | null
         }
         Update: {
           id?: string
@@ -69,6 +73,8 @@ export type Database = {
           businessTimezone?: string
           bufferMin?: number
           source?: string
+          reminder24hSentAt?: string | null
+          reminder2hSentAt?: string | null
         }
         Relationships: []
       }

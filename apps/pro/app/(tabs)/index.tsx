@@ -14,7 +14,7 @@ import Skeleton from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
 import EmptyState from '../../components/ui/EmptyState'
 import { PRIMARY, DARK, SURFACE, GRAY, SERIF, formatTime, isBs } from '../../lib/utils'
-import { useDashboard } from '../../hooks/queries'
+import { useDashboard, useUnreadNotificationsCount, useNotificationsRealtime } from '../../hooks/queries'
 
 // Saludo según la hora LOCAL del dispositivo (no la timezone del negocio):
 // quien está en Madrid con negocio en Caracas debe ver "Buenos días" a sus 9:00.
@@ -28,6 +28,10 @@ function getGreeting(): string {
 export default function HomeScreen() {
   const { data, isLoading, isError, refetch, isRefetching } = useDashboard()
   const [showAddClient, setShowAddClient] = useState(false)
+
+  // Badge de la campanita: Realtime (INSERT en Notification) + refetch on focus
+  const { data: unreadCount = 0 } = useUnreadNotificationsCount()
+  useNotificationsRealtime()
 
   // Recalculado al recuperar foco: con caché persistido de React Query el home
   // puede montar con datos de hace horas y el saludo quedaría congelado.
@@ -170,7 +174,12 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <HomeTopBar avatarUrl={avatarUrl} userName={userName} />
+      <HomeTopBar
+        avatarUrl={avatarUrl}
+        userName={userName}
+        unreadCount={unreadCount}
+        onBellPress={() => router.push('/notifications' as Parameters<typeof router.push>[0])}
+      />
 
       <FlatList
         data={loading ? [] : sortedAppts}

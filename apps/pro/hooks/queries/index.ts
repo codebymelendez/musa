@@ -13,3 +13,7 @@ export {
 } from './usePromotions'
 export { useLoyaltyProgram, useLoyaltyAccounts, useSaveLoyaltyProgram, useRedeemLoyaltyReward } from './useLoyalty'
 export { useInviteTeamMember } from './useTeam'
+export {
+  useNotifications, useUnreadNotificationsCount, useMarkNotificationRead,
+  useMarkAllNotificationsRead, useNotificationsRealtime, type NotificationItem,
+} from './useNotifications'

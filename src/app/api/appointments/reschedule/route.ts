@@ -97,6 +97,9 @@ export async function POST(req: NextRequest) {
         oldStartTime: appointment.startTime,
         oldEndTime: appointment.endTime,
         rescheduleToken: newToken,
+        // Reset: los recordatorios se recalculan contra la nueva hora
+        reminder24hSentAt: null,
+        reminder2hSentAt: null,
       })
       .eq('id', appointment.id)
       .select()
