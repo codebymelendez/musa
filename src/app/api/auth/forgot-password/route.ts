@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { z } from "zod";
 import { randomBytes } from "crypto";
 import { sendEmail } from "@/lib/mailer";
@@ -57,10 +57,13 @@ export async function POST(req: NextRequest) {
 
     const resetUrl = `${APP_URL}/reset-password?token=${token}`;
 
-    sendEmail({
-      to: email,
-      subject: "Recupera tu contraseña – Musa",
-      html: `
+    // after() para que Vercel no congele la promesa al responder
+    after(async () => {
+      try {
+        await sendEmail({
+          to: email,
+          subject: "Recupera tu contraseña – Musa",
+          html: `
         <!DOCTYPE html>
         <html lang="es">
         <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -105,7 +108,11 @@ export async function POST(req: NextRequest) {
         </body>
         </html>
       `,
-    }).catch(() => {});
+        });
+      } catch (error) {
+        console.error("[forgot-password POST] email failed", error);
+      }
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

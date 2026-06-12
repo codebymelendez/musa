@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase-server";
 import { createAdminClient } from "@/lib/supabase-admin";
@@ -93,12 +93,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Enviar email de bienvenida (fire-and-forget, nunca bloquea el registro)
-    sendEmail({
-      to: email,
-      subject: "Tu negocio en MUSA está listo para arrancar 🚀",
-      html: welcomePro({ nombre: name }),
-    }).catch((err) => console.error("[welcome-pro email]", err));
+    // Enviar email de bienvenida — after() para que Vercel no congele la
+    // promesa al responder (nunca bloquea el registro)
+    after(async () => {
+      try {
+        await sendEmail({
+          to: email,
+          subject: "Tu negocio en MUSA está listo para arrancar 🚀",
+          html: welcomePro({ nombre: name }),
+        });
+      } catch (err) {
+        console.error("[welcome-pro email]", err);
+      }
+    });
 
     const userData = {
       id: authData.user.id,

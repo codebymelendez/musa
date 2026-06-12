@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { signClientToken } from "@/lib/clientAuth";
@@ -63,13 +63,20 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Error al registrarte" }, { status: 500 });
       }
 
-      // Enviar email de bienvenida solo en el primer registro
+      // Enviar email de bienvenida solo en el primer registro — after() para que
+      // Vercel no congele la promesa al responder
       if (email) {
-        sendEmail({
-          to: email,
-          subject: "Bienvenida a MUSA ✨",
-          html: welcomeClient({ nombre: name }),
-        }).catch((err) => console.error("[welcome-client email]", err));
+        after(async () => {
+          try {
+            await sendEmail({
+              to: email,
+              subject: "Bienvenida a MUSA ✨",
+              html: welcomeClient({ nombre: name }),
+            });
+          } catch (err) {
+            console.error("[welcome-client email]", err);
+          }
+        });
       }
     }
 

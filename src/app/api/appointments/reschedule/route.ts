@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { sendEmail } from "@/lib/mailer";
@@ -134,54 +134,68 @@ export async function POST(req: NextRequest) {
 
     const newManageUrl = `${APP_URL}/cita/${newToken}`;
 
-    // Push al profesional
-    sendNotification(appointment.userId, {
-      title: "Cita reprogramada 📅",
-      body: `${appointment.client.name} movió su cita de ${oldDateStr}/${oldTimeStr} → ${newDateStr}/${newTimeStr}`,
-      url: "/home",
-      appointmentId: appointment.id,
-    }).catch(() => {});
+    // Push y emails — after() para que Vercel no congele las promesas al responder
+    after(async () => {
+      // Push al profesional y a la clienta
+      try {
+        await sendNotification(appointment.userId, {
+          title: "Cita reprogramada 📅",
+          body: `${appointment.client.name} movió su cita de ${oldDateStr}/${oldTimeStr} → ${newDateStr}/${newTimeStr}`,
+          url: "/home",
+          appointmentId: appointment.id,
+        });
 
-    // Push a la clienta
-    sendClientNotification(appointment.clientId, {
-      title: "¡Cita reprogramada! ✅",
-      body: `Tu cita de ${appointment.service.name} ahora es el ${newDateStr} a las ${newTimeStr}.`,
-      url: newManageUrl,
-      appointmentId: appointment.id,
-      tag: `reschedule-${appointment.id}`,
-    }).catch(() => {});
+        await sendClientNotification(appointment.clientId, {
+          title: "¡Cita reprogramada! ✅",
+          body: `Tu cita de ${appointment.service.name} ahora es el ${newDateStr} a las ${newTimeStr}.`,
+          url: newManageUrl,
+          appointmentId: appointment.id,
+          tag: `reschedule-${appointment.id}`,
+        });
+      } catch (error) {
+        console.error("[appointments reschedule] push notification failed", error);
+      }
 
-    // Email a la clienta
-    if (appointment.client.email) {
-      sendEmail({
-        to: appointment.client.email,
-        subject: `✅ Cita reprogramada – ${appointment.service.name}`,
-        html: buildClientRescheduleEmail({
-          clientName: appointment.client.name,
-          serviceName: appointment.service.name,
-          staffName: appointment.user.name,
-          newDateStr,
-          newTimeStr,
-          manageUrl: newManageUrl,
-        }),
-      }).catch(() => {});
-    }
+      // Email a la clienta
+      if (appointment.client.email) {
+        try {
+          await sendEmail({
+            to: appointment.client.email,
+            subject: `✅ Cita reprogramada – ${appointment.service.name}`,
+            html: buildClientRescheduleEmail({
+              clientName: appointment.client.name,
+              serviceName: appointment.service.name,
+              staffName: appointment.user.name,
+              newDateStr,
+              newTimeStr,
+              manageUrl: newManageUrl,
+            }),
+          });
+        } catch (error) {
+          console.error("[appointments reschedule] client email failed", error);
+        }
+      }
 
-    // Email al profesional
-    if (appointment.user.email) {
-      sendEmail({
-        to: appointment.user.email,
-        subject: `📅 Cita reprogramada – ${appointment.client.name}`,
-        html: buildStaffRescheduleEmail({
-          clientName: appointment.client.name,
-          serviceName: appointment.service.name,
-          oldDateStr,
-          oldTimeStr,
-          newDateStr,
-          newTimeStr,
-        }),
-      }).catch(() => {});
-    }
+      // Email al profesional
+      if (appointment.user.email) {
+        try {
+          await sendEmail({
+            to: appointment.user.email,
+            subject: `📅 Cita reprogramada – ${appointment.client.name}`,
+            html: buildStaffRescheduleEmail({
+              clientName: appointment.client.name,
+              serviceName: appointment.service.name,
+              oldDateStr,
+              oldTimeStr,
+              newDateStr,
+              newTimeStr,
+            }),
+          });
+        } catch (error) {
+          console.error("[appointments reschedule] staff email failed", error);
+        }
+      }
+    });
 
     return NextResponse.json({
       success: true,

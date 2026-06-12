@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "702838406807",
+    "project_id": "getmusa-633e9",
+    "storage_bucket": "getmusa-633e9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:702838406807:android:0b66c912ae82be43b0b3d2",
+        "android_client_info": {
+          "package_name": "app.getmusa.pro"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBTA2zcjFbzavMD_Z-pU1jzkBdjKkQb31Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

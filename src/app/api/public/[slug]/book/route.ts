@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase-admin";
@@ -272,21 +272,27 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
-    // Notificaciones (Async)
-    sendNotification(user.id, {
-      title: "Nueva cita confirmada 🗓️",
-      body: `${clientName} reservó ${service.name} el ${dateStr} a las ${startStr}`,
-      url: "/home",
-      appointmentId: appointment.id,
-    }).catch(() => {});
+    // Notificaciones — after() para que Vercel no congele las promesas al responder
+    after(async () => {
+      try {
+        await sendNotification(user.id, {
+          title: "Nueva cita confirmada 🗓️",
+          body: `${clientName} reservó ${service.name} el ${dateStr} a las ${startStr}`,
+          url: "/home",
+          appointmentId: appointment.id,
+        });
 
-    sendClientNotification(client.id, {
-      title: "¡Reserva confirmada! ✨",
-      body: `Tu cita de ${service.name} con ${user.name} es el ${dateStr} a las ${startStr}.`,
-      url: `/p/${slug}`,
-      appointmentId: appointment.id,
-      tag: `booking-${appointment.id}`,
-    }).catch(() => {});
+        await sendClientNotification(client.id, {
+          title: "¡Reserva confirmada! ✨",
+          body: `Tu cita de ${service.name} con ${user.name} es el ${dateStr} a las ${startStr}.`,
+          url: `/p/${slug}`,
+          appointmentId: appointment.id,
+          tag: `booking-${appointment.id}`,
+        });
+      } catch (error) {
+        console.error("[public book POST] push notification failed", error);
+      }
+    });
 
     const formattedAppointment = appointment ? {
       ...appointment,

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { sendEmail } from "@/lib/mailer";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { sendNotification, sendClientNotification } from "@/lib/notifications";
@@ -126,42 +126,52 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     timeZone: TZ,
   });
 
-  // WhatsApp de cancelación a la clienta (async)
-  if (client?.phone) {
-    sendWhatsAppMessage(
-      client.phone,
-      buildCancellationMsg({
-        clientName: client.name,
-        professionalName: user?.name ?? "",
-        dateStr,
-        startStr,
-      })
-    ).catch(() => {});
-  }
+  // WhatsApp, push y emails — after() para que Vercel no congele las promesas al responder
+  after(async () => {
+    // WhatsApp de cancelación a la clienta
+    if (client?.phone) {
+      try {
+        await sendWhatsAppMessage(
+          client.phone,
+          buildCancellationMsg({
+            clientName: client.name,
+            professionalName: user?.name ?? "",
+            dateStr,
+            startStr,
+          })
+        );
+      } catch (error) {
+        console.error("[appointments by-token] whatsapp failed", error);
+      }
+    }
 
-  // Push al profesional
-  sendNotification(appointment.userId, {
-    title: "Cita cancelada ❌",
-    body: `${client?.name} canceló su cita de ${service?.name} el ${dateStr} a las ${startStr}`,
-    url: "/home",
-    appointmentId: appointment.id,
-  }).catch(() => {});
+    // Push al profesional y a la clienta
+    try {
+      await sendNotification(appointment.userId, {
+        title: "Cita cancelada ❌",
+        body: `${client?.name} canceló su cita de ${service?.name} el ${dateStr} a las ${startStr}`,
+        url: "/home",
+        appointmentId: appointment.id,
+      });
 
-  // Push a la clienta
-  sendClientNotification(appointment.clientId, {
-    title: "Cita cancelada",
-    body: `Tu cita de ${service?.name} el ${dateStr} fue cancelada.`,
-    // DEPRECATED: User.slug legacy — el canónico es Business.slug (redirige vía SlugHistory)
-    url: `/p/${user?.slug}`,
-    appointmentId: appointment.id,
-  }).catch(() => {});
+      await sendClientNotification(appointment.clientId, {
+        title: "Cita cancelada",
+        body: `Tu cita de ${service?.name} el ${dateStr} fue cancelada.`,
+        // DEPRECATED: User.slug legacy — el canónico es Business.slug (redirige vía SlugHistory)
+        url: `/p/${user?.slug}`,
+        appointmentId: appointment.id,
+      });
+    } catch (error) {
+      console.error("[appointments by-token] push notification failed", error);
+    }
 
-  // Email al profesional si tiene email
-  if (user?.email) {
-    sendEmail({
-      to: user.email,
-      subject: `❌ Cita cancelada – ${client?.name}`,
-      html: `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"></head>
+    // Email al profesional si tiene email
+    if (user?.email) {
+      try {
+        await sendEmail({
+          to: user.email,
+          subject: `❌ Cita cancelada – ${client?.name}`,
+          html: `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;background:#fdf6ee;font-family:Helvetica,Arial,sans-serif">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf6ee;padding:40px 16px">
     <tr><td align="center">
@@ -184,15 +194,19 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     </td></tr>
   </table>
 </body></html>`,
-    }).catch(() => {});
-  }
+        });
+      } catch (error) {
+        console.error("[appointments by-token] staff email failed", error);
+      }
+    }
 
-  // Email a la clienta si tiene email
-  if (client?.email) {
-    sendEmail({
-      to: client.email,
-      subject: "Cita cancelada – Musa",
-      html: `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"></head>
+    // Email a la clienta si tiene email
+    if (client?.email) {
+      try {
+        await sendEmail({
+          to: client.email,
+          subject: "Cita cancelada – Musa",
+          html: `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;background:#fdf6ee;font-family:Helvetica,Arial,sans-serif">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf6ee;padding:40px 16px">
     <tr><td align="center">
@@ -224,8 +238,12 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     </td></tr>
   </table>
 </body></html>`,
-    }).catch(() => {});
-  }
+        });
+      } catch (error) {
+        console.error("[appointments by-token] client email failed", error);
+      }
+    }
+  });
 
   return NextResponse.json({ ok: true });
 }

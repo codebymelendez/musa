@@ -3,7 +3,7 @@
 // no tiene perfil en la tabla User (primer acceso).
 // Requiere sesión activa de Supabase + el rol elegido ('professional' | 'client').
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase-admin";
@@ -93,13 +93,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Error al crear perfil" }, { status: 500 });
   }
 
-  // Enviar email de bienvenida para clientas (fire-and-forget)
+  // Enviar email de bienvenida para clientas — after() para que Vercel no
+  // congele la promesa al responder
   if (appRole === "client" && session.email) {
-    sendEmail({
-      to: session.email,
-      subject: "Bienvenida a MUSA ✨",
-      html: welcomeClient({ nombre: rawName }),
-    }).catch((err) => console.error("[welcome-client google email]", err));
+    const emailTo = session.email;
+    after(async () => {
+      try {
+        await sendEmail({
+          to: emailTo,
+          subject: "Bienvenida a MUSA ✨",
+          html: welcomeClient({ nombre: rawName }),
+        });
+      } catch (err) {
+        console.error("[welcome-client google email]", err);
+      }
+    });
   }
 
   // Limpiar el flag de pending_role_selection en Supabase Auth metadata

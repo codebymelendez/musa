@@ -25,6 +25,7 @@
     },
     "android": {
       "package": "app.getmusa.pro",
+      "googleServicesFile": "./google-services.json",
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
