@@ -11,7 +11,8 @@ import {
   getBcvRate,
   type AppointmentItem, type AppointmentStatus, type AppointmentPayment,
 } from '../../lib/api'
-import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, formatTime, formatDate, formatMoney, formatBs, isBs as isBsCurrency, normalizeCurrency, normalizePaymentMethods } from '../../lib/utils'
+import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, formatTime, formatDate, formatBs, isBs as isBsCurrency, normalizeCurrency, normalizePaymentMethods } from '../../lib/utils'
+import { formatPrice, currencySymbol, isDualCurrency } from '../../lib/currency'
 import { Pulse, Bone } from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
 import { validate, paymentFormSchema } from '../../lib/validation'
@@ -39,6 +40,13 @@ const METHOD_LABEL: Record<string, string> = {
   zelle:        'Zelle',
   transferencia:'Transferencia',
   otro:         'Otro',
+}
+
+// Label visible del método: fuera del contexto dual venezolano "Efectivo USD"
+// se muestra "Efectivo" a secas. Los valores persistidos NO cambian.
+function methodLabel(id: string, dual: boolean): string {
+  if (!dual && id === 'efectivo_usd') return 'Efectivo'
+  return METHOD_LABEL[id] ?? id
 }
 
 // ─── status pill ──────────────────────────────────────────────────────────────
@@ -99,16 +107,21 @@ function DetailSkeleton() {
 function PaymentSummary({
   payment,
   businessTz,
+  dual,
   onEdit,
 }: {
   payment: AppointmentPayment
   businessTz: string
+  dual: boolean
   onEdit?: () => void
 }) {
-  const isBs = isBsCurrency(payment.currency)
+  // Dual (Venezuela): formato histórico intacto. No-dual: moneda del pago tal cual.
+  const isBs = dual && isBsCurrency(payment.currency)
   const formattedAmount = isBs
     ? formatBs(payment.amount)
-    : `$${payment.amount.toFixed(2)} USD`
+    : dual
+      ? `$${payment.amount.toFixed(2)} USD`
+      : formatPrice(payment.amount, payment.currency)
 
   return (
     <View style={ps.card}>
@@ -118,7 +131,7 @@ function PaymentSummary({
       </View>
 
       <Text style={[ps.amount, { fontFamily: MONO }]}>{formattedAmount}</Text>
-      <Text style={ps.method}>{METHOD_LABEL[payment.method] ?? payment.method}</Text>
+      <Text style={ps.method}>{methodLabel(payment.method, dual)}</Text>
 
       <View style={ps.statusRow}>
         {payment.isPaid ? (
@@ -161,6 +174,11 @@ export default function AppointmentDetailScreen() {
   const aptQuery = useAppointment(id)
   const { data: settingsData } = useSettings()
   const businessTz = useBusinessTimezone()
+
+  // Dual (Venezuela USD): toggle USD|Bs + tasa BCV. No-dual: un solo monto en
+  // la moneda del negocio, sin conversión.
+  const dual = isDualCurrency(settingsData?.business)
+  const bizCurrency = (settingsData?.business?.currency ?? 'USD').toUpperCase()
 
   const actionMutation = useAppointmentAction(id ?? '')
   const completeMutation = useCompleteAppointment(id ?? '')
@@ -274,7 +292,7 @@ export default function AppointmentDetailScreen() {
     const parsed = validate(paymentFormSchema, {
       amount: Number.isNaN(rawAmount) ? 0 : rawAmount,
       method: method ?? '',
-      currency,
+      currency: effectiveCurrency,
       isPaid,
       notes: payNotes.trim() || undefined,
     })
@@ -315,7 +333,9 @@ export default function AppointmentDetailScreen() {
     )
   }
 
-  const symbol = currency === 'BS' ? 'Bs.' : '$'
+  // Moneda efectiva del cobro: en dual la elige el toggle; en no-dual es la del negocio
+  const effectiveCurrency = dual ? currency : bizCurrency
+  const symbol = dual ? (currency === 'BS' ? 'Bs.' : '$') : currencySymbol(bizCurrency)
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -390,7 +410,7 @@ export default function AppointmentDetailScreen() {
                   <Text style={styles.metaText}>{apt.service.durationMin} min</Text>
                   <Text style={styles.metaDot}>·</Text>
                   <Text style={[styles.metaText, { fontFamily: MONO }]}>
-                    {formatMoney(apt.service.price, apt.service.currency)}
+                    {formatPrice(apt.service.price, bizCurrency)}
                   </Text>
                 </View>
               </View>
@@ -428,6 +448,7 @@ export default function AppointmentDetailScreen() {
                       <PaymentSummary
                         payment={apt.payment}
                         businessTz={businessTz}
+                        dual={dual}
                         onEdit={apt.status === 'confirmed'
                           ? () => startEditPayment(apt.payment!)
                           : undefined
@@ -454,33 +475,37 @@ export default function AppointmentDetailScreen() {
                           />
                         </View>
 
-                        {/* Currency pills */}
-                        <View style={pf.currencyRow}>
-                          {(['USD', 'BS'] as const).map(c => (
-                            <TouchableOpacity
-                              key={c}
-                              style={[pf.currencyPill, currency === c && pf.currencyPillActive]}
-                              onPress={() => handleCurrencyChange(c)}
-                              disabled={bcvFetching}
-                              activeOpacity={0.8}
-                            >
-                              {bcvFetching && c === 'BS'
-                                ? <ActivityIndicator size="small" color={currency === 'BS' ? '#fff' : PRIMARY} />
-                                : <Text style={[pf.currencyPillText, currency === c && pf.currencyPillTextActive]}>
-                                    {c === 'BS' ? 'Bs.' : 'USD'}
-                                  </Text>
-                              }
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                        {currency === 'BS' && bcvRate !== null && !bcvError && (
-                          <Text style={pf.bcvInfo}>
-                            Tasa BCV: {bcvRate.toLocaleString('es-VE', { minimumFractionDigits: 2 })} Bs/$
-                            {bcvDate ? `  ·  ${bcvDate}` : ''}
-                          </Text>
-                        )}
-                        {bcvError && (
-                          <Text style={pf.bcvError}>{bcvError} — selecciona USD para continuar</Text>
+                        {/* Currency pills + tasa BCV — solo en flujo dual (Venezuela USD) */}
+                        {dual && (
+                          <>
+                            <View style={pf.currencyRow}>
+                              {(['USD', 'BS'] as const).map(c => (
+                                <TouchableOpacity
+                                  key={c}
+                                  style={[pf.currencyPill, currency === c && pf.currencyPillActive]}
+                                  onPress={() => handleCurrencyChange(c)}
+                                  disabled={bcvFetching}
+                                  activeOpacity={0.8}
+                                >
+                                  {bcvFetching && c === 'BS'
+                                    ? <ActivityIndicator size="small" color={currency === 'BS' ? '#fff' : PRIMARY} />
+                                    : <Text style={[pf.currencyPillText, currency === c && pf.currencyPillTextActive]}>
+                                        {c === 'BS' ? 'Bs.' : 'USD'}
+                                      </Text>
+                                  }
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                            {currency === 'BS' && bcvRate !== null && !bcvError && (
+                              <Text style={pf.bcvInfo}>
+                                Tasa BCV: {bcvRate.toLocaleString('es-VE', { minimumFractionDigits: 2 })} Bs/$
+                                {bcvDate ? `  ·  ${bcvDate}` : ''}
+                              </Text>
+                            )}
+                            {bcvError && (
+                              <Text style={pf.bcvError}>{bcvError} — selecciona USD para continuar</Text>
+                            )}
+                          </>
                         )}
 
                         {/* Payment method grid — filtered by business settings */}
@@ -510,7 +535,7 @@ export default function AppointmentDetailScreen() {
                                     color={active ? '#fff' : DARK}
                                   />
                                   <Text style={[pf.methodPillText, active && pf.methodPillTextActive]}>
-                                    {m.label}
+                                    {methodLabel(m.id, dual)}
                                   </Text>
                                 </TouchableOpacity>
                               )

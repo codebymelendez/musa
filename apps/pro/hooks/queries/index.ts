@@ -1,6 +1,6 @@
 export { keys, appointmentRelatedKeys } from './keys'
 export { useDashboard } from './useDashboard'
-export { useSettings, useBusinessTimezone, useUpdateSettings, useBcvRate } from './useSettings'
+export { useSettings, useBusinessTimezone, useUpdateSettings, useBcvRate, useBusinessCurrency } from './useSettings'
 export {
   useAppointments, useAppointmentsInRange, useUpcomingAppointments, useAppointment,
   useCreateAppointment, useAppointmentAction, useCompleteAppointment, useRegisterPayment,

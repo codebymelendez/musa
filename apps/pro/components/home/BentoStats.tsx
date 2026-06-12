@@ -2,14 +2,18 @@ import { memo } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import { PRIMARY, DARK, BORDER, GRAY, MONO, formatMoney, formatBs } from '../../lib/utils'
+import { PRIMARY, DARK, BORDER, GRAY, MONO, formatBs } from '../../lib/utils'
+import { formatPrice } from '../../lib/currency'
 
 const BentoStats = memo(function BentoStats({
   appointmentsCount, nextApptLabel, cobradoUSD, cobradoBs, completedSinCobro,
   newClientsCount, weeklyRevenue, weeklyRevenueBs, monthlyRevenue, monthlyRevenueBs,
+  currency = 'USD', dual = true,
 }: {
   appointmentsCount: number
   nextApptLabel: string
+  // En dual (Venezuela) son buckets USD/Bs separados; en no-dual el bucket
+  // principal es el único total, en la moneda del negocio.
   cobradoUSD: number
   cobradoBs: number
   completedSinCobro: number
@@ -18,6 +22,8 @@ const BentoStats = memo(function BentoStats({
   weeklyRevenueBs?: number | null
   monthlyRevenue: number | null
   monthlyRevenueBs?: number | null
+  currency?: string
+  dual?: boolean
 }) {
   return (
     <View style={styles.bentoContainer}>
@@ -45,17 +51,17 @@ const BentoStats = memo(function BentoStats({
             <>
               {cobradoUSD > 0 && (
                 <Text style={[styles.bentoVal, { fontFamily: MONO }]}>
-                  {formatMoney(cobradoUSD)}
+                  {formatPrice(cobradoUSD, currency)}
                 </Text>
               )}
-              {cobradoBs > 0 && (
+              {dual && cobradoBs > 0 && (
                 <Text style={[styles.bentoValSm, { fontFamily: MONO }]}>
                   {formatBs(cobradoBs)}
                 </Text>
               )}
             </>
           ) : (
-            <Text style={[styles.bentoVal, { fontFamily: MONO, color: GRAY }]}>$0</Text>
+            <Text style={[styles.bentoVal, { fontFamily: MONO, color: GRAY }]}>{dual ? '$0' : formatPrice(0, currency)}</Text>
           )}
           {completedSinCobro > 0 && (
             <View style={styles.cobrarBadge}>
@@ -84,9 +90,9 @@ const BentoStats = memo(function BentoStats({
             <Ionicons name="trending-up-outline" size={13} color={PRIMARY} />
           </View>
           <Text style={[styles.bentoValSm, { fontFamily: MONO }]}>
-            {weeklyRevenue !== null ? formatMoney(weeklyRevenue) : '—'}
+            {weeklyRevenue !== null ? formatPrice(weeklyRevenue, currency) : '—'}
           </Text>
-          {(weeklyRevenueBs ?? 0) > 0 && (
+          {dual && (weeklyRevenueBs ?? 0) > 0 && (
             <Text style={[styles.bentoBsLine, { fontFamily: MONO }]}>
               {formatBs(weeklyRevenueBs!)}
             </Text>
@@ -98,9 +104,9 @@ const BentoStats = memo(function BentoStats({
             <Text style={styles.bentoLabel}>ING. MES</Text>
           </View>
           <Text style={[styles.bentoValSm, { fontFamily: MONO }]}>
-            {monthlyRevenue !== null ? formatMoney(monthlyRevenue) : '—'}
+            {monthlyRevenue !== null ? formatPrice(monthlyRevenue, currency) : '—'}
           </Text>
-          {(monthlyRevenueBs ?? 0) > 0 && (
+          {dual && (monthlyRevenueBs ?? 0) > 0 && (
             <Text style={[styles.bentoBsLine, { fontFamily: MONO }]}>
               {formatBs(monthlyRevenueBs!)}
             </Text>

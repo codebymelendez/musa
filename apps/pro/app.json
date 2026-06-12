@@ -30,6 +30,11 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#34271E"
+      },
+      "config": {
+        "googleMaps": {
+          "apiKey": ""
+        }
       }
     },
     "plugins": [
@@ -54,6 +59,12 @@
         "projectId": "b4250c86-c967-4280-a93b-1f010293accc"
       }
     },
-    "owner": "codebymelendezs-team"
+    "owner": "codebymelendezs-team",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/b4250c86-c967-4280-a93b-1f010293accc"
+    }
   }
 }

@@ -9,7 +9,8 @@ import { type StatsData, type AppointmentItem } from '../../lib/api'
 import { PRIMARY, DARK, BORDER, GRAY, MONO, SERIF, formatTime, formatShortDate, formatBs } from '../../lib/utils'
 import { Pulse, Bone } from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
-import { useStats, useUpcomingAppointments, useBusinessTimezone } from '../../hooks/queries'
+import { useStats, useUpcomingAppointments, useBusinessTimezone, useBusinessCurrency } from '../../hooks/queries'
+import { formatPrice } from '../../lib/currency'
 
 // ─── skeleton ─────────────────────────────────────────────────────────────────
 
@@ -66,6 +67,9 @@ type State = { kind: 'loading' } | { kind: 'error' } | { kind: 'ok'; stats: Stat
 export default function StatsScreen() {
   const [period, setPeriod] = useState<Period>('month')
   const businessTz = useBusinessTimezone()
+  // Dual (Venezuela): totales con bucket Bs aparte; no-dual: un único total
+  // en la moneda del negocio (/api/stats ya la devuelve en stats.currency).
+  const { dual } = useBusinessCurrency()
 
   const { year, month } = periodToYearMonth(period)
   const statsQuery = useStats(year, month)
@@ -135,8 +139,8 @@ export default function StatsScreen() {
               />
               <MetricCard
                 label={period === 'year' ? 'Ingresos del año' : 'Ingresos del mes'}
-                value={`$${revenue.toFixed(0)}`}
-                sub={revenueBs > 0 ? formatBs(revenueBs) : undefined}
+                value={dual ? `$${revenue.toFixed(0)}` : formatPrice(revenue, stats.currency)}
+                sub={dual && revenueBs > 0 ? formatBs(revenueBs) : undefined}
               />
               <MetricCard
                 label="Total clientas"
@@ -144,8 +148,8 @@ export default function StatsScreen() {
               />
               <MetricCard
                 label="Ticket promedio"
-                value={`$${stats.avgTicket.toFixed(0)}`}
-                sub={(stats.avgTicketBs ?? 0) > 0 ? formatBs(stats.avgTicketBs!) : undefined}
+                value={dual ? `$${stats.avgTicket.toFixed(0)}` : formatPrice(stats.avgTicket, stats.currency)}
+                sub={dual && (stats.avgTicketBs ?? 0) > 0 ? formatBs(stats.avgTicketBs!) : undefined}
               />
             </View>
 

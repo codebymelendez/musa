@@ -14,6 +14,7 @@ import Skeleton from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
 import EmptyState from '../../components/ui/EmptyState'
 import { PRIMARY, DARK, SURFACE, GRAY, SERIF, formatTime, isBs } from '../../lib/utils'
+import { isDualCurrency } from '../../lib/currency'
 import { useDashboard, useUnreadNotificationsCount, useNotificationsRealtime } from '../../hooks/queries'
 
 // Saludo según la hora LOCAL del dispositivo (no la timezone del negocio):
@@ -50,6 +51,9 @@ export default function HomeScreen() {
   const monthlyRevenue = data?.monthlyRevenue ?? null
   const monthlyRevenueBs = data?.monthlyRevenueBs ?? null
   const newClientsCount = data?.newClientsCount ?? null
+  // Moneda del negocio + flujo dual venezolano (USD/Bs)
+  const bizCurrency = (data?.businessCurrency ?? 'USD').toUpperCase()
+  const dual = isDualCurrency({ currency: data?.businessCurrency, country: data?.businessCountry })
 
   const sortedAppts = useMemo(
     () => [...(appointments ?? [])].sort(
@@ -146,6 +150,8 @@ export default function HomeScreen() {
           weeklyRevenueBs={weeklyRevenueBs}
           monthlyRevenue={monthlyRevenue}
           monthlyRevenueBs={monthlyRevenueBs}
+          currency={bizCurrency}
+          dual={dual}
         />
       )}
 

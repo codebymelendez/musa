@@ -10,17 +10,19 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { type ServiceItem } from '../../lib/api'
-import { PRIMARY, DARK, BORDER, GRAY, MONO, formatMoney } from '../../lib/utils'
+import { PRIMARY, DARK, BORDER, GRAY, MONO } from '../../lib/utils'
+import { formatPrice } from '../../lib/currency'
 import { Pulse, Bone } from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
 import EmptyState from '../../components/ui/EmptyState'
-import { useServices } from '../../hooks/queries'
+import { useServices, useBusinessCurrency } from '../../hooks/queries'
 import { MaxWidthContainer } from '../../components/ui/MaxWidthContainer'
 
 type LoadState = 'loading' | 'error' | 'ready'
 
 export default function ServicesScreen() {
   const servicesQuery = useServices()
+  const { currency: bizCurrency } = useBusinessCurrency()
 
   const services: ServiceItem[] = servicesQuery.data ?? []
   const state: LoadState = servicesQuery.data
@@ -87,7 +89,7 @@ export default function ServicesScreen() {
                     <Text style={styles.svcDuration}>{svc.durationMin} min</Text>
                   </View>
                   <Text style={[styles.svcPrice, { fontFamily: MONO }]}>
-                    {formatMoney(svc.price, svc.currency)}
+                    {formatPrice(svc.price, bizCurrency)}
                   </Text>
                 </View>
               ))

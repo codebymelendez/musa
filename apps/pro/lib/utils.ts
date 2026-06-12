@@ -54,27 +54,23 @@ export function formatShortDate(iso: string, tz = 'America/Caracas'): string {
   }).format(new Date(iso))
 }
 
-export function formatMoney(amount: number, currency = 'USD'): string {
-  return `$${amount.toFixed(2)}`
-}
-
 // ─── Moneda ──────────────────────────────────────────────────────────────────
+// Helpers canónicos en ./currency (espejo de src/lib/currency.ts).
 // La BD tiene valores históricos con casing mixto ('BS', 'Bs').
 // Nunca comparar currency con literales: usar siempre estos helpers.
-export function normalizeCurrency(currency?: string | null): 'USD' | 'BS' {
-  return (currency ?? 'USD').toUpperCase() === 'BS' ? 'BS' : 'USD'
+import { formatPrice } from './currency'
+
+export { normalizeCurrency, isBs, formatPrice, currencySymbol, isDualCurrency } from './currency'
+
+// Delegado a formatPrice — único punto de formateo de importes.
+export function formatMoney(amount: number, currency = 'USD'): string {
+  return formatPrice(amount, currency)
 }
 
-export function isBs(currency?: string | null): boolean {
-  return normalizeCurrency(currency) === 'BS'
-}
-
-// Formato es-VE: miles con punto, decimales con coma → "Bs 9.082,92"
-// (sin Intl para evitar dependencia de datos de locale en Hermes/Android)
+// Formato es-VE: "Bs 9.082,92". Solo tiene sentido en contexto dual (Venezuela);
+// fuera de dual usar formatPrice con la moneda del negocio.
 export function formatBs(amount: number): string {
-  const [int, dec] = amount.toFixed(2).split('.')
-  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
-  return `Bs ${grouped},${dec}`
+  return formatPrice(amount, 'BS')
 }
 
 // ─── Métodos de pago ─────────────────────────────────────────────────────────

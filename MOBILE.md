@@ -496,6 +496,7 @@ eas submit --platform ios
 8. **No crear endpoints nuevos** en `src/app/api/` para el MVP — consumir los existentes.
 9. **El campo `platform`** en `PushSubscription` siempre debe enviarse al registrar tokens. Nunca asumir que es web.
 10. **Expo Router file-based routing** — las rutas reflejan la estructura de carpetas en `app/`. Grupos con paréntesis `(tabs)` para tabs y `(auth)` para flujos de autenticación.
+11. **Moneda: `apps/pro/lib/currency.ts` es ESPEJO de `src/lib/currency.ts`** — `formatPrice`, `currencySymbol`, `isDualCurrency` (USD + país VE; `country` null se asume VE). No hay package compartido consumido por ambas apps (la web no consume `@musa/*`), así que cualquier cambio de semántica debe replicarse en los dos archivos. La copia móvil NO usa `Intl.NumberFormat` con `style: 'currency'` (datos de locale incompletos en Hermes/Android, mismo motivo que `formatBs`); el formato se construye a mano con la misma salida que la web. El flujo dual USD/Bs (tasa BCV) solo aplica cuando `isDualCurrency` es true.
 
 ---
 

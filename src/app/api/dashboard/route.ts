@@ -25,6 +25,9 @@ export async function GET(req: NextRequest) {
     const userName = user.name?.split(' ')[0] ?? '';
     const avatarUrl = user.avatarUrl ?? null;
     const businessLogoUrl = user.business?.logoUrl ?? null;
+    // Moneda y país del negocio — la app móvil los necesita para isDualCurrency
+    const businessCurrency = user.business?.currency ?? 'USD';
+    const businessCountry = user.business?.country ?? null;
     const businessId = user.businessId;
 
     // Default structure if no business is assigned
@@ -34,6 +37,8 @@ export async function GET(req: NextRequest) {
         userName,
         avatarUrl,
         businessLogoUrl,
+        businessCurrency,
+        businessCountry,
         appointments: [],
         promos: [],
         loyaltyProgram: null,
@@ -187,6 +192,8 @@ export async function GET(req: NextRequest) {
         userName,
         avatarUrl,
         businessLogoUrl,
+        businessCurrency,
+        businessCountry,
         appointments: formattedAppts,
         promos: activePromos,
         loyaltyProgram: loyaltyProgramRes.data ?? null,

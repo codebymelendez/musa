@@ -10,6 +10,7 @@ import { router } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { getBusinessTZ, type ClientItem, type ServiceItem } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO } from '../../lib/utils'
+import { formatPrice } from '../../lib/currency'
 import DatePickerModal from '../../components/DatePickerModal'
 import { Pulse, Bone } from '../../components/ui/Skeleton'
 import { getAvailableSlots } from '@musa/availability'
@@ -56,6 +57,7 @@ export default function NewAppointmentScreen() {
   const services: ServiceItem[] = servicesQuery.data ?? []
   const settingsData = settingsQuery.data ?? null
   const businessTz = getBusinessTZ(settingsData)
+  const bizCurrency = (settingsData?.business?.currency ?? 'USD').toUpperCase()
   const loading =
     (clientsQuery.isLoading && !clientsQuery.data) ||
     (servicesQuery.isLoading && !servicesQuery.data) ||
@@ -237,7 +239,7 @@ export default function NewAppointmentScreen() {
                 <View style={styles.selectedSvcBadge}>
                   <Ionicons name="sparkles-outline" size={16} color={PRIMARY} />
                   <Text style={styles.selectedSvcText}>
-                    {selectedService.name} ({selectedService.durationMin} min · ${selectedService.price})
+                    {selectedService.name} ({selectedService.durationMin} min · {formatPrice(selectedService.price, bizCurrency)})
                   </Text>
                   <TouchableOpacity
                     onPress={() => {
@@ -274,7 +276,7 @@ export default function NewAppointmentScreen() {
                         <View style={{ flex: 1 }}>
                           <Text style={styles.dropdownItemText}>{svc.name}</Text>
                           <Text style={styles.dropdownItemSub}>
-                            {svc.durationMin} min · ${svc.price}
+                            {svc.durationMin} min · {formatPrice(svc.price, bizCurrency)}
                           </Text>
                         </View>
                       </TouchableOpacity>

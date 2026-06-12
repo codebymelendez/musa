@@ -282,6 +282,8 @@ export interface DashboardData {
   userName: string
   avatarUrl: string | null
   businessLogoUrl?: string | null
+  businessCurrency?: string | null
+  businessCountry?: string | null
   appointments: AppointmentItem[]
   promos: PromotionItem[]
   loyaltyProgram: LoyaltyProgram | null
@@ -324,6 +326,9 @@ export interface SettingsData {
   business: {
     id: string; name: string; slug: string; city: string | null;
     address?: string | null;
+    // Moneda y país del negocio — fuente de verdad para precios e isDualCurrency
+    currency?: string | null;
+    country?: string | null;
     logoUrl?: string | null;
     phone?: string | null;
     category?: string | null;

@@ -6,7 +6,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, router } from 'expo-router'
-import { PRIMARY, DARK, SURFACE, BORDER, GRAY, SERIF, MONO, formatMoney } from '../../lib/utils'
+import { PRIMARY, DARK, SURFACE, BORDER, GRAY, SERIF, MONO } from '../../lib/utils'
 import { Pulse, Bone } from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
 import { validate, serviceFormSchema } from '../../lib/validation'

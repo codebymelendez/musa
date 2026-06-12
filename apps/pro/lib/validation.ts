@@ -45,7 +45,8 @@ export const clientFormSchema = z.object({
 export const paymentFormSchema = z.object({
   amount: amountSchema,
   method: z.string().min(1, 'Selecciona un método de pago'),
-  currency: z.enum(['USD', 'BS'], { message: 'Moneda inválida' }),
+  // Cualquier código ISO 4217 (EUR, COP…) + 'BS' legacy venezolano (no es ISO)
+  currency: z.string().regex(/^([A-Za-z]{3}|[Bb][Ss])$/, 'Moneda inválida'),
   isPaid: z.boolean(),
   notes: z.string().max(500, 'Las notas son demasiado largas').optional(),
 })

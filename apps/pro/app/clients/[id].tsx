@@ -11,12 +11,14 @@ import { useLocalSearchParams, router } from 'expo-router'
 import {
   type ClientItem, type AppointmentStatus, type AppointmentPayment, type LoyaltyProgram, type LoyaltyAccount,
 } from '../../lib/api'
-import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials, formatShortDate, formatMoney, formatBs, isBs } from '../../lib/utils'
+import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, initials, formatShortDate, formatBs, isBs } from '../../lib/utils'
+import { formatPrice } from '../../lib/currency'
 import { Pulse, Bone } from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
 import { validate, clientFormSchema } from '../../lib/validation'
 import {
   useClient, useUpdateClient, useLoyaltyProgram, useLoyaltyAccounts, useRedeemLoyaltyReward,
+  useBusinessCurrency,
 } from '../../hooks/queries'
 import { MaxWidthContainer } from '../../components/ui/MaxWidthContainer'
 
@@ -59,7 +61,15 @@ const METHOD_LABEL: Record<string, string> = {
   otro:         'Otro',
 }
 
-function paymentAmountStr(p: AppointmentPayment): string {
+// Fuera del contexto dual venezolano "Efectivo USD" se muestra "Efectivo".
+// Los valores persistidos NO cambian.
+function methodLabel(id: string, dual: boolean): string {
+  if (!dual && id === 'efectivo_usd') return 'Efectivo'
+  return METHOD_LABEL[id] ?? id
+}
+
+function paymentAmountStr(p: AppointmentPayment, dual: boolean): string {
+  if (!dual) return formatPrice(p.amount, p.currency)
   return isBs(p.currency)
     ? formatBs(p.amount)
     : `$${p.amount.toFixed(2)}`
@@ -370,6 +380,7 @@ export default function ClientDetailScreen() {
   const [editModal, setEditModal] = useState(false)
 
   const clientQuery = useClient(id)
+  const { currency: bizCurrency, dual } = useBusinessCurrency()
   const loyaltyProgramQuery = useLoyaltyProgram()
   const loyaltyAccountsQuery = useLoyaltyAccounts()
   const updateClientMutation = useUpdateClient(id ?? '')
@@ -523,16 +534,18 @@ export default function ClientDetailScreen() {
                     <View style={styles.cobroAmounts}>
                       {totalUSD > 0 && (
                         <Text style={[styles.cobroAmount, { fontFamily: MONO }]}>
-                          ${totalUSD.toFixed(2)} USD
+                          {dual ? `$${totalUSD.toFixed(2)} USD` : formatPrice(totalUSD, bizCurrency)}
                         </Text>
                       )}
-                      {totalBs > 0 && (
+                      {dual && totalBs > 0 && (
                         <Text style={[styles.cobroAmount, { fontFamily: MONO }]}>
                           {formatBs(totalBs)}
                         </Text>
                       )}
                       {paid.length === 0 && (
-                        <Text style={[styles.cobroAmount, { fontFamily: MONO }]}>$0.00</Text>
+                        <Text style={[styles.cobroAmount, { fontFamily: MONO }]}>
+                          {dual ? '$0.00' : formatPrice(0, bizCurrency)}
+                        </Text>
                       )}
                     </View>
                     {pending.length > 0 && (
@@ -566,10 +579,10 @@ export default function ClientDetailScreen() {
                         {apt.payment && (
                           <View style={styles.aptPaymentRow}>
                             <Text style={[styles.aptPaymentAmount, { fontFamily: MONO }]}>
-                              {paymentAmountStr(apt.payment)}
+                              {paymentAmountStr(apt.payment, dual)}
                             </Text>
                             <Text style={styles.aptPaymentMethod}>
-                              {METHOD_LABEL[apt.payment.method] ?? apt.payment.method}
+                              {methodLabel(apt.payment.method, dual)}
                             </Text>
                             {!apt.payment.isPaid && (
                               <View style={styles.aptPendingBadge}>

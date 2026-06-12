@@ -9,12 +9,13 @@ import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { router } from 'expo-router'
 import { type ServiceItem } from '../../lib/api'
-import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, formatMoney } from '../../lib/utils'
+import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF } from '../../lib/utils'
+import { formatPrice } from '../../lib/currency'
 import { Pulse, Bone } from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
 import EmptyState from '../../components/ui/EmptyState'
 import { validate, serviceFormSchema } from '../../lib/validation'
-import { useServices, useCreateService, useDeleteService } from '../../hooks/queries'
+import { useServices, useCreateService, useDeleteService, useBusinessCurrency } from '../../hooks/queries'
 
 // ─── duration pills ───────────────────────────────────────────────────────────
 
@@ -31,6 +32,8 @@ const SwipeableRow = memo(function SwipeableRow({
 }) {
   const translateX = useRef(new Animated.Value(0)).current
   const [revealed, setRevealed] = useState(false)
+  // Moneda del negocio — fuente de verdad para el precio mostrado
+  const { currency: bizCurrency } = useBusinessCurrency()
 
   const panResponder = useRef(PanResponder.create({
     onMoveShouldSetPanResponder: (_, g) =>
@@ -73,7 +76,7 @@ const SwipeableRow = memo(function SwipeableRow({
             <Text style={[svcStyles.svcDuration, { fontFamily: MONO }]}>{item.durationMin} min</Text>
           </View>
           <Text style={[svcStyles.svcPrice, { fontFamily: MONO }]}>
-            {formatMoney(item.price, item.currency)}
+            {formatPrice(item.price, bizCurrency)}
           </Text>
         </TouchableOpacity>
       </Animated.View>

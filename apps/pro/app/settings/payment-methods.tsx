@@ -9,7 +9,7 @@ import { router } from 'expo-router'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, SERIF, normalizePaymentMethods, type CanonicalPaymentMethod } from '../../lib/utils'
 import { Pulse, Bone } from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
-import { useSettings, useUpdateSettings } from '../../hooks/queries'
+import { useSettings, useUpdateSettings, useBusinessCurrency } from '../../hooks/queries'
 import { MaxWidthContainer } from '../../components/ui/MaxWidthContainer'
 
 type Method = {
@@ -28,6 +28,15 @@ const METHODS: Method[] = [
   { key: 'otro',          label: 'Otro',                   icon: 'ellipsis-horizontal-outline'                             },
 ]
 
+// Fuera del contexto dual venezolano, "Efectivo USD" se muestra "Efectivo" a
+// secas (sin hint de billetes dólares). Las keys persistidas NO cambian.
+function displayMethod(method: Method, dual: boolean): Method {
+  if (!dual && method.key === 'efectivo_usd') {
+    return { ...method, label: 'Efectivo', hint: undefined }
+  }
+  return method
+}
+
 function PaymentMethodsSkeleton() {
   return (
     <Pulse style={{ paddingHorizontal: 20, paddingTop: 20, gap: 12 }}>
@@ -42,6 +51,7 @@ type LoadState = 'loading' | 'error' | 'ready'
 export default function PaymentMethodsScreen() {
   const settingsQuery = useSettings()
   const updateSettingsMutation = useUpdateSettings()
+  const { dual } = useBusinessCurrency()
   const [saving, setSaving] = useState<string | null>(null)
   const insets = useSafeAreaInsets()
 
@@ -105,7 +115,8 @@ export default function PaymentMethodsScreen() {
             </View>
 
             <View style={styles.card}>
-              {METHODS.map((method, idx) => {
+              {METHODS.map((rawMethod, idx) => {
+                const method = displayMethod(rawMethod, dual)
                 const isActive = active.includes(method.key)
                 const isSaving = saving === method.key
                 return (
@@ -145,7 +156,10 @@ export default function PaymentMethodsScreen() {
                   {active.map(key => (
                     <View key={key} style={styles.pill}>
                       <Text style={styles.pillText}>
-                        {METHODS.find(m => m.key === key)?.label ?? key}
+                        {(() => {
+                          const m = METHODS.find(x => x.key === key)
+                          return m ? displayMethod(m, dual).label : key
+                        })()}
                       </Text>
                     </View>
                   ))}

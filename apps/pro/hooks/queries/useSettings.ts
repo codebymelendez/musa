@@ -3,6 +3,7 @@ import {
   getSettings, updateSettings, getBcvRate, getBusinessTZ,
   type SettingsData, type SettingsPatch,
 } from '../../lib/api'
+import { isDualCurrency } from '../../lib/currency'
 import { keys } from './keys'
 
 export function useSettings() {
@@ -53,11 +54,24 @@ export function useUpdateSettings() {
   })
 }
 
+// Moneda y país del negocio + si aplica el flujo dual USD/Bs (BCV).
+export function useBusinessCurrency(): { currency: string; country: string | null; dual: boolean } {
+  const { data } = useSettings()
+  return {
+    currency: (data?.business?.currency ?? 'USD').toUpperCase(),
+    country: data?.business?.country ?? null,
+    dual: isDualCurrency(data?.business),
+  }
+}
+
+// La tasa BCV solo tiene sentido en el flujo dual venezolano — fuera de él
+// la query queda deshabilitada aunque el caller pase enabled=true.
 export function useBcvRate(enabled = true) {
+  const { dual } = useBusinessCurrency()
   return useQuery({
     queryKey: keys.bcvRate,
     queryFn: getBcvRate,
-    enabled,
+    enabled: enabled && dual,
     staleTime: 30 * 60 * 1000,
   })
 }
