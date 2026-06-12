@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
         category,
         city,
         address,
+        logoUrl,
         hours:BusinessHours(dayOfWeek, isOpen),
         users:User(
           name,
@@ -166,6 +167,7 @@ export async function GET(request: NextRequest) {
         category: b.category || owner?.serviceType || null,
         city: b.city,
         address: b.address,
+        logoUrl: b.logoUrl ?? null,
         staffCount,
         owner: {
           name:          owner?.name ?? "Desconocido",

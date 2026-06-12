@@ -39,7 +39,7 @@ export default function Stats() {
                 {monthLabel}
               </p>
               <h2 className="font-display text-[48px] font-semibold text-on-surface tracking-[-0.02em] leading-none">
-                {formatCurrency(stats?.monthlyRevenue ?? 0)}
+                {formatCurrency(stats?.monthlyRevenue ?? 0, stats?.currency)}
               </h2>
             </div>
 
@@ -128,7 +128,7 @@ export default function Stats() {
                   </div>
                 </div>
                 <p className="font-ui font-semibold text-[16px] text-on-surface">
-                  {formatCurrency((stats as (typeof stats & { yearlyRevenue?: number }))?.yearlyRevenue ?? 0)}
+                  {formatCurrency((stats as (typeof stats & { yearlyRevenue?: number }))?.yearlyRevenue ?? 0, stats?.currency)}
                 </p>
               </div>
 
@@ -143,7 +143,7 @@ export default function Stats() {
                   </div>
                 </div>
                 <p className="font-ui font-semibold text-[16px] text-on-surface">
-                  {formatCurrency(stats?.avgTicket ?? 0)}
+                  {formatCurrency(stats?.avgTicket ?? 0, stats?.currency)}
                 </p>
               </div>
             </div>

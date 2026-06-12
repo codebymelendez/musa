@@ -4,10 +4,12 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { TimeSlot, formatCurrency, formatTimeES } from "@/lib/utils";
+import { TimeSlot, formatTimeES } from "@/lib/utils";
+import { formatPrice } from "@/lib/currency";
 import { Service } from "@/types";
 import { usePushSubscription } from "@/hooks/usePushSubscription";
 import PromotionBanner from "@/components/PromotionBanner";
+import { bestActivePromotion, applyPromotionDiscount } from "@/lib/promotions";
 import MusaLogo from "@/components/brand/MusaLogo";
 import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 import { createClient } from "@/lib/supabase-browser";
@@ -67,7 +69,9 @@ interface Promotion {
   title: string;
   description: string;
   discount: number;
+  validFrom?: string | null;
   validUntil: string;
+  isActive?: boolean;
 }
 
 // service → datetime → identity → confirmed
@@ -370,6 +374,10 @@ export default function PublicBookingPage() {
   }
 
   const { professional, services, business } = data;
+  // Moneda del negocio — fuente de verdad para todos los precios de la página
+  const bizCurrency = data.settings.currency;
+  // Mejor promoción activa del negocio — aplica a todos los servicios (las promos no están ligadas a un servicio)
+  const activePromo = bestActivePromotion(promotions);
   // Identidad visual del negocio: nombre y logo del Business con fallback al dueño
   const displayName = business?.name ?? professional.name;
   const displayLogo = business?.logoUrl ?? professional.avatarUrl;
@@ -520,8 +528,24 @@ export default function PublicBookingPage() {
                               <span className="font-mono-num text-[12px]">{s.durationMin}</span>
                               <span className="font-ui text-[12px]">min</span>
                             </span>
-                            <span className="font-mono-num text-[14px] text-primary">{formatCurrency(s.price, s.currency)}</span>
+                            {activePromo ? (
+                              <span className="flex items-baseline gap-1.5">
+                                <span className="font-mono-num text-[12px] text-on-surface-subtle line-through">
+                                  {formatPrice(s.price, bizCurrency)}
+                                </span>
+                                <span className="font-mono-num text-[14px] text-primary">
+                                  {formatPrice(applyPromotionDiscount(s.price, activePromo.discount), bizCurrency)}
+                                </span>
+                              </span>
+                            ) : (
+                              <span className="font-mono-num text-[14px] text-primary">{formatPrice(s.price, bizCurrency)}</span>
+                            )}
                           </div>
+                          {activePromo && (
+                            <p className="font-ui text-[11px] text-primary mt-1.5">
+                              {activePromo.title} · -{activePromo.discount}%
+                            </p>
+                          )}
                         </div>
                         <div className={cn("w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center mt-0.5 transition-colors", isSelected ? "bg-primary border-primary" : "border-border")}>
                           {isSelected && <CheckIcon className="w-3 h-3 text-white" />}
@@ -654,8 +678,24 @@ export default function PublicBookingPage() {
                 {selectedDate.toLocaleDateString("es-VE", { weekday: "long", day: "numeric", month: "long", timeZone: data.settings.timezone || "America/Caracas" })}{" "}
                 · {selectedSlot ? formatTimeES(selectedSlot.datetime, data.settings.timezone) : ""}
                 {" · "}
-                <span className="font-mono-num">{formatCurrency(selectedService?.price ?? 0, selectedService?.currency)}</span>
+                {activePromo ? (
+                  <>
+                    <span className="font-mono-num line-through text-on-surface-subtle">
+                      {formatPrice(selectedService?.price ?? 0, bizCurrency)}
+                    </span>{" "}
+                    <span className="font-mono-num text-primary">
+                      {formatPrice(applyPromotionDiscount(selectedService?.price ?? 0, activePromo.discount), bizCurrency)}
+                    </span>
+                  </>
+                ) : (
+                  <span className="font-mono-num">{formatPrice(selectedService?.price ?? 0, bizCurrency)}</span>
+                )}
               </p>
+              {activePromo && (
+                <p className="font-ui text-[12px] text-primary">
+                  {activePromo.title} · -{activePromo.discount}%
+                </p>
+              )}
             </div>
 
             {/* Error */}
@@ -908,7 +948,7 @@ export default function PublicBookingPage() {
               )}
               {selectedService && step !== "service" && (
                 <p className="font-display font-normal text-on-surface mt-1" style={{ fontSize: "22px", letterSpacing: "-0.02em" }}>
-                  {formatCurrency(selectedService.price, selectedService.currency)}
+                  {formatPrice(selectedService.price, bizCurrency)}
                 </p>
               )}
             </div>

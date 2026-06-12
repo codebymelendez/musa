@@ -4,7 +4,6 @@ import { getSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase-server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { awardLoyaltyPoints } from "@/lib/loyalty";
-import { normalizeCurrency } from "@/lib/currency";
 
 const patchSchema = z.object({
   status: z
@@ -14,7 +13,8 @@ const patchSchema = z.object({
   payment: z
     .object({
       amount: z.number(),
-      currency: z.enum(["USD", "BS", "Bs"]).optional().default("USD"),
+      // Moneda del negocio (ISO 4217) o "BS"/"Bs" legacy — ya no se limita a USD/BS
+      currency: z.string().min(2).max(5).optional().default("USD"),
       method: z.enum([
         "efectivo_bs",
         "efectivo_usd",
@@ -108,8 +108,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     // Usamos adminClient para Payment porque la tabla no tiene RLS de escritura para staff
     if (payment) {
       const { amount, method, isPaid = true, notes: payNotes } = payment;
-      // El enum zod acepta "Bs" por retrocompatibilidad, pero en BD siempre se persiste "BS"
-      const currency = normalizeCurrency(payment.currency);
+      // "Bs" legacy se persiste como "BS"; cualquier otra moneda se guarda en mayúsculas
+      // tal cual (EUR, COP…). normalizeCurrency NO sirve aquí: colapsaría EUR → USD.
+      const upper = payment.currency.toUpperCase();
+      const currency = upper === "BS" ? "BS" : upper;
       const adminForPayment = createAdminClient();
 
       // Verificar si ya existe un pago para esta cita

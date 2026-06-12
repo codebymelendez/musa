@@ -1,11 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Appointment, PaymentMethod } from "@/types";
-import { XMarkIcon, BanknotesIcon } from "@heroicons/react/24/outline";
+import { useState, useEffect, useRef } from "react";
+import { Appointment, Business, PaymentMethod } from "@/types";
+import { applyPromotionDiscount, promotionPaymentNote } from "@/lib/promotions";
+import { isDualCurrency, formatPrice, currencySymbol } from "@/lib/currency";
+import { XMarkIcon, BanknotesIcon, TagIcon } from "@heroicons/react/24/outline";
 
 interface Props {
   appointment: Appointment;
+  /** Negocio (currency + country) — decide si aplica el flujo dual USD/Bs (BCV). */
+  business?: Pick<Business, "currency" | "country"> | null;
   paymentMethods?: PaymentMethod[];
   onClose: () => void;
   onSaved: (payment: {
@@ -27,8 +31,13 @@ const ALL_METHODS: { value: PaymentMethod; label: string }[] = [
 
 const BS_METHODS: PaymentMethod[] = ["efectivo_bs", "pago_movil"];
 
-export default function PaymentModal({ appointment, paymentMethods, onClose, onSaved }: Props) {
+export default function PaymentModal({ appointment, business, paymentMethods, onClose, onSaved }: Props) {
   const servicePrice = appointment.service?.price ?? 0;
+
+  // Negocio venezolano cobrando en USD → flujo dual USD + Bs/BCV (comportamiento histórico).
+  // Cualquier otro caso → un solo monto en la moneda del negocio, sin conversión.
+  const dual = isDualCurrency(business);
+  const bizCurrency = (business?.currency ?? "USD").toUpperCase();
 
   const availableMethods = paymentMethods?.length
     ? ALL_METHODS.filter((m) => paymentMethods.includes(m.value))
@@ -46,7 +55,35 @@ export default function PaymentModal({ appointment, paymentMethods, onClose, onS
   const [bcvLoading, setBcvLoading] = useState(false);
   const [bcvError,   setBcvError]   = useState<string | null>(null);
 
-  const isBs = BS_METHODS.includes(method);
+  // Promoción activa del negocio en el momento de la cita → precio sugerido con descuento
+  const [appliedPromo, setAppliedPromo] = useState<{ id: string; title: string; discount: number } | null>(null);
+  const usdEditedRef = useRef(false);
+
+  const isBs = dual && BS_METHODS.includes(method);
+
+  useEffect(() => {
+    if (servicePrice <= 0) return;
+    const at = appointment.startTime ? `?at=${encodeURIComponent(appointment.startTime)}` : "";
+    fetch(`/api/promotions/active${at}`, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        const promo = data?.promotion;
+        if (!promo) return;
+        setAppliedPromo(promo);
+        // Solo prefijar si el staff no ha tocado el monto todavía
+        if (!usdEditedRef.current) {
+          const discounted = applyPromotionDiscount(servicePrice, promo.discount);
+          setUsdAmount(discounted.toFixed(2));
+          setBsAmount((prev) => {
+            if (!prev) return prev;
+            const rate = parseFloat(prev) / servicePrice;
+            return isFinite(rate) && rate > 0 ? (discounted * rate).toFixed(2) : prev;
+          });
+        }
+      })
+      .catch(() => { /* sin promo — se mantiene el precio del servicio */ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appointment.id]);
 
   // Fetch BCV once on first Bs-method selection
   useEffect(() => {
@@ -76,6 +113,7 @@ export default function PaymentModal({ appointment, paymentMethods, onClose, onS
   // When USD amount changes while a Bs method is active and rate is available,
   // keep Bs amount in sync only if the user hasn't manually edited it.
   const handleUsdChange = (val: string) => {
+    usdEditedRef.current = true;
     setUsdAmount(val);
     if (isBs && bcvRate !== null) {
       const usd = parseFloat(val);
@@ -89,12 +127,20 @@ export default function PaymentModal({ appointment, paymentMethods, onClose, onS
     setMethod(m);
     setError(null);
     // If switching to Bs and rate is already available, update display amount
-    if (BS_METHODS.includes(m) && bcvRate !== null) {
+    if (dual && BS_METHODS.includes(m) && bcvRate !== null) {
       const usd = parseFloat(usdAmount);
       if (!isNaN(usd) && usd >= 0) {
         setBsAmount((usd * bcvRate).toFixed(2));
       }
     }
+  };
+
+  // Notas finales: registra la promo aplicada + nota manual del staff
+  const buildNotes = (): string | undefined => {
+    const parts: string[] = [];
+    if (appliedPromo) parts.push(promotionPaymentNote(appliedPromo));
+    if (notes.trim()) parts.push(notes.trim());
+    return parts.length > 0 ? parts.join(" · ") : undefined;
   };
 
   const handleSave = async () => {
@@ -116,7 +162,7 @@ export default function PaymentModal({ appointment, paymentMethods, onClose, onS
       }
       setSaving(true);
       try {
-        await onSaved({ amount: amt, currency: "BS", method, isPaid: true, notes: notes || undefined });
+        await onSaved({ amount: amt, currency: "BS", method, isPaid: true, notes: buildNotes() });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Error al guardar");
       } finally {
@@ -130,7 +176,7 @@ export default function PaymentModal({ appointment, paymentMethods, onClose, onS
       }
       setSaving(true);
       try {
-        await onSaved({ amount: amt, currency: "USD", method, isPaid: true, notes: notes || undefined });
+        await onSaved({ amount: amt, currency: dual ? "USD" : bizCurrency, method, isPaid: true, notes: buildNotes() });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Error al guardar");
       } finally {
@@ -158,8 +204,29 @@ export default function PaymentModal({ appointment, paymentMethods, onClose, onS
         <div className="p-4 bg-surface-container-low rounded-2xl">
           <p className="font-medium text-on-surface">{appointment.client?.name}</p>
           <p className="text-sm text-on-surface-variant">
-            {appointment.service?.name} · ${servicePrice.toFixed(2)} USD
+            {appointment.service?.name} ·{" "}
+            {appliedPromo ? (
+              <>
+                <span className="line-through">
+                  {dual ? `$${servicePrice.toFixed(2)}` : formatPrice(servicePrice, bizCurrency)}
+                </span>{" "}
+                <span className="text-primary font-medium">
+                  {dual
+                    ? `$${applyPromotionDiscount(servicePrice, appliedPromo.discount).toFixed(2)}`
+                    : formatPrice(applyPromotionDiscount(servicePrice, appliedPromo.discount), bizCurrency)}
+                </span>
+                {dual && " USD"}
+              </>
+            ) : (
+              <>{dual ? `$${servicePrice.toFixed(2)} USD` : formatPrice(servicePrice, bizCurrency)}</>
+            )}
           </p>
+          {appliedPromo && (
+            <p className="text-xs text-primary mt-1 flex items-center gap-1">
+              <TagIcon className="w-3.5 h-3.5 flex-shrink-0" />
+              {appliedPromo.title} · -{appliedPromo.discount}%
+            </p>
+          )}
         </div>
 
         {/* Error general */}
@@ -206,7 +273,9 @@ export default function PaymentModal({ appointment, paymentMethods, onClose, onS
             </div>
           ) : (
             <div className="flex items-center gap-2 bg-surface-container-high rounded-xl px-4 h-14">
-              <span className="text-on-surface-variant font-medium">$</span>
+              <span className="text-on-surface-variant font-medium">
+                {dual ? "$" : currencySymbol(bizCurrency)}
+              </span>
               <input
                 type="number"
                 value={usdAmount}

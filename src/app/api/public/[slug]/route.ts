@@ -20,7 +20,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     // su dueña (User) con servicios + settings
     const { data: bizRows, error: bizError } = await admin
       .from('Business')
-      .select('id, name, slug, timezone, logoUrl, coverUrl, city, address')
+      .select('id, name, slug, timezone, logoUrl, coverUrl, city, address, currency, country')
       .ilike('slug', escapeIlike(slug))
       .limit(1);
     const biz = bizRows?.[0];
@@ -75,7 +75,8 @@ export async function GET(req: NextRequest, { params }: Params) {
       startHour: computedHours.startHour,
       endHour: computedHours.endHour,
       slotDuration: rawSettings?.slotDuration ?? 30,
-      currency: rawSettings?.currency ?? "USD",
+      // Business.currency es la fuente de verdad; ProfessionalSettings.currency es legacy
+      currency: biz.currency ?? rawSettings?.currency ?? "USD",
       bookingEnabled: rawSettings?.bookingEnabled ?? true,
       timezone: businessTz,
     };
@@ -181,6 +182,7 @@ export async function GET(req: NextRequest, { params }: Params) {
         coverUrl: biz.coverUrl ?? null,
         city: biz.city ?? null,
         address: biz.address ?? null,
+        currency: biz.currency ?? "USD",
         photos: bizPhotos ?? [],
       },
       services: user.services,

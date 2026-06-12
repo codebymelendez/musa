@@ -22,6 +22,7 @@ interface BusinessCard {
   category: string | null;
   city: string | null;
   address: string | null;
+  logoUrl: string | null;
   staffCount: number;
   owner: {
     name: string;
@@ -289,19 +290,21 @@ function ExploreContent() {
             {businesses.map((biz) => (
               <Link key={biz.id} href={`/p/${biz.slug}`} className="block group">
                 <div className="bg-surface-raised border border-border-subtle rounded-xl p-4 shadow-xs hover:shadow-md hover:border-primary-border transition-all duration-[160ms] group-active:scale-[0.99] flex items-start gap-4">
-                  {/* Avatar */}
+                  {/* Avatar: logo del negocio > avatar de la dueña > iniciales */}
                   <div className="w-14 h-14 rounded-xl bg-rose-50 overflow-hidden relative flex-shrink-0">
-                    {biz.owner.avatarUrl ? (
+                    {biz.logoUrl || biz.owner.avatarUrl ? (
                       <Image
-                        src={biz.owner.avatarUrl}
-                        alt={biz.owner.name}
+                        src={(biz.logoUrl ?? biz.owner.avatarUrl) as string}
+                        alt={biz.name}
                         fill
                         className="object-cover"
                         sizes="56px"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <ScissorsIcon className="w-5 h-5 text-sienna-300" />
+                        <span className="font-display font-normal italic text-[22px] leading-none text-sienna-300">
+                          {(biz.name || biz.owner.name || "?").charAt(0).toUpperCase()}
+                        </span>
                       </div>
                     )}
                   </div>

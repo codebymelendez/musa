@@ -36,7 +36,7 @@ interface FeaturedUser {
   avatarUrl: string | null;
   bio: string | null;
   serviceType: string | null;
-  business: { name: string; city: string | null; slug?: string } | null;
+  business: { name: string; city: string | null; slug?: string; logoUrl?: string | null } | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -120,7 +120,7 @@ async function getFeaturedProfessionals(): Promise<FeaturedUser[]> {
     if (topIds.length < 3) {
       const { data: recent } = await admin
         .from("User")
-        .select("id, name, slug, avatarUrl, bio, serviceType, business:Business(name, city, slug)")
+        .select("id, name, slug, avatarUrl, bio, serviceType, business:Business(name, city, slug, logoUrl)")
         .eq("appRole", "owner")
         .order("createdAt", { ascending: false })
         .limit(8);
@@ -132,7 +132,7 @@ async function getFeaturedProfessionals(): Promise<FeaturedUser[]> {
 
     const { data: users } = await admin
       .from("User")
-      .select("id, name, slug, avatarUrl, bio, serviceType, business:Business(name, city, slug)")
+      .select("id, name, slug, avatarUrl, bio, serviceType, business:Business(name, city, slug, logoUrl)")
       .in("id", topIds);
 
     return (users ?? [])
@@ -156,7 +156,7 @@ async function getFeaturedBusinesses(): Promise<FeaturedUser[]> {
       .from("User")
       .select(`
         id, name, slug, avatarUrl, bio, serviceType,
-        business:Business(name, city, slug),
+        business:Business(name, city, slug, logoUrl),
         services:Service(isActive, price)
       `)
       .eq("appRole", "owner")
@@ -333,14 +333,15 @@ function FeaturedCard({ user }: { user: FeaturedUser }) {
     : null;
   const city = (user.business as { city?: string | null } | null)?.city ?? null;
   const href = `/p/${user.business?.slug ?? user.slug}`;
+  const imageUrl = user.business?.logoUrl ?? user.avatarUrl;
 
   return (
     <Link href={href} className="group flex-shrink-0 w-40 md:w-44 block">
-      {/* Foto */}
+      {/* Foto: logo del negocio > avatar > iniciales */}
       <div className="relative h-28 rounded-t-xl overflow-hidden bg-[#EDE5DF]">
-        {user.avatarUrl ? (
+        {imageUrl ? (
           <Image
-            src={user.avatarUrl}
+            src={imageUrl}
             alt={user.name}
             fill
             className="object-cover group-hover:scale-[1.04] transition-transform duration-300"

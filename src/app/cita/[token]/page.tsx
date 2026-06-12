@@ -4,8 +4,21 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import QRDisplay from "@/components/loyalty/QRDisplay";
+import { formatPrice } from "@/lib/currency";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+interface LoyaltyInfo {
+  program: {
+    name: string;
+    accumulationType: string;
+    pointsPerVisit: number;
+    rewardThreshold: number;
+    rewardDescription: string;
+  };
+  account: { totalPoints: number; qrToken: string } | null;
+}
 
 interface Appointment {
   id: string;
@@ -15,12 +28,13 @@ interface Appointment {
   oldStartTime?: string;
   service: { name: string; durationMin: number; price: number; currency: string };
   client: { name: string; email?: string };
+  loyalty?: LoyaltyInfo | null;
   user: {
     name: string;
     slug: string;
     whatsapp?: string;
     avatarUrl?: string;
-    business?: { name: string | null; city: string | null } | null;
+    business?: { name: string | null; city: string | null; currency?: string | null } | null;
   };
 }
 
@@ -402,13 +416,24 @@ export default function CitaPortalPage() {
               <DetailRow
                 icon="💵"
                 label="Precio"
-                value={`${appointment.service.currency} ${appointment.service.price.toFixed(0)}`}
+                value={formatPrice(
+                  appointment.service.price,
+                  appointment.user.business?.currency ?? appointment.service.currency
+                )}
               />
               {location && (
                 <DetailRow icon="📍" label="Ubicación" value={location} />
               )}
             </div>
           </div>
+
+          {/* Fidelización */}
+          {appointment.loyalty && (
+            <LoyaltySection
+              loyalty={appointment.loyalty}
+              businessName={appointment.user.business?.name ?? appointment.user.name}
+            />
+          )}
 
           {/* Action buttons */}
           {canModify && (
@@ -619,6 +644,78 @@ export default function CitaPortalPage() {
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
+
+function LoyaltySection({ loyalty, businessName }: { loyalty: LoyaltyInfo; businessName: string }) {
+  const { program, account } = loyalty;
+  const threshold = program.rewardThreshold;
+  const unit = program.accumulationType === "visits" ? "visitas" : "puntos";
+
+  // Programa activo pero la clienta aún no tiene cuenta
+  if (!account) {
+    return (
+      <div className="bg-surface-raised border border-border-subtle rounded-2xl p-5 space-y-2">
+        <div className="flex items-center gap-2">
+          <span className="text-[16px]">⭐</span>
+          <p className="font-ui font-medium text-[14px] text-on-surface">{program.name}</p>
+        </div>
+        <p className="font-ui text-[13px] text-on-surface-muted leading-relaxed">
+          ¡Suma puntos con cada visita! Con {threshold} {unit} en {businessName} obtienes:{" "}
+          <strong className="text-on-surface">{program.rewardDescription}</strong>.
+        </p>
+      </div>
+    );
+  }
+
+  const progress = Math.min((account.totalPoints / threshold) * 100, 100);
+  const canRedeem = account.totalPoints >= threshold;
+
+  return (
+    <div className="bg-surface-raised border border-border-subtle rounded-2xl p-5 space-y-4">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="font-ui font-medium text-[14px] text-on-surface">{program.name}</p>
+          <p className="font-ui text-[12px] text-on-surface-muted">{businessName}</p>
+        </div>
+        {canRedeem && (
+          <span className="font-ui text-[10px] font-medium bg-green-100 text-green-700 px-2.5 py-1 rounded-full flex-shrink-0">
+            ¡Recompensa lista!
+          </span>
+        )}
+      </div>
+
+      {/* Progreso */}
+      <div className="space-y-1.5">
+        <div className="flex justify-between items-end">
+          <span className="font-display font-normal text-[30px] leading-none text-on-surface">
+            {account.totalPoints}
+          </span>
+          <span className="font-ui text-[12px] text-on-surface-muted mb-0.5">/ {threshold} {unit}</span>
+        </div>
+        <div className="h-2 bg-surface-sunken rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${canRedeem ? "bg-green-500" : "bg-primary"}`}
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <p className="font-ui text-[12px] text-on-surface-muted">
+          {canRedeem
+            ? `Puedes canjear: ${program.rewardDescription}`
+            : `Te faltan ${threshold - account.totalPoints} ${unit} para: ${program.rewardDescription}`}
+        </p>
+      </div>
+
+      {/* QR */}
+      <div className="pt-1 space-y-3">
+        <div className="flex justify-center">
+          <QRDisplay token={account.qrToken} size={170} />
+        </div>
+        <p className="font-ui text-[12px] text-on-surface-muted text-center leading-relaxed">
+          Muestra este código en <strong>{businessName}</strong> para sumar o canjear.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 function ProfessionalAvatar({
   name,

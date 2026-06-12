@@ -225,7 +225,7 @@ export default function AppointmentDetailPage() {
                     className="text-[14px] text-on-surface font-medium"
                     style={{ fontFamily: "var(--font-mono)" }}
                   >
-                    {formatCurrency(appointment.service.price)}
+                    {formatCurrency(appointment.service.price, user?.business?.currency)}
                   </p>
                 </>
               )}

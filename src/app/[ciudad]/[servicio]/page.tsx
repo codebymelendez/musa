@@ -75,7 +75,7 @@ interface Professional {
   avatarUrl: string | null;
   bio: string | null;
   serviceType: string | null;
-  business: { name: string; city: string | null; slug: string } | null;
+  business: { name: string; city: string | null; slug: string; logoUrl: string | null } | null;
 }
 
 // ── Static params ─────────────────────────────────────────────────────────────
@@ -164,7 +164,7 @@ async function getProfessionals(
   const admin = createAdminClient();
   const { data } = await admin
     .from("User")
-    .select("id, name, slug, avatarUrl, bio, serviceType, business:Business(name, city, slug)")
+    .select("id, name, slug, avatarUrl, bio, serviceType, business:Business(name, city, slug, logoUrl)")
     .eq("appRole", "owner")
     .eq("serviceType", serviceType)
     .not("slug", "is", null)
@@ -191,13 +191,16 @@ function ProfessionalCard({ professional }: { professional: Professional }) {
     ? (SERVICE_LABEL[professional.serviceType] ?? professional.serviceType)
     : null;
 
+  const imageUrl = professional.business?.logoUrl ?? professional.avatarUrl;
+
   return (
     <Link href={`/p/${professional.business?.slug ?? professional.slug}`} className="group block">
       <div className="bg-surface-raised border border-border-subtle rounded-xl overflow-hidden hover:shadow-md hover:-translate-y-px transition-all duration-200">
+        {/* Foto: logo del negocio > avatar > iniciales */}
         <div className="relative h-28 bg-surface-sunken overflow-hidden">
-          {professional.avatarUrl ? (
+          {imageUrl ? (
             <Image
-              src={professional.avatarUrl}
+              src={imageUrl}
               alt={professional.name}
               fill
               className="object-cover group-hover:scale-[1.04] transition-transform duration-300"

@@ -48,7 +48,7 @@ export default function ServiceModal({ service, onClose }: Props) {
         category,
         durationMin: durationNum,
         price:       priceNum,
-        currency:    "USD",
+        // currency se omite: el backend la hereda de Business.currency
       };
       if (service) {
         await updateService(service.id, payload);

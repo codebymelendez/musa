@@ -10,7 +10,8 @@ const createSchema = z.object({
   category: z.enum(["nails", "hair", "brows", "makeup", "other"]).optional().default("other"),
   durationMin: z.number().int().positive("La duración debe ser mayor a 0"),
   price: z.number().nonnegative("El precio no puede ser negativo"),
-  currency: z.string().default("USD"),
+  // Sin default: cuando no se envía, hereda Business.currency (fuente de verdad)
+  currency: z.string().optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -55,10 +56,10 @@ export async function POST(req: NextRequest) {
 
     const admin = createAdminClient();
     
-    // Obtener el businessId del usuario
+    // Obtener el businessId del usuario (+ moneda del negocio para herencia)
     const { data: userProfile } = await admin
       .from('User')
-      .select('businessId')
+      .select('businessId, business:Business(currency)')
       .eq('id', session.userId)
       .single();
 
@@ -66,13 +67,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No tienes un negocio configurado" }, { status: 400 });
     }
 
+    const biz = Array.isArray(userProfile.business) ? userProfile.business[0] : userProfile.business;
+
     const { data: service, error } = await admin
       .from('Service')
-      .insert({ 
-        ...parsed.data, 
+      .insert({
+        ...parsed.data,
         id: crypto.randomUUID(),
         userId: session.userId,
-        businessId: userProfile.businessId 
+        businessId: userProfile.businessId,
+        // Service.currency hereda Business.currency salvo override explícito
+        currency: parsed.data.currency ?? biz?.currency ?? "USD",
       })
       .select()
       .single();

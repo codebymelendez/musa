@@ -313,7 +313,7 @@ export default function AppointmentsPage() {
                                       ·
                                     </span>
                                     <span className="font-mono-num text-[12px] text-on-surface flex-shrink-0 font-medium">
-                                      {formatCurrency(apt.service.price)}
+                                      {formatCurrency(apt.service.price, user?.business?.currency)}
                                     </span>
                                   </>
                                 )}

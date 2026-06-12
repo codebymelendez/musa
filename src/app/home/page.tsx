@@ -273,7 +273,7 @@ export default function Home() {
                     className="font-mono-num text-[22px] text-on-surface leading-none"
                     style={{ letterSpacing: "-0.02em" }}
                   >
-                    {formatCurrency(expectedRevenue)}
+                    {formatCurrency(expectedRevenue, user?.business?.currency)}
                   </p>
                   <p className="font-ui text-[12px] text-on-surface-muted mt-1">
                     ingreso esperado
@@ -361,7 +361,7 @@ export default function Home() {
                                 <>
                                   <span className="text-on-surface-subtle text-[10px]">·</span>
                                   <span className="font-mono-num text-[12px] text-on-surface flex-shrink-0 font-medium">
-                                    {formatCurrency(apt.service.price)}
+                                    {formatCurrency(apt.service.price, user?.business?.currency)}
                                   </span>
                                 </>
                               )}
@@ -400,7 +400,7 @@ export default function Home() {
                                 {apt.payment?.isPaid ? (
                                   <p className="font-ui text-[11px] text-success flex items-center gap-1">
                                     <BanknotesIcon className="w-3.5 h-3.5" />
-                                    {formatCurrency(apt.payment.amount)} cobrado
+                                    {formatCurrency(apt.payment.amount, apt.payment.currency)} cobrado
                                   </p>
                                 ) : (
                                   <button
@@ -498,7 +498,7 @@ export default function Home() {
               </p>
               <p className="font-ui text-[12px] text-on-surface-muted mt-2">
                 {stats?.monthlyRevenue
-                  ? `citas · ${formatCurrency(stats.monthlyRevenue)}`
+                  ? `citas · ${formatCurrency(stats.monthlyRevenue, stats.currency)}`
                   : "citas completadas"}
               </p>
             </>
@@ -611,6 +611,7 @@ export default function Home() {
       {paymentTarget && (
         <PaymentModal
           appointment={paymentTarget}
+          business={user?.business}
           paymentMethods={user?.settings?.paymentMethods}
           onClose={() => setPaymentTarget(null)}
           onSaved={async (paymentData) => {

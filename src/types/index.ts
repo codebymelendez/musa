@@ -53,6 +53,9 @@ export interface Business {
   category: string | null;
   phone: string | null;
   city: string | null;
+  country?: string | null;
+  /** Moneda del negocio — fuente de verdad para precios (DEFAULT 'USD' en BD). */
+  currency?: string;
   logoUrl: string | null;
   planId: string;
   timezone?: string | null;

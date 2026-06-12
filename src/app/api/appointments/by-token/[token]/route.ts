@@ -26,7 +26,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       service:Service(*),
       user:User(id, name, slug, whatsapp, email, avatarUrl, businessId,
         settings:ProfessionalSettings(*),
-        business:Business(name, city)
+        business:Business(name, city, currency)
       )
     `)
     .or(`rescheduleToken.eq.${token},id.eq.${token}`)
@@ -58,11 +58,48 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const service = Array.isArray(appointment.service) ? appointment.service[0] : appointment.service;
   const payment = Array.isArray(appointment.payment) ? appointment.payment[0] : appointment.payment;
 
+  // Fidelización: programa activo del negocio + cuenta de ESTA clienta.
+  // Solo se serializan los campos mínimos — nunca datos de otras clientas.
+  let loyalty: {
+    program: {
+      name: string;
+      accumulationType: string;
+      pointsPerVisit: number;
+      rewardThreshold: number;
+      rewardDescription: string;
+    };
+    account: { totalPoints: number; qrToken: string } | null;
+  } | null = null;
+
+  if (user?.businessId && appointment.clientId) {
+    const { data: program } = await supabase
+      .from("LoyaltyProgram")
+      .select("name, accumulationType, pointsPerVisit, rewardThreshold, rewardDescription")
+      .eq("businessId", user.businessId)
+      .eq("isActive", true)
+      .maybeSingle();
+
+    if (program) {
+      const { data: account } = await supabase
+        .from("ClientLoyaltyAccount")
+        .select("totalPoints, qrToken")
+        .eq("businessId", user.businessId)
+        .eq("clientId", appointment.clientId)
+        .maybeSingle();
+
+      loyalty = {
+        program,
+        account: account ? { totalPoints: account.totalPoints, qrToken: account.qrToken } : null,
+      };
+    }
+  }
+
   return NextResponse.json({
     ...appointment,
     client,
     service,
     payment,
+    loyalty,
     user: {
       ...user,
       business,

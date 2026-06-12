@@ -18,6 +18,14 @@ export async function GET(req: NextRequest) {
   try {
     const adminSupabase = createAdminClient();
 
+    // ── Moneda del negocio (para formatear los totales en el front) ──────────
+    const { data: userRow } = await adminSupabase
+      .from('User')
+      .select('business:Business(currency)')
+      .eq('id', session.userId)
+      .single();
+    const bizForCurrency = Array.isArray(userRow?.business) ? userRow.business[0] : userRow?.business;
+
     // ── Citas completadas del mes + Ingresos ──────────────────────────────────
     const { data: completedAppointments, error: appointmentsError } = await adminSupabase
       .from('Appointment')
@@ -123,7 +131,8 @@ export async function GET(req: NextRequest) {
       yearlyRevenue,
       yearlyRevenueBs,
       rescheduledThisMonth: rescheduledThisMonth || 0,
-      currency: "USD",
+      // Moneda principal del negocio; el bucket *Bs queda aparte (dual Venezuela)
+      currency: bizForCurrency?.currency ?? "USD",
     });
   } catch (error) {
     console.error("[stats GET]", error);

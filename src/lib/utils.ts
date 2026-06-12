@@ -1,6 +1,7 @@
 // Utilidades generales de Musa
 
 import { ProfessionalSettings } from "@/types";
+import { formatPrice } from "@/lib/currency";
 
 // ─── Slugify ──────────────────────────────────────────────────────────────────
 export function slugify(text: string): string {
@@ -14,13 +15,9 @@ export function slugify(text: string): string {
 }
 
 // ─── Formatear moneda ─────────────────────────────────────────────────────────
-export function formatCurrency(
-  amount: number,
-  currency = "USD"
-): string {
-  if (currency === "USD") return `$${amount.toFixed(2)}`;
-  if (currency === "BS") return `Bs. ${amount.toFixed(2)}`;
-  return `${amount.toFixed(2)} ${currency}`;
+// Delegado a formatPrice (src/lib/currency.ts) — único punto de formateo de precios.
+export function formatCurrency(amount: number, currency = "USD"): string {
+  return formatPrice(amount, currency);
 }
 
 // ─── Timezone de Venezuela ────────────────────────────────────────────────────

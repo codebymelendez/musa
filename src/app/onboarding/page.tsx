@@ -121,7 +121,7 @@ export default function Onboarding() {
             body: JSON.stringify({
               ...svc,
               category: serviceType,
-              currency: "USD",
+              // currency se omite: el backend la hereda de Business.currency
             }),
           })
         )
