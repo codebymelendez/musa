@@ -281,6 +281,7 @@ export interface DashboardData {
   businessTz: string
   userName: string
   avatarUrl: string | null
+  businessLogoUrl?: string | null
   appointments: AppointmentItem[]
   promos: PromotionItem[]
   loyaltyProgram: LoyaltyProgram | null

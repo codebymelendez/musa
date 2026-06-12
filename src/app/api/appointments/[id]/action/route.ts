@@ -42,7 +42,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       const startStr = new Date(appointment.startTime).toLocaleTimeString("es-VE", {
         hour: "2-digit",
         minute: "2-digit",
-        timeZone: "America/Caracas",
+        timeZone: appointment.businessTimezone || "America/Caracas",
       });
       await sendClientNotification(appointment.clientId, {
         title: "Cita cancelada",

@@ -275,14 +275,16 @@ export default function SettingsTabScreen() {
 
   const planName = profile?.business?.plan?.name ?? 'Free'
   const bookingLink = slug ? getPublicProfileUrl(slug) : ''
+  // Identidad del negocio en el header: logo primero, foto personal como fallback
+  const headerLogo = profile?.business?.logoUrl ?? profile?.avatarUrl ?? null
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       {/* TopAppBar */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          {profile?.avatarUrl ? (
-            <Image source={{ uri: profile.avatarUrl }} style={styles.headerAvatar} cachePolicy="memory-disk" transition={100} />
+          {headerLogo ? (
+            <Image source={{ uri: headerLogo }} style={styles.headerAvatar} cachePolicy="memory-disk" transition={100} />
           ) : (
             <View style={styles.headerAvatarFallback}>
               <Text style={styles.headerAvatarText}>

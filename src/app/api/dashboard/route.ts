@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
     const businessTz = user.business?.timezone || DEFAULT_TZ;
     const userName = user.name?.split(' ')[0] ?? '';
     const avatarUrl = user.avatarUrl ?? null;
+    const businessLogoUrl = user.business?.logoUrl ?? null;
     const businessId = user.businessId;
 
     // Default structure if no business is assigned
@@ -32,6 +33,7 @@ export async function GET(req: NextRequest) {
         businessTz,
         userName,
         avatarUrl,
+        businessLogoUrl,
         appointments: [],
         promos: [],
         loyaltyProgram: null,
@@ -184,6 +186,7 @@ export async function GET(req: NextRequest) {
         businessTz,
         userName,
         avatarUrl,
+        businessLogoUrl,
         appointments: formattedAppts,
         promos: activePromos,
         loyaltyProgram: loyaltyProgramRes.data ?? null,

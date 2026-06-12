@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
   const { data: appointments } = await admin
     .from("Appointment")
     .select(`
-      id, startTime, rescheduleToken,
+      id, startTime, rescheduleToken, businessTimezone,
       user:User(name),
       service:Service(name)
     `)
@@ -106,17 +106,18 @@ export async function POST(req: NextRequest) {
     const start = new Date(appt.startTime);
     const user = Array.isArray(appt.user) ? appt.user[0] : appt.user;
     const service = Array.isArray(appt.service) ? appt.service[0] : appt.service;
+    const apptTz = appt.businessTimezone || TZ;
     return {
       dateStr: start.toLocaleDateString("es-VE", {
         weekday: "long",
         day: "numeric",
         month: "long",
-        timeZone: TZ,
+        timeZone: apptTz,
       }),
       startStr: start.toLocaleTimeString("es-VE", {
         hour: "2-digit",
         minute: "2-digit",
-        timeZone: TZ,
+        timeZone: apptTz,
       }),
       professionalName: (user as { name: string } | null)?.name ?? "",
       serviceName: (service as { name: string } | null)?.name ?? "",

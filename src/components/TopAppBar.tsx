@@ -30,7 +30,9 @@ export default function TopAppBar() {
   if (!isAllowed) return null;
 
   const displayName = user?.business?.name || user?.name || null;
-  const avatarSrc = user?.avatarUrl ?? null;
+  // Identidad del negocio: logo configurado en ajustes del negocio; la foto
+  // personal solo como fallback si no hay logo.
+  const avatarSrc = user?.business?.logoUrl ?? user?.avatarUrl ?? null;
 
   return (
     <header className="fixed top-0 w-full z-50 glass-nav border-b border-border-subtle flex items-center justify-between px-5 h-[60px]">

@@ -48,7 +48,7 @@ export async function PATCH(req: NextRequest) {
 
     const { data: business, error: bizErr } = await admin
       .from("Business")
-      .select("id, slug, slugChangedAt")
+      .select("id, slug, slugChangedAt, timezone")
       .eq("id", user.businessId)
       .single();
     if (bizErr || !business) {
@@ -69,7 +69,7 @@ export async function PATCH(req: NextRequest) {
           day: "numeric",
           month: "long",
           year: "numeric",
-          timeZone: "America/Caracas",
+          timeZone: business.timezone || "America/Caracas",
         });
         return NextResponse.json(
           { error: `Solo puedes cambiar tu enlace una vez cada ${COOLDOWN_DAYS} días. Podrás cambiarlo de nuevo el ${fecha}.` },

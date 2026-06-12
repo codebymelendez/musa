@@ -41,7 +41,8 @@ export default function HomeScreen() {
   const loading = isLoading && !data
   const businessTz = data?.businessTz ?? 'America/Caracas'
   const userName = data?.userName ?? ''
-  const avatarUrl = data?.avatarUrl ?? null
+  // Logo del negocio primero; foto personal solo como fallback
+  const avatarUrl = data?.businessLogoUrl ?? data?.avatarUrl ?? null
   const appointments = data?.appointments
   const promos = data?.promos ?? []
   const weeklyRevenue = data?.weeklyRevenue ?? null

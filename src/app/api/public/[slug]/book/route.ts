@@ -218,6 +218,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         endTime: end.toISOString(),
         status: "confirmed",
         rescheduleToken,
+        businessTimezone: biz.timezone || "America/Caracas",
       })
       .select('*, client:Client(*), service:Service(*)')
       .single();

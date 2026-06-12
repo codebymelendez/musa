@@ -97,13 +97,16 @@ export async function POST(req: NextRequest) {
 
     const { data: user } = await supabase
       .from('User')
-      .select('businessId')
+      .select('businessId, business:Business(timezone)')
       .eq('id', session.userId)
       .single();
 
     if (!user?.businessId) {
       return NextResponse.json({ error: "El usuario no pertenece a un negocio" }, { status: 400 });
     }
+
+    const businessObj = Array.isArray(user.business) ? user.business[0] : user.business;
+    const businessTimezone = businessObj?.timezone || "America/Caracas";
 
     // Obtener duración del servicio
     const { data: service } = await supabase
@@ -202,6 +205,7 @@ export async function POST(req: NextRequest) {
         status: "confirmed",
         notes,
         rescheduleToken: crypto.randomUUID(),
+        businessTimezone,
       })
       .select('*, client:Client(*), service:Service(*)')
       .single();

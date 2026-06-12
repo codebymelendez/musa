@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
 
     if (updateError) throw updateError;
 
-    const TZ = "America/Caracas";
+    const TZ = appointment.businessTimezone || "America/Caracas";
     const oldStartTime = new Date(appointment.startTime);
     const oldDateStr = oldStartTime.toLocaleDateString("es-VE", {
       weekday: "short",

@@ -112,7 +112,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const client = Array.isArray(appointment.client) ? appointment.client[0] : appointment.client;
   const service = Array.isArray(appointment.service) ? appointment.service[0] : appointment.service;
 
-  const TZ = "America/Caracas";
+  const TZ = appointment.businessTimezone || "America/Caracas";
   const startTime = new Date(appointment.startTime);
   const dateStr = startTime.toLocaleDateString("es-VE", {
     weekday: "long",
