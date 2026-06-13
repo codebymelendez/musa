@@ -8,6 +8,7 @@ import { checkAppointmentLimit } from "@/lib/limits";
 import { sendWhatsAppMessage, buildBookingConfirmationMsg, normalizePhone } from "@/lib/whatsapp";
 import { rateLimit } from "@/lib/rateLimit";
 import { escapeIlike } from "@/lib/slug";
+import { bestActivePromotion } from "@/lib/promotions";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -205,6 +206,20 @@ export async function POST(req: NextRequest, { params }: Params) {
       }
     }
 
+    // Promoción activa al momento de reservar → snapshot inmutable en la cita.
+    // Criterio idéntico a /p/[slug]: traer todas las promos del negocio y filtrar
+    // con isPromotionActive (null = activa). NO filtrar isActive en el SQL para que
+    // el criterio viva en un solo lugar (el helper) y no diverja.
+    let promoSnapshot: { id: string; title: string; discount: number } | null = null;
+    if (user.businessId) {
+      const { data: bizPromos } = await admin
+        .from('Promotion')
+        .select('id, title, discount, validFrom, validUntil, isActive')
+        .eq('businessId', user.businessId);
+      const best = bestActivePromotion(bizPromos ?? [], new Date());
+      if (best) promoSnapshot = { id: best.id, title: best.title, discount: best.discount };
+    }
+
     // Crear cita con token de reschedule
     const rescheduleToken = randomUUID();
     const { data: appointment, error: appoError } = await admin
@@ -219,6 +234,9 @@ export async function POST(req: NextRequest, { params }: Params) {
         status: "confirmed",
         rescheduleToken,
         businessTimezone: biz.timezone || "America/Caracas",
+        promotionId: promoSnapshot?.id ?? null,
+        promotionTitle: promoSnapshot?.title ?? null,
+        promotionDiscount: promoSnapshot?.discount ?? null,
       })
       .select('*, client:Client(*), service:Service(*)')
       .single();

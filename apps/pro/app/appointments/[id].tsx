@@ -13,6 +13,7 @@ import {
 } from '../../lib/api'
 import { PRIMARY, DARK, SURFACE, BORDER, GRAY, MONO, SERIF, formatTime, formatDate, formatBs, isBs as isBsCurrency, normalizeCurrency, normalizePaymentMethods } from '../../lib/utils'
 import { formatPrice, currencySymbol, isDualCurrency } from '../../lib/currency'
+import { applyPromotionDiscount, promotionPaymentNote } from '../../lib/promotions'
 import { Pulse, Bone } from '../../components/ui/Skeleton'
 import ErrorState from '../../components/ui/ErrorState'
 import { validate, paymentFormSchema } from '../../lib/validation'
@@ -217,7 +218,13 @@ export default function AppointmentDetailScreen() {
     if (!data || initializedForRef.current === data.id) return
     initializedForRef.current = data.id
     if (!data.payment) {
-      const priceStr = data.service?.price ? String(data.service.price) : ''
+      // Promo fijada al reservar (web pública): prefijar el monto con el precio ya
+      // descontado. La base USD guardada también es la descontada, para que la
+      // conversión a Bs (BCV) opere sobre el monto correcto. El monto sigue editable.
+      const basePrice = data.service?.price ?? 0
+      const disc = data.promotionDiscount ?? 0
+      const effective = disc > 0 ? applyPromotionDiscount(basePrice, disc) : basePrice
+      const priceStr = effective ? String(effective) : ''
       usdBaseRef.current = priceStr
       setAmount(priceStr)
       setCurrency('USD')
@@ -289,12 +296,20 @@ export default function AppointmentDetailScreen() {
   async function handleRegisterPayment(apt: AppointmentItem) {
     if (!id) return
     const rawAmount = parseFloat(amount.replace(',', '.'))
+    // Registrar la promo aplicada en las notas, mismo formato que la web
+    // ("Promo: {title} (-{N}%)"). Solo al crear el cobro: al editar, payNotes ya
+    // trae la nota previa y re-añadirla la duplicaría.
+    const disc = apt.promotionDiscount ?? 0
+    const promoNote = !editingPayment && disc > 0
+      ? promotionPaymentNote({ title: apt.promotionTitle ?? 'Promoción', discount: disc })
+      : null
+    const finalNotes = [promoNote, payNotes.trim()].filter(Boolean).join(' · ') || undefined
     const parsed = validate(paymentFormSchema, {
       amount: Number.isNaN(rawAmount) ? 0 : rawAmount,
       method: method ?? '',
       currency: effectiveCurrency,
       isPaid,
-      notes: payNotes.trim() || undefined,
+      notes: finalNotes,
     })
     if (!parsed.ok) { Alert.alert('', parsed.error); return }
     try {
@@ -406,13 +421,38 @@ export default function AppointmentDetailScreen() {
                 ) : null}
                 <View style={styles.divider} />
                 <Text style={styles.serviceLabel}>{apt.service.name}</Text>
-                <View style={styles.metaRow}>
-                  <Text style={styles.metaText}>{apt.service.durationMin} min</Text>
-                  <Text style={styles.metaDot}>·</Text>
-                  <Text style={[styles.metaText, { fontFamily: MONO }]}>
-                    {formatPrice(apt.service.price, bizCurrency)}
-                  </Text>
-                </View>
+                {(() => {
+                  // Promo fijada al reservar: precio original tachado + descontado.
+                  const disc = apt.promotionDiscount ?? 0
+                  const hasPromo = disc > 0
+                  const discounted = hasPromo
+                    ? applyPromotionDiscount(apt.service.price, disc)
+                    : apt.service.price
+                  return (
+                    <>
+                      <View style={styles.metaRow}>
+                        <Text style={styles.metaText}>{apt.service.durationMin} min</Text>
+                        <Text style={styles.metaDot}>·</Text>
+                        {hasPromo && (
+                          <Text style={[styles.priceStruck, { fontFamily: MONO }]}>
+                            {formatPrice(apt.service.price, bizCurrency)}
+                          </Text>
+                        )}
+                        <Text style={[styles.metaText, { fontFamily: MONO }, hasPromo && styles.priceDiscounted]}>
+                          {formatPrice(discounted, bizCurrency)}
+                        </Text>
+                      </View>
+                      {hasPromo && (
+                        <View style={styles.promoBadge}>
+                          <Ionicons name="pricetag-outline" size={12} color={PRIMARY} />
+                          <Text style={styles.promoBadgeText}>
+                            {apt.promotionTitle ?? 'Promoción'} · -{disc}%
+                          </Text>
+                        </View>
+                      )}
+                    </>
+                  )
+                })()}
               </View>
 
               {/* 2. Date & time */}
@@ -693,9 +733,13 @@ const styles = StyleSheet.create({
   phoneText: { fontSize: 15, color: PRIMARY },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: BORDER, marginBottom: 14 },
   serviceLabel: { fontSize: 16, fontWeight: '500', color: DARK, marginBottom: 6 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   metaText: { fontSize: 14, color: GRAY },
   metaDot: { fontSize: 14, color: BORDER },
+  priceStruck: { fontSize: 14, color: GRAY, textDecorationLine: 'line-through' },
+  priceDiscounted: { color: PRIMARY, fontWeight: '600' },
+  promoBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
+  promoBadgeText: { fontSize: 12, color: PRIMARY, fontWeight: '500' },
   section: { marginBottom: 4 },
   sectionTitle: {
     fontSize: 13, fontWeight: '500', color: GRAY,

@@ -22,8 +22,16 @@ export function normalizeISODate(dateStr: string): string {
 }
 
 function normalizeAppointment(apt: AppointmentItem): AppointmentItem {
+  // Defensa: Supabase puede devolver payment como array (one-to-many inverso) y
+  // el caché persistido previo al fix del endpoint pudo guardarlo así. Aplanar a
+  // objeto|null evita formatear montos undefined (TypeError en formatPrice).
+  const rawPayment = (apt as { payment?: unknown }).payment
+  const payment = Array.isArray(rawPayment)
+    ? (rawPayment[0] as AppointmentPayment) ?? null
+    : (apt.payment ?? null)
   return {
     ...apt,
+    payment,
     startTime: normalizeISODate(apt.startTime),
     endTime:   normalizeISODate(apt.endTime),
     createdAt: normalizeISODate(apt.createdAt),
@@ -76,6 +84,12 @@ export interface AppointmentItem {
   endTime: string
   status: AppointmentStatus
   notes: string | null
+  // Snapshot inmutable de la promoción aplicada al RESERVAR (web pública). Se
+  // respeta al cobrar aunque la promo cambie/expire. null = sin promo / cita
+  // anterior a la migración.
+  promotionId?: string | null
+  promotionTitle?: string | null
+  promotionDiscount?: number | null
   createdAt: string
   updatedAt: string
   client: AppointmentClient

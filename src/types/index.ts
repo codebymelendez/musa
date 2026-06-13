@@ -154,6 +154,11 @@ export interface Appointment {
   endTime: string;
   status: AppointmentStatus;
   notes: string | null;
+  // Snapshot inmutable de la promoción aplicada al RESERVAR: se respeta al cobrar
+  // aunque la promo cambie/expire/se borre. null = sin promo (o cita pre-migración).
+  promotionId?: string | null;
+  promotionTitle?: string | null;
+  promotionDiscount?: number | null;
   createdAt: string;
   updatedAt: string;
   client?: Client;

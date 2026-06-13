@@ -51,11 +51,21 @@ export async function GET(req: NextRequest, { params }: Params) {
 
     if (error || !client) return NextResponse.json({ error: "Clienta no encontrada" }, { status: 404 });
 
+    // Aplanar relaciones que Supabase devuelve como array (payment es one-to-many
+    // inverso → llega como []). Sin esto, el detalle móvil trata apt.payment como
+    // objeto y revienta al formatear un monto undefined. Mismo patrón que el resto
+    // de endpoints de citas.
     const sorted = {
       ...client,
-      appointments: (client.appointments || []).sort(
-        (a: any, b: any) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
-      ),
+      appointments: (client.appointments || [])
+        .map((apt: { service?: unknown; payment?: unknown; [k: string]: unknown }) => ({
+          ...apt,
+          service: Array.isArray(apt.service) ? apt.service[0] ?? null : apt.service ?? null,
+          payment: Array.isArray(apt.payment) ? apt.payment[0] ?? null : apt.payment ?? null,
+        }))
+        .sort(
+          (a: any, b: any) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+        ),
     };
 
     return NextResponse.json(sorted);

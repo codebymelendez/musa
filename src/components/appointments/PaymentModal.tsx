@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Appointment, Business, PaymentMethod } from "@/types";
 import { applyPromotionDiscount, promotionPaymentNote } from "@/lib/promotions";
 import { isDualCurrency, formatPrice, currencySymbol } from "@/lib/currency";
@@ -43,8 +43,24 @@ export default function PaymentModal({ appointment, business, paymentMethods, on
     ? ALL_METHODS.filter((m) => paymentMethods.includes(m.value))
     : ALL_METHODS;
 
+  // Promo aplicada: snapshot inmutable persistido en la cita al RESERVAR. No se
+  // consulta la promo viva — el descuento se fija al reservar y se respeta al
+  // cobrar aunque cambie/expire/se borre. Citas pre-migración tienen estos
+  // campos null → sin promo, precio completo.
+  const appliedPromo =
+    appointment.promotionDiscount && appointment.promotionDiscount > 0
+      ? {
+          id: appointment.promotionId ?? null,
+          title: appointment.promotionTitle ?? "Promoción",
+          discount: appointment.promotionDiscount,
+        }
+      : null;
+  const initialUsd = appliedPromo
+    ? applyPromotionDiscount(servicePrice, appliedPromo.discount)
+    : servicePrice;
+
   const [method, setMethod] = useState<PaymentMethod>(availableMethods[0]?.value ?? "efectivo_usd");
-  const [usdAmount, setUsdAmount] = useState(servicePrice.toFixed(2));
+  const [usdAmount, setUsdAmount] = useState(initialUsd.toFixed(2));
   const [bsAmount,  setBsAmount]  = useState("");
   const [notes,     setNotes]     = useState("");
   const [saving,    setSaving]    = useState(false);
@@ -55,35 +71,7 @@ export default function PaymentModal({ appointment, business, paymentMethods, on
   const [bcvLoading, setBcvLoading] = useState(false);
   const [bcvError,   setBcvError]   = useState<string | null>(null);
 
-  // Promoción activa del negocio en el momento de la cita → precio sugerido con descuento
-  const [appliedPromo, setAppliedPromo] = useState<{ id: string; title: string; discount: number } | null>(null);
-  const usdEditedRef = useRef(false);
-
   const isBs = dual && BS_METHODS.includes(method);
-
-  useEffect(() => {
-    if (servicePrice <= 0) return;
-    const at = appointment.startTime ? `?at=${encodeURIComponent(appointment.startTime)}` : "";
-    fetch(`/api/promotions/active${at}`, { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        const promo = data?.promotion;
-        if (!promo) return;
-        setAppliedPromo(promo);
-        // Solo prefijar si el staff no ha tocado el monto todavía
-        if (!usdEditedRef.current) {
-          const discounted = applyPromotionDiscount(servicePrice, promo.discount);
-          setUsdAmount(discounted.toFixed(2));
-          setBsAmount((prev) => {
-            if (!prev) return prev;
-            const rate = parseFloat(prev) / servicePrice;
-            return isFinite(rate) && rate > 0 ? (discounted * rate).toFixed(2) : prev;
-          });
-        }
-      })
-      .catch(() => { /* sin promo — se mantiene el precio del servicio */ });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appointment.id]);
 
   // Fetch BCV once on first Bs-method selection
   useEffect(() => {
@@ -113,7 +101,6 @@ export default function PaymentModal({ appointment, business, paymentMethods, on
   // When USD amount changes while a Bs method is active and rate is available,
   // keep Bs amount in sync only if the user hasn't manually edited it.
   const handleUsdChange = (val: string) => {
-    usdEditedRef.current = true;
     setUsdAmount(val);
     if (isBs && bcvRate !== null) {
       const usd = parseFloat(val);
